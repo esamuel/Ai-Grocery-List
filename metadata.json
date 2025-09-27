@@ -1,0 +1,7 @@
+{
+  "name": "Aii Grocery list",
+  "description": "A smart grocery shopping list that automatically categorizes your items using AI. Add items by typing or using your voice, and collaborate with your family in real-time.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AI Grocery List App Icon (SVG) -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background rounded square -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+
+  <!-- Shopping cart -->
+  <g transform="translate(200, 280)">
+    <path d="M64 80h88l40 260h304l48-180H212" stroke="white" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="264" cy="420" r="36" fill="white"/>
+    <circle cx="464" cy="420" r="36" fill="white"/>
+  </g>
+
+  <!-- AI spark / brain node network inside a circle badge -->
+  <g transform="translate(620, 210)">
+    <circle cx="150" cy="150" r="110" fill="rgba(255,255,255,0.15)" stroke="white" stroke-width="10"/>
+    <g stroke="white" stroke-width="10" stroke-linecap="round">
+      <line x1="150" y1="60" x2="150" y2="240"/>
+      <line x1="60" y1="150" x2="240" y2="150"/>
+      <line x1="95" y1="95" x2="205" y2="205"/>
+      <line x1="95" y1="205" x2="205" y2="95"/>
+    </g>
+    <g fill="white">
+      <circle cx="150" cy="60" r="14"/>
+      <circle cx="150" cy="240" r="14"/>
+      <circle cx="60" cy="150" r="14"/>
+      <circle cx="240" cy="150" r="14"/>
+      <circle cx="95" cy="95" r="12"/>
+      <circle cx="95" cy="205" r="12"/>
+      <circle cx="205" cy="95" r="12"/>
+      <circle cx="205" cy="205" r="12"/>
+    </g>
+  </g>
+
+  <!-- Subtle highlight -->
+  <ellipse cx="512" cy="220" rx="360" ry="180" fill="url(#shine)"/>
+
+  <defs>
+    <linearGradient id="bg" x1="64" y1="64" x2="960" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2EC4B6"/>
+      <stop offset="1" stop-color="#1B9AAA"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="152" y1="60" x2="872" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
