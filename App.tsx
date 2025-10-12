@@ -22,6 +22,7 @@ import { Toast } from './components/Toast';
 import { InstallPrompt } from './components/InstallPrompt';
 import { PaywallModal } from './components/PaywallModal';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner } from './services/firebaseService';
 import type { User } from 'firebase/auth';
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
@@ -218,6 +219,10 @@ const translations = {
     familyFeature4: "Shared favorites",
     familyFeature5: "Family activity feed",
     familyFeature6: "Budget management",
+    installApp: "Install App",
+    installAppDesc: "Add to home screen",
+    appInstalled: "App installed successfully!",
+    installNotAvailable: "Install not available on this device",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -407,6 +412,10 @@ const translations = {
     familyFeature4: "מועדפים משותפים",
     familyFeature5: "פיד פעילות משפחתי",
     familyFeature6: "ניהול תקציב",
+    installApp: "התקן אפליקציה",
+    installAppDesc: "הוסף למסך הבית",
+    appInstalled: "האפליקציה הותקנה בהצלחה!",
+    installNotAvailable: "ההתקנה אינה זמינה במכשיר זה",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -595,6 +604,10 @@ const translations = {
     familyFeature4: "Favoritos compartidos",
     familyFeature5: "Feed de actividad familiar",
     familyFeature6: "Gestión de presupuesto",
+    installApp: "Instalar App",
+    installAppDesc: "Agregar a pantalla de inicio",
+    appInstalled: "¡Aplicación instalada exitosamente!",
+    installNotAvailable: "Instalación no disponible en este dispositivo",
   }
 };
 
@@ -716,6 +729,9 @@ function App() {
   
   // Firestore sync hook
   const { items, historyItems, setItems, setHistoryItems, isSyncing } = useFirestoreSync(listId);
+  
+  // PWA Install hook
+  const { isInstallable, installApp } = usePWAInstall();
   
   // Local loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -1034,6 +1050,20 @@ function App() {
     showToast(`Selected ${planId} plan (${isYearly ? 'Yearly' : 'Monthly'}). Payment integration coming soon!`, 'info');
     setShowPaywall(false);
   }, [showToast]);
+
+  // PWA Install handler
+  const handleInstallApp = useCallback(async () => {
+    if (!isInstallable) {
+      showToast(currentText.installNotAvailable, 'warning');
+      return;
+    }
+
+    const success = await installApp();
+    if (success) {
+      showToast(currentText.appInstalled, 'success');
+      setShowSettings(false);
+    }
+  }, [isInstallable, installApp, currentText, showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
   const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number }[]) => {
@@ -1482,6 +1512,14 @@ function App() {
                 >
                   💎 Upgrade to Pro
                 </button>
+                {isInstallable && (
+                  <button
+                    onClick={handleInstallApp}
+                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-lg hover:from-green-600 hover:to-blue-600 transition-all shadow-md"
+                  >
+                    📱 {currentText.installApp}
+                  </button>
+                )}
                 <button
                   onClick={() => { setShowSettings(false); setCurrentView('checklist'); }}
                   className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"

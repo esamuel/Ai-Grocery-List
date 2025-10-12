@@ -7,22 +7,36 @@ export type ChecklistItem = {
 };
 
 const DEFAULT_ITEMS: ChecklistItem[] = [
-  { id: 'pricing-packaging', label: 'Design pricing & packaging (Free, Pro, Family) with annual discounts and free trial', done: false },
-  { id: 'payments-stack', label: 'Select payments stack (Web: Stripe; iOS/Android: RevenueCat) and tech approach', done: false },
-  { id: 'landing-site', label: 'Build landing site with clear CTA, FAQs, and SEO pages', done: false },
-  { id: 'analytics', label: 'Integrate analytics and event tracking (activation, retention, conversion)', done: false },
-  { id: 'paywall', label: 'Implement in-app paywall, free trial flow, upgrade/downgrade screens', done: false },
-  { id: 'onboarding-checklist', label: 'Add onboarding checklist (invite family, add items, voice, import)', done: false },
-  { id: 'referral', label: 'Referral program (give/get 1 month Pro) and share links', done: false },
-  { id: 'store-readiness', label: 'Store readiness: icons, screenshots, videos, store copy, privacy labels', done: false },
-  { id: 'legal', label: 'Legal & compliance: Privacy, Terms, cookie/consent, GDPR/CCPA', done: false },
-  { id: 'stability-cost', label: 'Stability & cost: Firestore rules, Sentry, Gemini guardrails', done: false },
-  { id: 'content-seo', label: 'Content & SEO plan (blog posts, comparison pages, i18n SEO)', done: false },
-  { id: 'launch-roadmap', label: 'Launch roadmap (beta → soft launch → public) with success criteria', done: false },
-  { id: 'growth-channels', label: 'Growth channels (bloggers, Reddit, TikTok demos, email list)', done: false },
+  // ✅ COMPLETED
+  { id: 'core-features', label: '✅ Core grocery list with AI categorization (EN/HE/ES)', done: true },
+  { id: 'firebase-setup', label: '✅ Firebase authentication and family sharing', done: true },
+  { id: 'voice-input', label: '✅ Voice recognition with multi-language support', done: true },
+  { id: 'price-tracking', label: '✅ Price tracking with currency support (USD/ILS/EUR/GBP)', done: true },
+  { id: 'spending-insights', label: '✅ Spending insights and analytics dashboard', done: true },
+  { id: 'price-alerts', label: '✅ Price alerts (best deals, price spikes, trends)', done: true },
+  { id: 'store-comparison', label: '✅ Store comparison and best store recommendations', done: true },
+  { id: 'daily-purchases', label: '✅ Daily purchase tracking with history by date', done: true },
+  { id: 'export-reports', label: '✅ Export & reports (CSV, spending reports)', done: true },
+  { id: 'smart-suggestions', label: '✅ Smart suggestions with predictive analytics', done: true },
+  { id: 'pwa-setup', label: '✅ PWA setup with offline support and install prompts', done: true },
+  { id: 'onboarding-checklist', label: '✅ Onboarding modal (family sharing, voice, import guide)', done: true },
+  { id: 'pricing-packaging', label: '✅ Pricing & packaging designed (Free, Pro $4.99, Family $7.99)', done: true },
+  { id: 'paywall', label: '✅ In-app paywall with 3 tiers and 7-day free trial', done: true },
+  
+  // 🚧 IN PROGRESS / TODO
+  { id: 'payments-stack', label: '🚧 Integrate Stripe payment processing (selected: Stripe + RevenueCat)', done: false },
+  { id: 'analytics', label: '🚧 Add analytics tracking (PostHog or Mixpanel for events)', done: false },
+  { id: 'landing-site', label: '🚧 Build landing site with pricing, features, and SEO pages', done: false },
+  { id: 'legal', label: '🚧 Legal docs: Privacy Policy, Terms of Service, GDPR compliance', done: false },
+  { id: 'referral', label: '🚧 Referral program (give/get 1 month Pro) and share links', done: false },
+  { id: 'store-readiness', label: '🚧 App Store assets: screenshots, videos, store copy, privacy labels', done: false },
+  { id: 'stability-cost', label: '🚧 Production hardening: Firestore rules, Sentry, AI guardrails', done: false },
+  { id: 'content-seo', label: '🚧 Content marketing: blog posts, comparison pages, localized SEO', done: false },
+  { id: 'launch-roadmap', label: '🚧 Launch plan: beta testing → soft launch → public launch', done: false },
+  { id: 'growth-channels', label: '🚧 Growth strategy: bloggers, Reddit, TikTok, email marketing', done: false },
 ];
 
-const STORAGE_KEY = 'launchChecklistV1';
+const STORAGE_KEY = 'launchChecklistV2'; // Updated to show completed items
 
 export function LaunchChecklistPage({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<ChecklistItem[]>(() => {
