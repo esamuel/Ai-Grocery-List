@@ -744,39 +744,31 @@ function App() {
   };
 
   // Swipe right: move single item to favorites and remove from list
-  const handleMoveItemToFavorites = (id: string) => {
+  const handleMoveItemToFavorites = async (id: string) => {
     const target = items.find(i => i.id === id);
-    if (!target) return;
-    setHistoryItems(prevHistory => {
-      const next = [...prevHistory];
-      const idx = next.findIndex(h => h.name.toLowerCase() === target.name.toLowerCase());
-      if (idx > -1) {
-        next[idx].frequency += 1;
-        next[idx].lastPurchased = new Date().toISOString();
-      } else {
-        const now = new Date().toISOString();
-        next.push({ 
-          name: target.name, 
-          category: target.category, 
-          frequency: 1, 
-          lastPurchased: now,
-          firstPurchased: now
-        });
-      }
-      return next;
-    });
-    setItems(prev => prev.filter(i => i.id !== id));
-    if (listId) {
-      addOrIncrementPurchase(listId, [{ name: target.name, category: target.category }])
-        .catch(e => console.warn('Failed to update purchase history from swipe action', e));
+    if (!target || !listId) return;
+
+    console.log('⭐ Moving item to favorites:', target.name);
+
+    try {
+      // FIRST: Update history in Firestore
+      await addOrIncrementPurchase(listId, [{ name: target.name, category: target.category }]);
+      
+      // SECOND: Remove from current list
+      // The Firestore listener will automatically update historyItems
+      setItems(prev => prev.filter(i => i.id !== id));
+      
+      console.log('✅ Item moved to favorites');
+    } catch (e) {
+      console.error('❌ Failed to move item to favorites:', e);
     }
   };
 
-  const handleClearCompleted = useCallback(() => {
+  const handleClearCompleted = useCallback(async () => {
     const completedItems = items.filter(item => item.completed);
     if (completedItems.length === 0) return;
 
-    console.log('Moving completed items to purchase history:', completedItems);
+    console.log('🧹 Clearing completed items:', completedItems.length);
 
     // If price tracking is enabled, show the price modal
     if (enablePriceTracking) {
@@ -786,54 +778,38 @@ function App() {
     }
 
     // Otherwise, add items without prices
-    handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
-  }, [items, enablePriceTracking]);
+    await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
+  }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
 
-  const handleCompletedItemsWithPrices = useCallback((itemsWithPrices: { name: string; category: string; price?: number }[]) => {
-    const now = new Date().toISOString();
+  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number }[]) => {
+    if (!listId) return;
 
-    // Add completed items to local history state
-    setHistoryItems(prevHistory => {
-        const newHistory = [...prevHistory];
-        itemsWithPrices.forEach(item => {
-            const historyIndex = newHistory.findIndex(h => h.name.toLowerCase() === item.name.toLowerCase());
-            if (historyIndex > -1) {
-                newHistory[historyIndex].frequency += 1;
-                newHistory[historyIndex].lastPurchased = now;
-                console.log('Updated frequency for:', item.name, 'new frequency:', newHistory[historyIndex].frequency);
-            } else {
-                const newHistoryItem: PurchaseHistoryItem = {
-                    name: item.name,
-                    category: item.category,
-                    frequency: 1,
-                    lastPurchased: now,
-                    firstPurchased: now,
-                };
-                newHistory.push(newHistoryItem);
-                console.log('Added new item to purchase history:', newHistoryItem);
-            }
-        });
-        return newHistory;
-    });
+    console.log('🔄 Processing completed items with prices:', itemsWithPrices);
 
-    // Remove completed items from current list
-    setItems(prevItems => {
-        const remainingItems = prevItems.filter(item => !item.completed);
-        console.log('Remaining items after clear:', remainingItems);
-        return remainingItems;
-    });
-
-    // Update unified purchase history in Firestore with prices
-    if (listId) {
-      addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({ 
+    try {
+      // FIRST: Update history in Firestore (with prices)
+      await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({ 
         name: i.name, 
         category: i.category,
         price: i.price,
         currency: currency
-      })))
-        .catch(e => console.warn('Failed to update purchase history from completed items', e));
+      })));
+      
+      console.log('✅ Purchase history updated in Firestore');
+
+      // SECOND: Remove completed items from current list
+      // The Firestore listener will automatically update historyItems
+      setItems(prevItems => {
+        const remainingItems = prevItems.filter(item => !item.completed);
+        console.log('✅ Removed completed items. Remaining:', remainingItems.length);
+        return remainingItems;
+      });
+
+    } catch (e) {
+      console.error('❌ Failed to process completed items:', e);
+      showToast(currentText.error, 'error');
     }
-  }, [setHistoryItems, setItems, listId, currency]);
+  }, [listId, currency, setItems, currentText.error, showToast]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
