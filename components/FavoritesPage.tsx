@@ -5,11 +5,13 @@ import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { StarIcon } from './icons/StarIcon';
 import { analyzePriceAlert, formatPriceAlertBadge } from '../services/priceAlertService';
+import { getCurrencySymbol } from '../services/spendingInsightsService';
 
 interface FavoritesPageProps {
   historyItems: PurchaseHistoryItem[];
   onAddItem: (item: PurchaseHistoryItem) => void;
   onDeleteItem: (itemName: string) => void;
+  currency: string;
   translations: {
     title: string;
     subtitle: string;
@@ -22,7 +24,8 @@ interface FavoritesPageProps {
 
 type SortMode = 'frequency' | 'recent' | 'starred';
 
-export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, translations }) => {
+export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, currency, translations }) => {
+  const currencySymbol = getCurrencySymbol(currency);
   const [sortMode, setSortMode] = useState<SortMode>('frequency');
 
   if (historyItems.length === 0) {
@@ -153,16 +156,16 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 {item.lastPrice && (
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs font-semibold text-green-700">
-                      ${item.lastPrice.toFixed(2)}
+                      {currencySymbol}{item.lastPrice.toFixed(2)}
                     </span>
                     {item.avgPrice && item.avgPrice !== item.lastPrice && (
                       <span className="text-xs text-gray-500">
-                        Avg: ${item.avgPrice.toFixed(2)}
+                        Avg: {currencySymbol}{item.avgPrice.toFixed(2)}
                       </span>
                     )}
                     {item.lowestPrice && item.lastPrice > item.lowestPrice && (
                       <span className="text-xs text-blue-600">
-                        Best: ${item.lowestPrice.toFixed(2)}
+                        Best: {currencySymbol}{item.lowestPrice.toFixed(2)}
                       </span>
                     )}
                   </div>

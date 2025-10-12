@@ -1137,7 +1137,7 @@ function App() {
               />
             </>
         ) : currentView === 'favorites' ? (
-            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList }} />
+            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList }} />
         ) : currentView === 'insights' ? (
             <SpendingInsights 
               historyItems={historyItems} 
