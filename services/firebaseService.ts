@@ -218,10 +218,29 @@ export const subscribeToList = (listId: string, callback: (data: GroceryListData
     };
 };
 
+// Remove undefined values from an object (Firestore doesn't accept undefined)
+function removeUndefinedValues(obj: any): any {
+    if (Array.isArray(obj)) {
+        return obj.map(removeUndefinedValues);
+    }
+    if (obj !== null && typeof obj === 'object') {
+        const cleaned: any = {};
+        for (const key in obj) {
+            if (obj[key] !== undefined) {
+                cleaned[key] = removeUndefinedValues(obj[key]);
+            }
+        }
+        return cleaned;
+    }
+    return obj;
+}
+
 export const updateList = async (listId: string, data: GroceryListData): Promise<void> => {
     const { dbLite } = getFirebaseServices();
+    // Clean undefined values before sending to Firestore
+    const cleanData = removeUndefinedValues(data);
     // Use Firestore Lite for write to avoid WebChannel Write stream
-    await setDocLite(docLite(dbLite, listsCollection, listId), data as any);
+    await setDocLite(docLite(dbLite, listsCollection, listId), cleanData);
 };
 
 // User favorites functions (separate from individual lists)
