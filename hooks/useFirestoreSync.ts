@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { subscribeToList, updateList } from '../services/firebaseService';
+import { subscribeToList, updateList, updateListItems } from '../services/firebaseService';
 import type { GroceryItem, PurchaseHistoryItem, GroceryListData } from '../types';
 
 /**
@@ -140,11 +140,26 @@ export const useFirestoreSync = (listId: string | null) => {
     }, [listId]);
 
     const setItems = useCallback((itemsUpdater: GroceryItem[] | ((prev: GroceryItem[]) => GroceryItem[])) => {
-        updateData(prevData => ({
-            ...prevData,
-            items: typeof itemsUpdater === 'function' ? itemsUpdater(prevData.items) : itemsUpdater,
-        }));
-    }, [updateData]);
+        if (!listId) return;
+        
+        setData(currentData => {
+            const newItems = typeof itemsUpdater === 'function' ? itemsUpdater(currentData.items) : itemsUpdater;
+            const newData = { ...currentData, items: newItems };
+            
+            // Handle offline mode
+            if (listId.startsWith('offline-')) {
+                localStorage.setItem(`groceryList:${listId}`, JSON.stringify(newData));
+                console.log('Saved items to offline storage:', listId);
+            } else {
+                // Update ONLY items field, don't touch history
+                updateListItems(listId, newItems).catch(error => {
+                    console.error("Failed to update items in Firestore:", error);
+                });
+            }
+            
+            return newData;
+        });
+    }, [listId]);
 
 
 

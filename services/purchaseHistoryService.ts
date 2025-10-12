@@ -101,11 +101,12 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
     const docRef = groceryListDocPath(listId);
     // Clean undefined values before sending to Firestore
     const cleanedItems = removeUndefined(items);
+    console.log(`🔄 Writing ${cleanedItems.length} items to Firestore...`);
     await updateDocLite(docRef, { 
       history: cleanedItems,
       updatedAt: new Date().toISOString()
     });
-    console.log('✅ Purchase history updated in Firestore');
+    console.log(`✅ Purchase history updated in Firestore (${cleanedItems.length} items)`);
   } catch (e) {
     console.error('❌ Failed to update purchase history:', e);
     throw e;
@@ -130,8 +131,11 @@ export async function addOrIncrementPurchase(
     const key = purchase.name.toLowerCase();
     const existing = map.get(key);
     
+    console.log(`📝 Processing purchase: "${purchase.name}", exists: ${!!existing}`);
+    
     if (existing) {
       // Update existing item
+      console.log(`  ➡️ Updating existing item. Old frequency: ${existing.frequency}`);
       const updated: PurchaseHistoryItem = {
         ...existing,
         frequency: existing.frequency + 1,
@@ -173,9 +177,11 @@ export async function addOrIncrementPurchase(
         updated.highestPrice = Math.max(...allPrices);
       }
       
+      console.log(`  ✅ New frequency: ${updated.frequency}, lastPurchased: ${updated.lastPurchased}`);
       map.set(key, updated);
     } else {
       // Create new item
+      console.log(`  ➕ Creating new history item`);
       const newItem: PurchaseHistoryItem = {
         name: purchase.name,
         category: purchase.category || 'Uncategorized',
@@ -210,7 +216,10 @@ export async function addOrIncrementPurchase(
     }
   });
   
-  await setPurchaseHistory(listId, Array.from(map.values()));
+  const finalHistory = Array.from(map.values());
+  console.log(`💾 Saving ${finalHistory.length} items to history (was ${current.length})`);
+  
+  await setPurchaseHistory(listId, finalHistory);
 }
 
 // Toggle starred status

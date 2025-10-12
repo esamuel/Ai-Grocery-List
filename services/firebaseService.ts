@@ -7,6 +7,7 @@ import {
     doc as docLite,
     getDoc as getDocLite,
     setDoc as setDocLite,
+    updateDoc as updateDocLite,
     collection as collectionLite,
     query as queryLite,
     where as whereLite,
@@ -241,6 +242,20 @@ export const updateList = async (listId: string, data: GroceryListData): Promise
     const cleanData = removeUndefinedValues(data);
     // Use Firestore Lite for write to avoid WebChannel Write stream
     await setDocLite(docLite(dbLite, listsCollection, listId), cleanData);
+};
+
+// Update ONLY the items field (don't overwrite history)
+export const updateListItems = async (listId: string, items: GroceryItem[]): Promise<void> => {
+    const { dbLite } = getFirebaseServices();
+    // Clean undefined values before sending to Firestore
+    const cleanItems = removeUndefinedValues(items);
+    // Use updateDoc to only update the items field
+    const docRef = docLite(dbLite, listsCollection, listId);
+    await updateDocLite(docRef, { 
+        items: cleanItems,
+        updatedAt: new Date().toISOString()
+    });
+    console.log('✅ Items list updated in Firestore');
 };
 
 // User favorites functions (separate from individual lists)
