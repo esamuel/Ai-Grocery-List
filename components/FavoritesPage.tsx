@@ -20,6 +20,14 @@ interface FavoritesPageProps {
     times: string;
     delete: string;
     add: string;
+    // Price alerts
+    bestPriceEver: string;
+    greatDeal: string;
+    priceIncreased: string;
+    higherThanUsual: string;
+    // Store comparison
+    bestAtStore: string;
+    cheaper: string;
   };
 }
 
@@ -129,8 +137,16 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
             const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
             const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
             const priceAlert = analyzePriceAlert(item);
-            const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert) : null;
-            const storeBadge = getStoreBadge(item);
+            const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert, {
+              bestPriceEver: translations.bestPriceEver,
+              greatDeal: translations.greatDeal,
+              priceIncreased: translations.priceIncreased,
+              higherThanUsual: translations.higherThanUsual,
+            }) : null;
+            const storeBadge = getStoreBadge(item, {
+              bestAtStore: translations.bestAtStore,
+              cheaper: translations.cheaper,
+            });
             
             return (
             <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
@@ -159,6 +175,9 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 <p className="text-sm text-gray-500">
                   {item.category} &middot; {translations.purchased} {item.frequency} {translations.times}
                   {daysSince > 0 && ` · ${daysSince}d ago`}
+                  {item.prices && item.prices.length > 0 && item.prices[item.prices.length - 1].store && (
+                    <> · 🏪 {item.prices[item.prices.length - 1].store}</>
+                  )}
                 </p>
                 {item.lastPrice && (
                   <div className="flex items-center gap-2 mt-1">

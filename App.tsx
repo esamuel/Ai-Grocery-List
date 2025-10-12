@@ -150,6 +150,14 @@ const translations = {
     noPriceData: "Complete items with prices to see insights",
     setBudget: "Set Monthly Budget",
     budgetDesc: "Track spending against a monthly budget",
+    // Price Alerts
+    bestPriceEver: "Best Price Ever",
+    greatDeal: "Great Deal",
+    priceIncreased: "Price Increased",
+    higherThanUsual: "Higher Than Usual",
+    // Store Comparison
+    bestAtStore: "Best at",
+    cheaper: "cheaper",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -274,6 +282,14 @@ const translations = {
     noPriceData: "השלם פריטים עם מחירים כדי לראות תובנות",
     setBudget: "הגדר תקציב חודשי",
     budgetDesc: "עקוב אחר הוצאות מול תקציב חודשי",
+    // Price Alerts
+    bestPriceEver: "המחיר הכי טוב אי פעם",
+    greatDeal: "עסקה מעולה",
+    priceIncreased: "מחיר עלה",
+    higherThanUsual: "יותר יקר מהרגיל",
+    // Store Comparison
+    bestAtStore: "הכי זול ב",
+    cheaper: "זול יותר",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -397,6 +413,14 @@ const translations = {
     noPriceData: "Completa artículos con precios para ver información",
     setBudget: "Establecer Presupuesto Mensual",
     budgetDesc: "Rastrea gastos contra un presupuesto mensual",
+    // Price Alerts
+    bestPriceEver: "Mejor Precio Jamás",
+    greatDeal: "Gran Oferta",
+    priceIncreased: "Precio Aumentó",
+    higherThanUsual: "Más Caro que lo Usual",
+    // Store Comparison
+    bestAtStore: "Mejor en",
+    cheaper: "más barato",
   }
 };
 
@@ -1143,7 +1167,7 @@ function App() {
               />
             </>
         ) : currentView === 'favorites' ? (
-            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList }} />
+            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper }} />
         ) : currentView === 'insights' ? (
             <SpendingInsights 
               historyItems={historyItems} 
@@ -1440,6 +1464,12 @@ function App() {
                 frequencyBased: currentText.frequencyBased,
                 seasonal: currentText.seasonal,
                 complementary: currentText.complementary,
+                bestPriceEver: currentText.bestPriceEver,
+                greatDeal: currentText.greatDeal,
+                priceIncreased: currentText.priceIncreased,
+                higherThanUsual: currentText.higherThanUsual,
+                bestAtStore: currentText.bestAtStore,
+                cheaper: currentText.cheaper,
               }}
             />
           </div>

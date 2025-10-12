@@ -19,6 +19,14 @@ interface SmartSuggestionsProps {
     seasonal: string;
     complementary: string;
     predictive?: string;
+    // Price alerts
+    bestPriceEver: string;
+    greatDeal: string;
+    priceIncreased: string;
+    higherThanUsual: string;
+    // Store comparison
+    bestAtStore: string;
+    cheaper: string;
   };
 }
 
@@ -109,7 +117,12 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
         {displayedSuggestions.map((suggestion, index) => {
           const priceTrend = getPriceTrend(suggestion.item);
           const priceAlert = analyzePriceAlert(suggestion.item);
-          const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert) : null;
+          const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert, {
+            bestPriceEver: translations.bestPriceEver,
+            greatDeal: translations.greatDeal,
+            priceIncreased: translations.priceIncreased,
+            higherThanUsual: translations.higherThanUsual,
+          }) : null;
           
           return (
           <div

@@ -8,6 +8,13 @@ export interface PriceAlert {
   percentChange?: number;
 }
 
+export interface PriceAlertTranslations {
+  bestPriceEver: string;
+  greatDeal: string;
+  priceIncreased: string;
+  higherThanUsual: string;
+}
+
 /**
  * Analyze price and return alert if needed
  * @param item - Purchase history item with price data
@@ -117,28 +124,44 @@ export function getPriceTrend(item: PurchaseHistoryItem): PriceTrend | null {
 /**
  * Format price alert badge with emoji and color class
  */
-export function formatPriceAlertBadge(alert: PriceAlert): {
+export function formatPriceAlertBadge(alert: PriceAlert, translations?: PriceAlertTranslations): {
   emoji: string;
   text: string;
   className: string;
 } {
+  // Use translations if provided, otherwise fallback to English
+  const getText = (type: PriceAlertType): string => {
+    if (!translations) return alert.message;
+    
+    switch (type) {
+      case 'best-deal':
+        return translations.bestPriceEver;
+      case 'good-deal':
+        return translations.greatDeal;
+      case 'price-spike':
+        return alert.message === 'Price Increased' ? translations.priceIncreased : translations.higherThanUsual;
+      default:
+        return alert.message;
+    }
+  };
+  
   switch (alert.type) {
     case 'best-deal':
       return {
         emoji: '🎉',
-        text: alert.message,
+        text: getText('best-deal'),
         className: 'bg-green-100 text-green-800 border-green-300',
       };
     case 'good-deal':
       return {
         emoji: '💚',
-        text: alert.message,
+        text: getText('good-deal'),
         className: 'bg-green-50 text-green-700 border-green-200',
       };
     case 'price-spike':
       return {
         emoji: '📈',
-        text: alert.message,
+        text: getText('price-spike'),
         className: 'bg-orange-100 text-orange-800 border-orange-300',
       };
     default:

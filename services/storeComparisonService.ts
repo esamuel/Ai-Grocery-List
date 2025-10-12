@@ -127,10 +127,15 @@ export function getOverallBestStores(items: PurchaseHistoryItem[]): Array<{
   return results.slice(0, 5); // Top 5 stores
 }
 
+export interface StoreTranslations {
+  bestAtStore: string;
+  cheaper: string;
+}
+
 /**
  * Get store recommendation badge for display
  */
-export function getStoreBadge(item: PurchaseHistoryItem): {
+export function getStoreBadge(item: PurchaseHistoryItem, translations?: StoreTranslations): {
   text: string;
   className: string;
 } | null {
@@ -140,8 +145,11 @@ export function getStoreBadge(item: PurchaseHistoryItem): {
 
   // Only show badge if there's significant savings
   if (bestStore.savingsPercent && bestStore.savingsPercent > 5) {
+    const bestAtText = translations?.bestAtStore || 'Best at';
+    const cheaperText = translations?.cheaper || 'cheaper';
+    
     return {
-      text: `🏪 Best at ${bestStore.store} (${bestStore.savingsPercent.toFixed(0)}% cheaper)`,
+      text: `🏪 ${bestAtText} ${bestStore.store} (${bestStore.savingsPercent.toFixed(0)}% ${cheaperText})`,
       className: 'bg-blue-50 text-blue-700 border-blue-200',
     };
   }
