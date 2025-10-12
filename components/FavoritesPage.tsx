@@ -6,6 +6,7 @@ import { TrashIcon } from './icons/TrashIcon';
 import { StarIcon } from './icons/StarIcon';
 import { analyzePriceAlert, formatPriceAlertBadge } from '../services/priceAlertService';
 import { getCurrencySymbol } from '../services/spendingInsightsService';
+import { getStoreBadge } from '../services/storeComparisonService';
 
 interface FavoritesPageProps {
   historyItems: PurchaseHistoryItem[];
@@ -129,6 +130,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
             const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
             const priceAlert = analyzePriceAlert(item);
             const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert) : null;
+            const storeBadge = getStoreBadge(item);
             
             return (
             <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
@@ -146,6 +148,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                   {alertBadge && (
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${alertBadge.className}`}>
                       {alertBadge.emoji} {alertBadge.text}
+                    </span>
+                  )}
+                  {storeBadge && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${storeBadge.className}`}>
+                      {storeBadge.text}
                     </span>
                   )}
                 </div>

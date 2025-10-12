@@ -6,7 +6,7 @@ interface PriceInputModalProps {
   completedItems: GroceryItem[];
   currency: string;
   onClose: () => void;
-  onSubmit: (itemsWithPrices: { name: string; category: string; price?: number }[]) => void;
+  onSubmit: (itemsWithPrices: { name: string; category: string; price?: number; store?: string }[]) => void;
   translations: {
     title: string;
     subtitle: string;
@@ -14,6 +14,8 @@ interface PriceInputModalProps {
     save: string;
     total: string;
     optional: string;
+    store?: string;
+    storePlaceholder?: string;
   };
 }
 
@@ -26,6 +28,7 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
   translations
 }) => {
   const [prices, setPrices] = useState<Record<string, string>>({});
+  const [storeName, setStoreName] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -40,9 +43,11 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
     const itemsWithoutPrices = completedItems.map(item => ({
       name: item.name,
       category: item.category,
+      store: storeName || undefined,
     }));
     onSubmit(itemsWithoutPrices);
     setPrices({});
+    setStoreName('');
     onClose();
   };
 
@@ -51,9 +56,11 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
       name: item.name,
       category: item.category,
       price: prices[item.name] ? parseFloat(prices[item.name]) : undefined,
+      store: storeName || undefined,
     }));
     onSubmit(itemsWithPrices);
     setPrices({});
+    setStoreName('');
     onClose();
   };
 
@@ -85,6 +92,20 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
         <div className="mb-4">
           <h2 className="text-xl font-bold text-gray-800">{translations.title}</h2>
           <p className="text-sm text-gray-600 mt-1">{translations.subtitle}</p>
+        </div>
+
+        {/* Store Name Input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            🏪 {translations.store || 'Store'} <span className="text-gray-400 font-normal">({translations.optional})</span>
+          </label>
+          <input
+            type="text"
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder={translations.storePlaceholder || 'e.g., Rami Levy, Shufersal...'}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         <div className="space-y-3 mb-4">

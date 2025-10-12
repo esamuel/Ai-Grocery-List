@@ -131,6 +131,8 @@ const translations = {
     priceModalSkip: "Skip",
     priceModalSave: "Save with Prices",
     priceModalTotal: "Total",
+    priceModalStore: "Store",
+    priceModalStorePlaceholder: "e.g., Rami Levy, Shufersal, Mega...",
     enablePriceTracking: "Enable Price Tracking",
     priceTrackingDesc: "Track what you spend on groceries",
     // Spending Insights
@@ -253,6 +255,8 @@ const translations = {
     priceModalSkip: "דלג",
     priceModalSave: "שמור עם מחירים",
     priceModalTotal: "סה״כ",
+    priceModalStore: "חנות",
+    priceModalStorePlaceholder: "למשל, רמי לוי, שופרסל, מגה...",
     enablePriceTracking: "הפעל מעקב מחירים",
     priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
     // Spending Insights
@@ -374,6 +378,8 @@ const translations = {
     priceModalSkip: "Saltar",
     priceModalSave: "Guardar con Precios",
     priceModalTotal: "Total",
+    priceModalStore: "Tienda",
+    priceModalStorePlaceholder: "ej., Rami Levy, Shufersal, Mega...",
     enablePriceTracking: "Habilitar Seguimiento de Precios",
     priceTrackingDesc: "Rastrea lo que gastas en comestibles",
     // Spending Insights
@@ -1461,6 +1467,8 @@ function App() {
           save: currentText.priceModalSave,
           total: currentText.priceModalTotal,
           optional: currentText.priceModalSubtitle,
+          store: currentText.priceModalStore,
+          storePlaceholder: currentText.priceModalStorePlaceholder,
         }}
       />
     </div>
