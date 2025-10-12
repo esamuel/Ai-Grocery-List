@@ -7,6 +7,7 @@ import { categorizeGroceries } from './services/geminiService';
 import { FavoritesPage } from './components/FavoritesPage';
 import { PriceInputModal } from './components/PriceInputModal';
 import { SpendingInsights } from './components/SpendingInsights';
+import { DailyPurchases } from './components/DailyPurchases';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
 import { InfoIcon } from './components/icons/InfoIcon';
@@ -24,11 +25,11 @@ import type { User } from 'firebase/auth';
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 type Language = 'en' | 'he' | 'es';
-type View = 'list' | 'favorites' | 'insights' | 'checklist';
+type View = 'list' | 'favorites' | 'insights' | 'daily' | 'checklist';
 
 const translations = {
   en: {
-    title: "Aii Grocery list",
+    title: "AI Grocery list",
     subtitle: "Your smart shopping companion",
     error: "Failed to categorize items. Please try again.",
     inputPlaceholder: "e.g., '2 avocados, milk, bread'",
@@ -158,6 +159,26 @@ const translations = {
     // Store Comparison
     bestAtStore: "Best at",
     cheaper: "cheaper",
+    // Sort buttons
+    mostFrequent: "Most Frequent",
+    today: "Today",
+    starred: "Starred",
+    category: "Category",
+    alphabetical: "A-Z",
+    
+    // Daily Purchases
+    dailyPurchases: "Daily Purchases",
+    dailyPurchasesSubtitle: "View your shopping history by date",
+    date: "Date",
+    items: "items",
+    totalSpent: "Total Spent",
+    store: "Store",
+    noPurchases: "No purchases found for this date",
+    selectDate: "Select a Date",
+    exportCSV: "Export CSV",
+    generateReport: "Generate Report",
+    copyReport: "Copy Report",
+    reportCopied: "Report copied to clipboard!",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -290,6 +311,26 @@ const translations = {
     // Store Comparison
     bestAtStore: "הכי זול ב",
     cheaper: "זול יותר",
+    // Sort buttons
+    mostFrequent: "הכי תכוף",
+    today: "היום",
+    starred: "מועדפים",
+    category: "קטגוריה",
+    alphabetical: "א-ת",
+    
+    // Daily Purchases
+    dailyPurchases: "קניות יומיות",
+    dailyPurchasesSubtitle: "צפה בהיסטוריית הקניות שלך לפי תאריך",
+    date: "תאריך",
+    items: "פריטים",
+    totalSpent: "סך הכל הוצא",
+    store: "חנות",
+    noPurchases: "לא נמצאו קניות לתאריך זה",
+    selectDate: "בחר תאריך",
+    exportCSV: "ייצא CSV",
+    generateReport: "צור דוח",
+    copyReport: "העתק דוח",
+    reportCopied: "הדוח הועתק ללוח!",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -421,6 +462,26 @@ const translations = {
     // Store Comparison
     bestAtStore: "Mejor en",
     cheaper: "más barato",
+    // Sort buttons
+    mostFrequent: "Más Frecuente",
+    today: "Hoy",
+    starred: "Favoritos",
+    category: "Categoría",
+    alphabetical: "A-Z",
+    
+    // Daily Purchases
+    dailyPurchases: "Compras Diarias",
+    dailyPurchasesSubtitle: "Ve tu historial de compras por fecha",
+    date: "Fecha",
+    items: "artículos",
+    totalSpent: "Total Gastado",
+    store: "Tienda",
+    noPurchases: "No se encontraron compras para esta fecha",
+    selectDate: "Seleccionar Fecha",
+    exportCSV: "Exportar CSV",
+    generateReport: "Generar Reporte",
+    copyReport: "Copiar Reporte",
+    reportCopied: "¡Reporte copiado al portapapeles!",
   }
 };
 
@@ -1080,6 +1141,7 @@ function App() {
             <NavButton currentView={currentView} buttonView="list" onClick={() => setCurrentView('list')}><ListIcon className="w-6 h-6 mb-1"/><span>{currentText.list}</span></NavButton>
             <NavButton currentView={currentView} buttonView="favorites" onClick={() => setCurrentView('favorites')}><StarIcon className="w-6 h-6 mb-1"/><span>{currentText.favorites}</span></NavButton>
             <NavButton currentView={currentView} buttonView="insights" onClick={() => setCurrentView('insights')}><span className="text-2xl mb-1">📊</span><span>{currentText.spendingInsights}</span></NavButton>
+            <NavButton currentView={currentView} buttonView="daily" onClick={() => setCurrentView('daily')}><span className="text-2xl mb-1">📅</span><span>{currentText.dailyPurchases}</span></NavButton>
         </div>
       </header>
 
@@ -1167,7 +1229,7 @@ function App() {
               />
             </>
         ) : currentView === 'favorites' ? (
-            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper }} />
+            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
         ) : currentView === 'insights' ? (
             <SpendingInsights 
               historyItems={historyItems} 
@@ -1186,6 +1248,25 @@ function App() {
                 remaining: currentText.remaining,
                 overBudget: currentText.overBudget,
                 noPriceData: currentText.noPriceData,
+              }}
+            />
+        ) : currentView === 'daily' ? (
+            <DailyPurchases 
+              historyItems={historyItems} 
+              currency={currency}
+              translations={{
+                title: currentText.dailyPurchases,
+                subtitle: currentText.dailyPurchasesSubtitle,
+                date: currentText.date,
+                items: currentText.items,
+                totalSpent: currentText.totalSpent,
+                store: currentText.store,
+                noPurchases: currentText.noPurchases,
+                selectDate: currentText.selectDate,
+                exportCSV: currentText.exportCSV,
+                generateReport: currentText.generateReport,
+                copyReport: currentText.copyReport,
+                reportCopied: currentText.reportCopied,
               }}
             />
         ) : (

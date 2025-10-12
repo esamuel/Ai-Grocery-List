@@ -152,29 +152,42 @@ export async function addOrIncrementPurchase(
         );
       }
       
-      // Handle price tracking if price is provided
-      if (purchase.price !== undefined && purchase.price > 0) {
+      // Handle price tracking and store information
+      const shouldCreatePriceEntry = purchase.price !== undefined && purchase.price > 0;
+      const shouldCreateStoreEntry = purchase.store && purchase.store.trim() !== '';
+      
+      if (shouldCreatePriceEntry || shouldCreateStoreEntry) {
         const priceEntry: any = {
-          price: purchase.price,
-          currency: purchase.currency || 'USD',
           purchaseDate: now,
           quantity: purchase.quantity || 1,
         };
         
-        // Only add store if provided (avoid undefined in Firestore)
-        if (purchase.store) {
+        // Add price if provided
+        if (shouldCreatePriceEntry) {
+          priceEntry.price = purchase.price;
+          priceEntry.currency = purchase.currency || 'USD';
+        }
+        
+        // Add store if provided
+        if (shouldCreateStoreEntry) {
           priceEntry.store = purchase.store;
         }
         
         // Add to price history
         updated.prices = [...(existing.prices || []), priceEntry];
-        updated.lastPrice = purchase.price;
         
-        // Calculate price statistics
-        const allPrices = updated.prices.map(p => p.price);
-        updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
-        updated.lowestPrice = Math.min(...allPrices);
-        updated.highestPrice = Math.max(...allPrices);
+        // Update price statistics only if price was provided
+        if (shouldCreatePriceEntry) {
+          updated.lastPrice = purchase.price;
+          
+          // Calculate price statistics
+          const allPrices = updated.prices.map(p => p.price).filter(p => p !== undefined);
+          if (allPrices.length > 0) {
+            updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+            updated.lowestPrice = Math.min(...allPrices);
+            updated.highestPrice = Math.max(...allPrices);
+          }
+        }
       }
       
       console.log(`  ✅ New frequency: ${updated.frequency}, lastPurchased: ${updated.lastPurchased}`);
@@ -191,25 +204,36 @@ export async function addOrIncrementPurchase(
         avgDaysBetween: 0,
       };
       
-      // Add price if provided
-      if (purchase.price !== undefined && purchase.price > 0) {
+      // Handle price tracking and store information for new items
+      const shouldCreatePriceEntry = purchase.price !== undefined && purchase.price > 0;
+      const shouldCreateStoreEntry = purchase.store && purchase.store.trim() !== '';
+      
+      if (shouldCreatePriceEntry || shouldCreateStoreEntry) {
         const priceEntry: any = {
-          price: purchase.price,
-          currency: purchase.currency || 'USD',
           purchaseDate: now,
           quantity: purchase.quantity || 1,
         };
         
-        // Only add store if provided (avoid undefined in Firestore)
-        if (purchase.store) {
+        // Add price if provided
+        if (shouldCreatePriceEntry) {
+          priceEntry.price = purchase.price;
+          priceEntry.currency = purchase.currency || 'USD';
+        }
+        
+        // Add store if provided
+        if (shouldCreateStoreEntry) {
           priceEntry.store = purchase.store;
         }
         
         newItem.prices = [priceEntry];
-        newItem.lastPrice = purchase.price;
-        newItem.avgPrice = purchase.price;
-        newItem.lowestPrice = purchase.price;
-        newItem.highestPrice = purchase.price;
+        
+        // Set price statistics only if price was provided
+        if (shouldCreatePriceEntry) {
+          newItem.lastPrice = purchase.price;
+          newItem.avgPrice = purchase.price;
+          newItem.lowestPrice = purchase.price;
+          newItem.highestPrice = purchase.price;
+        }
       }
       
       map.set(key, newItem);

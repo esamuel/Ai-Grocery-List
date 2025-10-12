@@ -28,10 +28,16 @@ interface FavoritesPageProps {
     // Store comparison
     bestAtStore: string;
     cheaper: string;
+    // Sort buttons
+    mostFrequent: string;
+    today: string;
+    starred: string;
+    category: string;
+    alphabetical: string;
   };
 }
 
-type SortMode = 'frequency' | 'recent' | 'starred';
+type SortMode = 'frequency' | 'recent' | 'starred' | 'category' | 'alphabetical';
 
 export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, currency, translations }) => {
   const currencySymbol = getCurrencySymbol(currency);
@@ -63,16 +69,27 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
       return true; // Show all items for other modes
     })
     .sort((a, b) => {
-      if (sortMode === 'frequency') {
-        return b.frequency - a.frequency;
-      } else if (sortMode === 'recent') {
-        return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
-      } else if (sortMode === 'starred') {
-        if (a.starred && !b.starred) return -1;
-        if (!a.starred && b.starred) return 1;
-        return b.frequency - a.frequency;
+      switch (sortMode) {
+        case 'frequency':
+          return b.frequency - a.frequency;
+        case 'recent':
+          return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
+        case 'starred':
+          if (a.starred && !b.starred) return -1;
+          if (!a.starred && b.starred) return 1;
+          return b.frequency - a.frequency;
+        case 'category':
+          // Sort by category first, then by frequency within category
+          if (a.category !== b.category) {
+            return a.category.localeCompare(b.category);
+          }
+          return b.frequency - a.frequency;
+        case 'alphabetical':
+          // Sort by name alphabetically
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
       }
-      return 0;
     });
 
   // Calculate days since last purchase
@@ -91,7 +108,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
         </div>
         
         {/* Sort Controls */}
-        <div className="flex justify-center gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           <button
             onClick={() => setSortMode('frequency')}
             className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -100,7 +117,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Most Frequent
+            {translations.mostFrequent}
           </button>
           <button
             onClick={() => setSortMode('recent')}
@@ -110,7 +127,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            📅 Today
+            📅 {translations.today}
           </button>
           <button
             onClick={() => setSortMode('starred')}
@@ -120,7 +137,27 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            ⭐ Starred
+            ⭐ {translations.starred}
+          </button>
+          <button
+            onClick={() => setSortMode('category')}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sortMode === 'category'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            🏷️ {translations.category}
+          </button>
+          <button
+            onClick={() => setSortMode('alphabetical')}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sortMode === 'alphabetical'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            🔤 {translations.alphabetical}
           </button>
         </div>
       </div>
@@ -175,9 +212,15 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 <p className="text-sm text-gray-500">
                   {item.category} &middot; {translations.purchased} {item.frequency} {translations.times}
                   {daysSince > 0 && ` · ${daysSince}d ago`}
-                  {item.prices && item.prices.length > 0 && item.prices[item.prices.length - 1].store && (
-                    <> · 🏪 {item.prices[item.prices.length - 1].store}</>
-                  )}
+                  {(() => {
+                    // Find the most recent purchase with a store name
+                    if (!item.prices || item.prices.length === 0) return null;
+                    
+                    const sortedPrices = [...item.prices].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+                    const recentWithStore = sortedPrices.find(p => p.store && p.store.trim() !== '');
+                    
+                    return recentWithStore ? <> · 🏪 {recentWithStore.store}</> : null;
+                  })()}
                 </p>
                 {item.lastPrice && (
                   <div className="flex items-center gap-2 mt-1">

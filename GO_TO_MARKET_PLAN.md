@@ -1,10 +1,47 @@
-# Aii Grocery list – Go-To-Market and Monetization Plan
+# AI Grocery List – Go-To-Market and Monetization Plan
 
-Last updated: 2025-09-25
+Last updated: 2025-01-17
 
 ## Overview
 
-This document outlines the go-to-market strategy, platform sequencing, pricing, payments, growth tactics, and operational readiness for launching and scaling the Aii Grocery list app.
+This document outlines the go-to-market strategy, platform sequencing, pricing, payments, growth tactics, and operational readiness for launching and scaling the AI Grocery List app.
+
+## ✅ CURRENT FEATURES (COMPLETED)
+
+### Core Features
+- **AI-Powered Categorization**: Automatic item categorization using Google Gemini AI
+- **Multi-language Support**: English, Hebrew (עברית), Spanish (Español)
+- **Real-time Sync**: Firebase/Firestore integration for instant updates
+- **Family Sharing**: Multi-user lists with Firebase Auth
+- **Voice Input**: Speech recognition for hands-free list creation
+- **Smart Import**: Bulk import with semantic duplicate detection
+- **Offline Support**: Works without internet connection
+
+### Advanced Features (Phase 1-6)
+- **Price Tracking**: Optional price input with currency support (USD, ILS, EUR, GBP)
+- **Spending Insights**: Monthly spending summaries, weekly trends, category breakdowns
+- **Price Alerts**: Best deals, good deals, price spike notifications
+- **Store Comparison**: Track prices across different stores, best store recommendations
+- **Daily Purchase Tracking**: View shopping history by specific dates
+- **Export & Reports**: CSV export, spending reports, monthly summaries
+- **Smart Suggestions**: Predictive suggestions based on purchase frequency
+- **Receipt Scanning**: ⚠️ Planned for Phase 5 (not yet implemented)
+
+### User Experience
+- **Unified History**: Combined favorites and suggestions with multiple sorting options
+- **Category Sorting**: Group items by category (dairy, fruits, vegetables, etc.)
+- **Alphabetical Sorting**: A-Z sorting in multiple languages
+- **Predictive Analytics**: "Every X days" predictions for regular purchases
+- **Budget Tracking**: Monthly budget setting with spending alerts
+- **Store Names**: Track which store each item was purchased from
+
+### Technical Implementation
+- **React 19 + TypeScript**: Modern, type-safe frontend
+- **Vite Build System**: Fast development and optimized production builds
+- **Firebase Integration**: Authentication, Firestore database, real-time sync
+- **Google Gemini AI**: Item categorization, translations, receipt OCR
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **PWA Ready**: Progressive Web App capabilities
 
 ## 1) Platforms and Sequencing
 
@@ -196,13 +233,34 @@ This document outlines the go-to-market strategy, platform sequencing, pricing, 
 
 ## TODO Tracking
 
-- [x] Decide platform sequencing (Web/PWA → iOS/Android via Capacitor) and monetization model
+### ✅ COMPLETED FEATURES
+- [x] Core grocery list functionality with AI categorization
+- [x] Multi-language support (EN/HE/ES) with full translations
+- [x] Firebase authentication and family sharing
+- [x] Real-time sync with Firestore
+- [x] Voice input with speech recognition
+- [x] Smart import with semantic duplicate detection
+- [x] Price tracking with currency support
+- [x] Spending insights and analytics
+- [x] Price alerts and store comparison
+- [x] Daily purchase tracking
+- [x] Export & reports (CSV, spending reports)
+- [x] Smart suggestions with predictive analytics
+- [ ] Receipt scanning with OCR integration (Phase 5 - planned)
+- [x] Unified history with multiple sorting options
+- [x] Budget tracking and spending alerts
+- [x] Store name tracking
+- [x] Offline support and responsive design
+- [x] Deploy to Netlify with production-ready build
+
+### 🚧 NEXT PRIORITIES (Monetization & Launch)
 - [ ] Design pricing & packaging (Free, Pro, Family) with annual discounts and free trial
 - [ ] Select payments stack (Web: Stripe; iOS/Android: RevenueCat) and tech approach
 - [ ] Build landing site with clear CTA, FAQs, and SEO pages
 - [ ] Integrate analytics and event tracking (activation, retention, conversion)
 - [ ] Implement in-app paywall, free trial flow, upgrade/downgrade screens
 - [ ] Add onboarding checklist (invite family, add items, voice, import)
+- [ ] PWA setup for installable experience
 - [ ] Referral program (give/get 1 month Pro) and share links
 - [ ] Store readiness: icons, screenshots, videos, store copy, privacy labels
 - [ ] Legal & compliance: Privacy, Terms, cookie/consent, GDPR/CCPA
