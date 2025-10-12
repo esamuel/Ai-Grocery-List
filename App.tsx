@@ -6,6 +6,7 @@ import { GroceryList } from './components/GroceryList';
 import { categorizeGroceries } from './services/geminiService';
 import { FavoritesPage } from './components/FavoritesPage';
 import { PriceInputModal } from './components/PriceInputModal';
+import { SpendingInsights } from './components/SpendingInsights';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
 import { InfoIcon } from './components/icons/InfoIcon';
@@ -23,7 +24,7 @@ import type { User } from 'firebase/auth';
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 type Language = 'en' | 'he' | 'es';
-type View = 'list' | 'favorites' | 'checklist';
+type View = 'list' | 'favorites' | 'insights' | 'checklist';
 
 const translations = {
   en: {
@@ -132,6 +133,21 @@ const translations = {
     priceModalTotal: "Total",
     enablePriceTracking: "Enable Price Tracking",
     priceTrackingDesc: "Track what you spend on groceries",
+    // Spending Insights
+    spendingInsights: "Spending Insights",
+    monthlySpending: "Monthly Spending",
+    itemsPurchased: "items purchased",
+    avgPerItem: "Avg per item",
+    weeklyTrend: "Weekly Trend",
+    thisWeek: "This Week",
+    lastWeek: "Last Week",
+    categoryBreakdown: "Category Breakdown",
+    budget: "Monthly Budget",
+    remaining: "Remaining",
+    overBudget: "Over Budget",
+    noPriceData: "Complete items with prices to see insights",
+    setBudget: "Set Monthly Budget",
+    budgetDesc: "Track spending against a monthly budget",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -239,6 +255,21 @@ const translations = {
     priceModalTotal: "סה״כ",
     enablePriceTracking: "הפעל מעקב מחירים",
     priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
+    // Spending Insights
+    spendingInsights: "תובנות הוצאות",
+    monthlySpending: "הוצאות חודשיות",
+    itemsPurchased: "פריטים נרכשו",
+    avgPerItem: "ממוצע לפריט",
+    weeklyTrend: "מגמה שבועית",
+    thisWeek: "השבוע",
+    lastWeek: "שבוע שעבר",
+    categoryBreakdown: "פירוט לפי קטגוריה",
+    budget: "תקציב חודשי",
+    remaining: "נותר",
+    overBudget: "חריגה מהתקציב",
+    noPriceData: "השלם פריטים עם מחירים כדי לראות תובנות",
+    setBudget: "הגדר תקציב חודשי",
+    budgetDesc: "עקוב אחר הוצאות מול תקציב חודשי",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -345,6 +376,21 @@ const translations = {
     priceModalTotal: "Total",
     enablePriceTracking: "Habilitar Seguimiento de Precios",
     priceTrackingDesc: "Rastrea lo que gastas en comestibles",
+    // Spending Insights
+    spendingInsights: "Información de Gastos",
+    monthlySpending: "Gasto Mensual",
+    itemsPurchased: "artículos comprados",
+    avgPerItem: "Promedio por artículo",
+    weeklyTrend: "Tendencia Semanal",
+    thisWeek: "Esta Semana",
+    lastWeek: "Semana Pasada",
+    categoryBreakdown: "Desglose por Categoría",
+    budget: "Presupuesto Mensual",
+    remaining: "Restante",
+    overBudget: "Sobre Presupuesto",
+    noPriceData: "Completa artículos con precios para ver información",
+    setBudget: "Establecer Presupuesto Mensual",
+    budgetDesc: "Rastrea gastos contra un presupuesto mensual",
   }
 };
 
@@ -432,6 +478,14 @@ function App() {
       return localStorage.getItem('currency') || 'USD';
     } catch {
       return 'USD';
+    }
+  });
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('monthlyBudget');
+      return saved ? parseFloat(saved) : 0;
+    } catch {
+      return 0;
     }
   });
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -995,6 +1049,7 @@ function App() {
         <div className="max-w-3xl mx-auto border-t border-gray-200 flex">
             <NavButton currentView={currentView} buttonView="list" onClick={() => setCurrentView('list')}><ListIcon className="w-6 h-6 mb-1"/><span>{currentText.list}</span></NavButton>
             <NavButton currentView={currentView} buttonView="favorites" onClick={() => setCurrentView('favorites')}><StarIcon className="w-6 h-6 mb-1"/><span>{currentText.favorites}</span></NavButton>
+            <NavButton currentView={currentView} buttonView="insights" onClick={() => setCurrentView('insights')}><span className="text-2xl mb-1">📊</span><span>{currentText.spendingInsights}</span></NavButton>
         </div>
       </header>
 
@@ -1083,6 +1138,26 @@ function App() {
             </>
         ) : currentView === 'favorites' ? (
             <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList }} />
+        ) : currentView === 'insights' ? (
+            <SpendingInsights 
+              historyItems={historyItems} 
+              currency={currency}
+              budget={monthlyBudget > 0 ? monthlyBudget : undefined}
+              translations={{
+                title: currentText.spendingInsights,
+                monthlySpending: currentText.monthlySpending,
+                itemsPurchased: currentText.itemsPurchased,
+                avgPerItem: currentText.avgPerItem,
+                weeklyTrend: currentText.weeklyTrend,
+                thisWeek: currentText.thisWeek,
+                lastWeek: currentText.lastWeek,
+                categoryBreakdown: currentText.categoryBreakdown,
+                budget: currentText.budget,
+                remaining: currentText.remaining,
+                overBudget: currentText.overBudget,
+                noPriceData: currentText.noPriceData,
+              }}
+            />
         ) : (
             <LaunchChecklistPage onClose={() => setCurrentView('list')} />
         )}
@@ -1135,6 +1210,30 @@ function App() {
                       <option value="EUR">€ EUR</option>
                       <option value="GBP">£ GBP</option>
                     </select>
+                  </div>
+                )}
+                
+                {/* Budget Setting */}
+                {enablePriceTracking && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">📊 {currentText.setBudget}</h3>
+                    <p className="text-xs text-gray-500 mb-2">{currentText.budgetDesc}</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={monthlyBudget || ''}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setMonthlyBudget(value);
+                          localStorage.setItem('monthlyBudget', String(value));
+                        }}
+                        placeholder="0"
+                        min="0"
+                        step="50"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600">{currency}</span>
+                    </div>
                   </div>
                 )}
               </div>
