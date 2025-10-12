@@ -34,19 +34,33 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     );
   }
 
-  // Sort items based on selected mode
-  const sortedItems = [...historyItems].sort((a, b) => {
-    if (sortMode === 'frequency') {
-      return b.frequency - a.frequency;
-    } else if (sortMode === 'recent') {
-      return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
-    } else if (sortMode === 'starred') {
-      if (a.starred && !b.starred) return -1;
-      if (!a.starred && b.starred) return 1;
-      return b.frequency - a.frequency;
-    }
-    return 0;
-  });
+  // Filter and sort items based on selected mode
+  const sortedItems = [...historyItems]
+    .filter(item => {
+      // For "recent" mode, show only TODAY's purchases
+      if (sortMode === 'recent') {
+        const today = new Date();
+        const lastPurchased = new Date(item.lastPurchased);
+        return (
+          today.getFullYear() === lastPurchased.getFullYear() &&
+          today.getMonth() === lastPurchased.getMonth() &&
+          today.getDate() === lastPurchased.getDate()
+        );
+      }
+      return true; // Show all items for other modes
+    })
+    .sort((a, b) => {
+      if (sortMode === 'frequency') {
+        return b.frequency - a.frequency;
+      } else if (sortMode === 'recent') {
+        return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
+      } else if (sortMode === 'starred') {
+        if (a.starred && !b.starred) return -1;
+        if (!a.starred && b.starred) return 1;
+        return b.frequency - a.frequency;
+      }
+      return 0;
+    });
 
   // Calculate days since last purchase
   const getDaysSince = (lastPurchased: string): number => {
@@ -83,7 +97,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Recent
+            📅 Today
           </button>
           <button
             onClick={() => setSortMode('starred')}
@@ -98,13 +112,19 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
         </div>
       </div>
 
-      <div className="space-y-3">
-        {sortedItems.map(item => {
-          const daysSince = getDaysSince(item.lastPurchased);
-          const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
-          const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
-          
-          return (
+      {sortedItems.length === 0 && sortMode === 'recent' ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <p className="text-lg text-gray-600">📅 No purchases today yet</p>
+          <p className="text-sm text-gray-400 mt-2">Items you complete today will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sortedItems.map(item => {
+            const daysSince = getDaysSince(item.lastPurchased);
+            const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
+            const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
+            
+            return (
             <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -158,9 +178,10 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

@@ -64,6 +64,23 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
   }
 }
 
+// Remove undefined values from an object (Firestore doesn't accept undefined)
+function removeUndefined(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = removeUndefined(obj[key]);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 // Set purchase history to Firestore
 export async function setPurchaseHistory(listId: string, items: PurchaseHistoryItem[]): Promise<void> {
   if (listId.startsWith('offline-')) {
@@ -82,8 +99,10 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
 
   try {
     const docRef = groceryListDocPath(listId);
+    // Clean undefined values before sending to Firestore
+    const cleanedItems = removeUndefined(items);
     await updateDocLite(docRef, { 
-      history: items,
+      history: cleanedItems,
       updatedAt: new Date().toISOString()
     });
     console.log('✅ Purchase history updated in Firestore');
@@ -131,13 +150,17 @@ export async function addOrIncrementPurchase(
       
       // Handle price tracking if price is provided
       if (purchase.price !== undefined && purchase.price > 0) {
-        const priceEntry = {
+        const priceEntry: any = {
           price: purchase.price,
           currency: purchase.currency || 'USD',
           purchaseDate: now,
-          store: purchase.store,
           quantity: purchase.quantity || 1,
         };
+        
+        // Only add store if provided (avoid undefined in Firestore)
+        if (purchase.store) {
+          priceEntry.store = purchase.store;
+        }
         
         // Add to price history
         updated.prices = [...(existing.prices || []), priceEntry];
@@ -164,13 +187,17 @@ export async function addOrIncrementPurchase(
       
       // Add price if provided
       if (purchase.price !== undefined && purchase.price > 0) {
-        const priceEntry = {
+        const priceEntry: any = {
           price: purchase.price,
           currency: purchase.currency || 'USD',
           purchaseDate: now,
-          store: purchase.store,
           quantity: purchase.quantity || 1,
         };
+        
+        // Only add store if provided (avoid undefined in Firestore)
+        if (purchase.store) {
+          priceEntry.store = purchase.store;
+        }
         
         newItem.prices = [priceEntry];
         newItem.lastPrice = purchase.price;
