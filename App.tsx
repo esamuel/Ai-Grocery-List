@@ -764,23 +764,7 @@ function App() {
     }
   };
 
-  const handleClearCompleted = useCallback(async () => {
-    const completedItems = items.filter(item => item.completed);
-    if (completedItems.length === 0) return;
-
-    console.log('🧹 Clearing completed items:', completedItems.length);
-
-    // If price tracking is enabled, show the price modal
-    if (enablePriceTracking) {
-      setPendingCompletedItems(completedItems);
-      setShowPriceModal(true);
-      return;
-    }
-
-    // Otherwise, add items without prices
-    await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
-  }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
-
+  // Define this FIRST since handleClearCompleted depends on it
   const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number }[]) => {
     if (!listId) return;
 
@@ -809,6 +793,23 @@ function App() {
       console.error('❌ Failed to process completed items:', e);
     }
   }, [listId, currency, setItems]);
+
+  const handleClearCompleted = useCallback(async () => {
+    const completedItems = items.filter(item => item.completed);
+    if (completedItems.length === 0) return;
+
+    console.log('🧹 Clearing completed items:', completedItems.length);
+
+    // If price tracking is enabled, show the price modal
+    if (enablePriceTracking) {
+      setPendingCompletedItems(completedItems);
+      setShowPriceModal(true);
+      return;
+    }
+
+    // Otherwise, add items without prices
+    await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
+  }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
