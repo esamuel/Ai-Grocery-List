@@ -807,9 +807,8 @@ function App() {
 
     } catch (e) {
       console.error('❌ Failed to process completed items:', e);
-      showToast(currentText.error, 'error');
     }
-  }, [listId, currency, setItems, currentText.error, showToast]);
+  }, [listId, currency, setItems]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
