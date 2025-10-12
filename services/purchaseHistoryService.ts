@@ -1,4 +1,4 @@
-import { doc as docLite, getDoc as getDocLite, setDoc as setDocLite } from 'firebase/firestore/lite';
+import { doc as docLite, getDoc as getDocLite, updateDoc as updateDocLite } from 'firebase/firestore/lite';
 import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
 import type { PurchaseHistoryItem, GroceryHistoryItem } from '../types';
 import type { SuggestedItem } from './suggestionsFirestoreService';
@@ -20,9 +20,9 @@ function getDb() {
   return anyFirebase.__firebase_db_lite;
 }
 
-function historyDocPath(listId: string) {
-  // Path: groceryLists/{listId}/purchaseHistory/data
-  return docLite(getDb(), 'groceryLists', listId, 'purchaseHistory', 'data');
+function groceryListDocPath(listId: string) {
+  // Path: groceryLists/{listId} (main document)
+  return docLite(getDb(), 'groceryLists', listId);
 }
 
 // Calculate average days between purchases
@@ -40,12 +40,12 @@ function calculateAvgDaysBetween(frequency: number, firstPurchased: string, last
 export async function getPurchaseHistory(listId: string): Promise<PurchaseHistoryItem[]> {
   // Offline support
   if (listId.startsWith('offline-')) {
-    const key = `purchaseHistory:${listId}`;
+    const key = `groceryList:${listId}`;
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as PurchaseHistoryItem[]) : [];
+      return Array.isArray(parsed.history) ? (parsed.history as PurchaseHistoryItem[]) : [];
     } catch (e) {
       console.warn('getPurchaseHistory (offline) parse failed', e);
       return [];
@@ -53,11 +53,11 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
   }
 
   try {
-    const docRef = historyDocPath(listId);
+    const docRef = groceryListDocPath(listId);
     const snap = await getDocLite(docRef);
     if (!snap.exists()) return [];
     const data = snap.data();
-    return (data.items || []) as PurchaseHistoryItem[];
+    return (data.history || []) as PurchaseHistoryItem[];
   } catch (e) {
     console.warn('getPurchaseHistory failed', e);
     return [];
@@ -67,17 +67,30 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
 // Set purchase history to Firestore
 export async function setPurchaseHistory(listId: string, items: PurchaseHistoryItem[]): Promise<void> {
   if (listId.startsWith('offline-')) {
-    const key = `purchaseHistory:${listId}`;
-    localStorage.setItem(key, JSON.stringify(items));
+    const key = `groceryList:${listId}`;
+    try {
+      const raw = localStorage.getItem(key) || '{}';
+      const parsed = JSON.parse(raw);
+      parsed.history = items;
+      parsed.updatedAt = new Date().toISOString();
+      localStorage.setItem(key, JSON.stringify(parsed));
+    } catch (e) {
+      console.warn('setPurchaseHistory (offline) failed', e);
+    }
     return;
   }
 
-  const docRef = historyDocPath(listId);
-  await setDocLite(docRef, { 
-    items, 
-    updatedAt: new Date().toISOString(),
-    version: 2 // Mark as new unified format
-  });
+  try {
+    const docRef = groceryListDocPath(listId);
+    await updateDocLite(docRef, { 
+      history: items,
+      updatedAt: new Date().toISOString()
+    });
+    console.log('✅ Purchase history updated in Firestore');
+  } catch (e) {
+    console.error('❌ Failed to update purchase history:', e);
+    throw e;
+  }
 }
 
 // Add or increment item in purchase history

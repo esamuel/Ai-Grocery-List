@@ -57,6 +57,12 @@ const sanitizeListData = (data: any): GroceryListData => {
                 avgDaysBetween: historyItem && historyItem.avgDaysBetween ? Number(historyItem.avgDaysBetween) : undefined,
                 starred: historyItem ? !!historyItem.starred : undefined,
                 tags: historyItem && Array.isArray(historyItem.tags) ? historyItem.tags : undefined,
+                // Price tracking fields
+                prices: historyItem && Array.isArray(historyItem.prices) ? historyItem.prices : undefined,
+                lastPrice: historyItem && historyItem.lastPrice ? Number(historyItem.lastPrice) : undefined,
+                avgPrice: historyItem && historyItem.avgPrice ? Number(historyItem.avgPrice) : undefined,
+                lowestPrice: historyItem && historyItem.lowestPrice ? Number(historyItem.lowestPrice) : undefined,
+                highestPrice: historyItem && historyItem.highestPrice ? Number(historyItem.highestPrice) : undefined,
             };
         });
     }
