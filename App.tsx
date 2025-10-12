@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { GroceryItem, Category, GroceryHistoryItem } from './types';
+import type { GroceryItem, Category, PurchaseHistoryItem, GroceryHistoryItem } from './types';
 import { ItemInput } from './components/ItemInput';
 import { GroceryList } from './components/GroceryList';
 import { categorizeGroceries } from './services/geminiService';
 import { FavoritesPage } from './components/FavoritesPage';
-import { SuggestionsList } from './components/SuggestionsList';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
 import { InfoIcon } from './components/icons/InfoIcon';
@@ -20,10 +19,10 @@ import { Toast } from './components/Toast';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner } from './services/firebaseService';
 import type { User } from 'firebase/auth';
-import { subscribeSuggestions, upsertSuggestionsToFirestore, addOrIncrementFromPurchasedFirestore, SuggestedItem } from './services/suggestionsFirestoreService';
+import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 type Language = 'en' | 'he' | 'es';
-type View = 'list' | 'favorites' | 'suggestions' | 'checklist';
+type View = 'list' | 'favorites' | 'checklist';
 
 const translations = {
   en: {
@@ -38,9 +37,8 @@ const translations = {
     uncategorized: "Uncategorized",
     clearCompleted: "Clear Completed",
     list: "List",
-    favorites: "Favorites",
-    suggestionsNav: "Suggestions",
-    favoritesTitle: "Your Favorite Items",
+    favorites: "History",
+    favoritesTitle: "Purchase History",
     favoritesSubtitle: "Shop faster by adding your frequent purchases.",
     purchased: "purchased",
     times: "times",
@@ -86,6 +84,7 @@ const translations = {
     suggestionsSubtitle: "Based on your shopping patterns and time of day",
     addSuggestion: "Add",
     noSuggestions: "No suggestions available",
+    predictive: "Smart Prediction",
     timeBased: "Time-based",
     frequencyBased: "Frequent",
     seasonal: "Seasonal",
@@ -137,9 +136,8 @@ const translations = {
     uncategorized: "ללא קטגוריה",
     clearCompleted: "נקה פריטים שנקנו",
     list: "רשימה",
-    favorites: "מועדפים",
-    suggestionsNav: "הצעות",
-    favoritesTitle: "הפריטים המועדפים עליך",
+    favorites: "היסטוריה",
+    favoritesTitle: "היסטוריית קניות",
     favoritesSubtitle: "קנה מהר יותר על ידי הוספת הרכישות התכופות שלך.",
     purchased: "נקנה",
     times: "פעמים",
@@ -185,6 +183,7 @@ const translations = {
     suggestionsSubtitle: "מבוסס על דפוסי הקנייה שלך ושעת היום",
     addSuggestion: "הוסף",
     noSuggestions: "אין הצעות זמינות",
+    predictive: "חיזוי חכם",
     timeBased: "מבוסס זמן",
     frequencyBased: "תכוף",
     seasonal: "עונתי",
@@ -236,9 +235,8 @@ const translations = {
     uncategorized: "Sin categoría",
     clearCompleted: "Limpiar Completados",
     list: "Lista",
-    favorites: "Favoritos",
-    suggestionsNav: "Sugerencias",
-    favoritesTitle: "Tus Artículos Favoritos",
+    favorites: "Historial",
+    favoritesTitle: "Historial de Compras",
     favoritesSubtitle: "Compra más rápido añadiendo tus compras frecuentes.",
     purchased: "comprado",
     times: "veces",
@@ -284,6 +282,7 @@ const translations = {
     suggestionsSubtitle: "Basado en tus patrones de compra y hora del día",
     addSuggestion: "Añadir",
     noSuggestions: "No hay sugerencias disponibles",
+    predictive: "Predicción Inteligente",
     timeBased: "Por tiempo",
     frequencyBased: "Frecuente",
     seasonal: "Estacional",
@@ -393,7 +392,7 @@ function App() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [suggestions, setSuggestions] = useState<SuggestedItem[]>([]);
+  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   
   // Get list ID and other states from auth
   const [listId, setListId] = useState<string | null>(null);
@@ -510,16 +509,6 @@ function App() {
     };
   }, []);
 
-  // Suggestions realtime (polling) subscription via Firestore Lite
-  useEffect(() => {
-    if (!listId) return;
-    const unsubscribe = subscribeSuggestions(listId, language, (items) => {
-      setSuggestions(items);
-    });
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [listId, language]);
 
   const handleSignOut = async () => {
     try {
@@ -595,7 +584,7 @@ function App() {
     }
   }, [items, language, currentText.error, currentText.uncategorized, setItems]);
 
-  const handleAddItemFromHistory = useCallback((historyItem: GroceryHistoryItem) => {
+  const handleAddItemFromHistory = useCallback((historyItem: PurchaseHistoryItem) => {
     console.log('Adding item from history:', historyItem.name);
     const itemExists = isSemanticDuplicate(historyItem.name, items.map(i => i.name));
     if (itemExists) {
@@ -618,7 +607,7 @@ function App() {
       return updatedItems;
     });
     setCurrentView('list');
-  }, [items, currentText.uncategorized, setItems]);
+  }, [items, currentText.uncategorized, setItems, currentText.itemAlreadyAdded, showToast]);
 
   const handleDeleteHistoryItem = useCallback((itemName: string) => {
     setHistoryItems(prev => prev.filter(item => item.name.toLowerCase() !== itemName.toLowerCase()));
@@ -720,16 +709,23 @@ function App() {
       const idx = next.findIndex(h => h.name.toLowerCase() === target.name.toLowerCase());
       if (idx > -1) {
         next[idx].frequency += 1;
-        next[idx].lastAdded = new Date().toISOString();
+        next[idx].lastPurchased = new Date().toISOString();
       } else {
-        next.push({ name: target.name, category: target.category, frequency: 1, lastAdded: new Date().toISOString() });
+        const now = new Date().toISOString();
+        next.push({ 
+          name: target.name, 
+          category: target.category, 
+          frequency: 1, 
+          lastPurchased: now,
+          firstPurchased: now
+        });
       }
       return next;
     });
     setItems(prev => prev.filter(i => i.id !== id));
     if (listId) {
-      addOrIncrementFromPurchasedFirestore(listId, language, [{ name: target.name, category: target.category }])
-        .catch(e => console.warn('Failed to update suggestions from swipe action', e));
+      addOrIncrementPurchase(listId, [{ name: target.name, category: target.category }])
+        .catch(e => console.warn('Failed to update purchase history from swipe action', e));
     }
   };
 
@@ -737,26 +733,28 @@ function App() {
     const completedItems = items.filter(item => item.completed);
     if (completedItems.length === 0) return;
 
-    console.log('Moving completed items to favorites:', completedItems);
+    console.log('Moving completed items to purchase history:', completedItems);
 
-    // Add completed items to history/favorites
+    // Add completed items to purchase history
+    const now = new Date().toISOString();
     setHistoryItems(prevHistory => {
         const newHistory = [...prevHistory];
         completedItems.forEach(item => {
             const historyIndex = newHistory.findIndex(h => h.name.toLowerCase() === item.name.toLowerCase());
             if (historyIndex > -1) {
                 newHistory[historyIndex].frequency += 1;
-                newHistory[historyIndex].lastAdded = new Date().toISOString();
+                newHistory[historyIndex].lastPurchased = now;
                 console.log('Updated frequency for:', item.name, 'new frequency:', newHistory[historyIndex].frequency);
             } else {
-                const newHistoryItem = {
+                const newHistoryItem: PurchaseHistoryItem = {
                     name: item.name,
                     category: item.category,
                     frequency: 1,
-                    lastAdded: new Date().toISOString(),
+                    lastPurchased: now,
+                    firstPurchased: now,
                 };
                 newHistory.push(newHistoryItem);
-                console.log('Added new item to favorites:', newHistoryItem);
+                console.log('Added new item to purchase history:', newHistoryItem);
             }
         });
         return newHistory;
@@ -769,12 +767,12 @@ function App() {
         return remainingItems;
     });
 
-    // Also learn from purchased items -> add/increment to Suggestions (Firestore)
+    // Update unified purchase history in Firestore
     if (listId) {
-      addOrIncrementFromPurchasedFirestore(listId, language, completedItems.map(i => ({ name: i.name, category: i.category })))
-        .catch(e => console.warn('Failed to update suggestions from purchased items', e));
+      addOrIncrementPurchase(listId, completedItems.map(i => ({ name: i.name, category: i.category })))
+        .catch(e => console.warn('Failed to update purchase history from completed items', e));
     }
-  }, [items, setHistoryItems, setItems]);
+  }, [items, setHistoryItems, setItems, listId]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
@@ -819,27 +817,28 @@ function App() {
     }
   }, [items, setItems]);
 
-  const handleImportSuccess = useCallback((importedItems: GroceryItem[]) => {
-    const suggested: SuggestedItem[] = importedItems.map(i => ({
-      name: i.name,
-      category: i.category,
-      frequency: 1,
-      lastAdded: new Date().toISOString(),
-    }));
-    if (listId) {
-      upsertSuggestionsToFirestore(listId, language, suggested)
-        .then(() => setCurrentView('suggestions'))
-        .catch(e => {
-          console.warn('Failed to upsert suggestions to Firestore, falling back to add to list', e);
-          setItems(prevItems => [...importedItems, ...prevItems]);
-        })
-        .finally(() => setShowImportExport(false));
-    } else {
+  const handleImportSuccess = useCallback(async (importedItems: GroceryItem[]) => {
+    if (!listId) {
       // No list yet; fallback to adding into current list to avoid data loss
       setItems(prevItems => [...importedItems, ...prevItems]);
       setShowImportExport(false);
+      return;
     }
-  }, [language, listId, setItems]);
+
+    try {
+      // Add imported items directly to purchase history
+      await addOrIncrementPurchase(listId, importedItems.map(i => ({
+        name: i.name,
+        category: i.category,
+      })));
+      setCurrentView('favorites'); // View purchase history after import
+      setShowImportExport(false);
+    } catch (e) {
+      console.warn('Failed to add items to purchase history, falling back to add to list', e);
+      setItems(prevItems => [...importedItems, ...prevItems]);
+      setShowImportExport(false);
+    }
+  }, [listId, setItems]);
 
   const categorizedList = useMemo<Category[]>(() => {
     const groups: { [key: string]: GroceryItem[] } = items.reduce((acc, item) => {
@@ -959,7 +958,6 @@ function App() {
         <div className="max-w-3xl mx-auto border-t border-gray-200 flex">
             <NavButton currentView={currentView} buttonView="list" onClick={() => setCurrentView('list')}><ListIcon className="w-6 h-6 mb-1"/><span>{currentText.list}</span></NavButton>
             <NavButton currentView={currentView} buttonView="favorites" onClick={() => setCurrentView('favorites')}><StarIcon className="w-6 h-6 mb-1"/><span>{currentText.favorites}</span></NavButton>
-            <NavButton currentView={currentView} buttonView="suggestions" onClick={() => setCurrentView('suggestions')}><span className="w-6 h-6 mb-1">✨</span><span>{currentText.suggestionsNav}</span></NavButton>
         </div>
       </header>
 
@@ -976,8 +974,15 @@ function App() {
       <main className="max-w-3xl mx-auto p-4 sm:px-6 lg:px-8 pb-32">
         {currentView === 'list' ? (
             <>
-              {/* Clear Completed Action */}
-              <div className="flex justify-end items-center mb-2 rtl:flex-row-reverse">
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center mb-2 rtl:flex-row-reverse gap-2">
+                <button
+                  onClick={() => setShowSmartSuggestions(true)}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-purple-500 text-white hover:bg-purple-600 shadow-sm flex items-center gap-2"
+                >
+                  <span>✨</span>
+                  <span>Smart Suggestions</span>
+                </button>
                 {hasCompletedItems && (
                   <button onClick={handleClearCompleted} className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-sm">
                     {currentText.clearCompleted}
@@ -1029,24 +1034,6 @@ function App() {
                 </div>
               )}
               
-              {/* Smart Suggestions */}
-              <SmartSuggestions
-                currentItems={items.map(item => item.name)}
-                historyItems={historyItems}
-                language={language}
-                onAddSuggestion={handleAddSuggestion}
-                translations={{
-                  title: currentText.suggestionsTitle,
-                  subtitle: currentText.suggestionsSubtitle,
-                  addButton: currentText.addSuggestion,
-                  noSuggestions: currentText.noSuggestions,
-                  timeBased: currentText.timeBased,
-                  frequencyBased: currentText.frequencyBased,
-                  seasonal: currentText.seasonal,
-                  complementary: currentText.complementary,
-                }}
-              />
-              
               <GroceryList 
                 categories={categorizedList} 
                 onToggleItem={handleToggleItem} 
@@ -1059,17 +1046,6 @@ function App() {
             </>
         ) : currentView === 'favorites' ? (
             <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList }} />
-        ) : currentView === 'suggestions' ? (
-            <SuggestionsList 
-              suggestions={suggestions}
-              language={language}
-              onAdd={(name, category) => {
-                const exists = isSemanticDuplicate(name, items.map(i => i.name));
-                if (exists) { showToast(currentText.itemAlreadyAdded, 'warning'); return; }
-                const newItem: GroceryItem = { id: `${Date.now()}-${name}-${Math.random()}`, name, category, completed: false } as GroceryItem;
-                setItems(prev => [newItem, ...prev]);
-              }}
-            />
         ) : (
             <LaunchChecklistPage onClose={() => setCurrentView('list')} />
         )}
@@ -1250,6 +1226,48 @@ function App() {
           clipboardEmpty: currentText.clipboardEmpty,
         }}
       />
+
+      {/* Smart Suggestions Modal */}
+      {showSmartSuggestions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowSmartSuggestions(false)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <span>✨</span>
+                <span>{currentText.suggestionsTitle}</span>
+              </h2>
+              <button
+                onClick={() => setShowSmartSuggestions(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <SmartSuggestions
+              currentItems={items.map(item => item.name)}
+              historyItems={historyItems}
+              language={language}
+              onAddSuggestion={(suggestion) => {
+                handleAddSuggestion(suggestion);
+                // Optionally close the modal after adding
+                // setShowSmartSuggestions(false);
+              }}
+              translations={{
+                title: currentText.suggestionsTitle,
+                subtitle: currentText.suggestionsSubtitle,
+                addButton: currentText.addSuggestion,
+                noSuggestions: currentText.noSuggestions,
+                predictive: currentText.predictive,
+                timeBased: currentText.timeBased,
+                frequencyBased: currentText.frequencyBased,
+                seasonal: currentText.seasonal,
+                complementary: currentText.complementary,
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

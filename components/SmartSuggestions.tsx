@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { ShoppingSuggestion } from '../services/smartSuggestionsService';
 import { getSmartSuggestions, getStarterSuggestions } from '../services/smartSuggestionsService';
-import type { GroceryHistoryItem } from '../types';
+import type { PurchaseHistoryItem } from '../types';
 
 interface SmartSuggestionsProps {
   currentItems: string[];
-  historyItems: GroceryHistoryItem[];
+  historyItems: PurchaseHistoryItem[];
   language: 'en' | 'he' | 'es';
   onAddSuggestion: (suggestion: ShoppingSuggestion) => void;
   translations: {
@@ -17,6 +17,7 @@ interface SmartSuggestionsProps {
     frequencyBased: string;
     seasonal: string;
     complementary: string;
+    predictive?: string;
   };
 }
 
@@ -64,6 +65,7 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
 
   const getTypeIcon = (type: ShoppingSuggestion['type']) => {
     switch (type) {
+      case 'predictive': return '🔮';
       case 'time-based': return '⏰';
       case 'frequency-based': return '🔄';
       case 'seasonal': return '🌟';
@@ -74,6 +76,7 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
 
   const getTypeLabel = (type: ShoppingSuggestion['type']) => {
     switch (type) {
+      case 'predictive': return translations.predictive || 'Smart Prediction';
       case 'time-based': return translations.timeBased;
       case 'frequency-based': return translations.frequencyBased;
       case 'seasonal': return translations.seasonal;

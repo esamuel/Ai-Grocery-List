@@ -15,15 +15,16 @@ import {
 import type { GroceryListData, GroceryHistoryItem } from '../types';
 
 // --- IMPORTANT ---
-// Replace this with your actual Firebase configuration from the Firebase console
- const firebaseConfig = {
-  apiKey: "AIzaSyAFM-d9hOYN-UhKNf8Sl188Y-d9APvQFf8",
-  authDomain: "family-grocery-list-ee6d3.firebaseapp.com",
-  projectId: "family-grocery-list-ee6d3",
-  storageBucket: "family-grocery-list-ee6d3.firebasestorage.app",
-  messagingSenderId: "903662338050",
-  appId: "1:903662338050:web:018a78f73137931c1fa71b",
-  measurementId: "G-742NHTZLD7"
+// Firebase configuration is loaded from Vite environment variables.
+// Define these in your local .env.local and in Netlify site environment settings.
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string,
 };
 
 let app: FirebaseApp | null = null;
@@ -41,9 +42,12 @@ const getFirebaseServices = () => {
     }
 
     console.log('getFirebaseServices: Initializing Firebase...');
-    // Provide a clear, actionable error if the config is still the placeholder
-    if (firebaseConfig.apiKey.startsWith("YOUR_")) {
-        throw new Error("Firebase is not configured. Please add your credentials to services/firebaseService.ts");
+    // Validate config presence and provide clear errors
+    const missing = Object.entries(firebaseConfig)
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    if (missing.length > 0) {
+        throw new Error(`Firebase is not configured. Missing env vars for: ${missing.join(', ')}. Set VITE_FIREBASE_* variables in your environment.`);
     }
 
     try {

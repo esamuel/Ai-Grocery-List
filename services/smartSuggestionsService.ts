@@ -1,10 +1,10 @@
-import type { GroceryHistoryItem } from '../types';
+import type { PurchaseHistoryItem } from '../types';
 
 interface ShoppingSuggestion {
-  item: GroceryHistoryItem;
+  item: PurchaseHistoryItem;
   reason: string;
   confidence: number;
-  type: 'time-based' | 'frequency-based' | 'seasonal' | 'complementary';
+  type: 'time-based' | 'frequency-based' | 'seasonal' | 'complementary' | 'predictive';
 }
 
 interface TimeBasedRule {
@@ -148,7 +148,7 @@ const complementaryItemsEs: Record<string, string[]> = {
 };
 
 // Get time-based suggestions
-function getTimeBasedSuggestions(historyItems: GroceryHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
+function getTimeBasedSuggestions(historyItems: PurchaseHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
   const currentHour = new Date().getHours();
   const suggestions: ShoppingSuggestion[] = [];
   
@@ -185,7 +185,7 @@ function getTimeBasedSuggestions(historyItems: GroceryHistoryItem[], language: '
 }
 
 // Get frequency-based suggestions
-function getFrequencyBasedSuggestions(historyItems: GroceryHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
+function getFrequencyBasedSuggestions(historyItems: PurchaseHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
   const suggestions: ShoppingSuggestion[] = [];
   const now = new Date();
   
@@ -196,7 +196,7 @@ function getFrequencyBasedSuggestions(historyItems: GroceryHistoryItem[], langua
   
   for (const item of frequentItems.slice(0, 5)) {
     const daysSinceLastPurchase = Math.floor(
-      (now.getTime() - new Date(item.lastAdded).getTime()) / (1000 * 60 * 60 * 24)
+      (now.getTime() - new Date(item.lastPurchased).getTime()) / (1000 * 60 * 60 * 24)
     );
     
     // Suggest if it's been more than a week since last purchase
@@ -219,8 +219,57 @@ function getFrequencyBasedSuggestions(historyItems: GroceryHistoryItem[], langua
   return suggestions;
 }
 
+// Get predictive suggestions based on purchase patterns
+function getPredictiveSuggestions(historyItems: PurchaseHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
+  const suggestions: ShoppingSuggestion[] = [];
+  const now = new Date();
+  
+  // Find items with established purchase patterns
+  const predictableItems = historyItems
+    .filter(item => item.frequency >= 3 && item.avgDaysBetween && item.avgDaysBetween > 0);
+  
+  for (const item of predictableItems) {
+    const daysSinceLastPurchase = Math.floor(
+      (now.getTime() - new Date(item.lastPurchased).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    
+    const avgDays = item.avgDaysBetween || 7;
+    const threshold = avgDays * 0.8; // Suggest when 80% of average time has passed
+    
+    // Predict if it's time to buy again
+    if (daysSinceLastPurchase >= threshold) {
+      const daysOverdue = daysSinceLastPurchase - avgDays;
+      const confidence = Math.min(0.95, 0.7 + (daysOverdue / avgDays) * 0.25);
+      
+      let reason = '';
+      if (daysOverdue > 0) {
+        reason = language === 'he'
+          ? `בדרך כלל קונה כל ${avgDays} ימים (${daysOverdue} ימים מאוחר)`
+          : language === 'es'
+            ? `Normalmente compras cada ${avgDays} días (${daysOverdue} días tarde)`
+            : `Usually buy every ${avgDays} days (${daysOverdue} days overdue)`;
+      } else {
+        reason = language === 'he'
+          ? `בדרך כלל קונה כל ${avgDays} ימים`
+          : language === 'es'
+            ? `Normalmente compras cada ${avgDays} días`
+            : `Usually buy every ${avgDays} days`;
+      }
+      
+      suggestions.push({
+        item,
+        reason,
+        confidence,
+        type: 'predictive'
+      });
+    }
+  }
+  
+  return suggestions.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+}
+
 // Get seasonal suggestions
-function getSeasonalSuggestions(historyItems: GroceryHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
+function getSeasonalSuggestions(historyItems: PurchaseHistoryItem[], language: 'en' | 'he' | 'es'): ShoppingSuggestion[] {
   const currentMonth = new Date().getMonth();
   const seasonalRule = seasonalRules[currentMonth];
   const suggestions: ShoppingSuggestion[] = [];
@@ -249,7 +298,7 @@ function getSeasonalSuggestions(historyItems: GroceryHistoryItem[], language: 'e
 // Get complementary suggestions based on current list
 function getComplementarySuggestions(
   currentItems: string[], 
-  historyItems: GroceryHistoryItem[], 
+  historyItems: PurchaseHistoryItem[], 
   language: 'en' | 'he' | 'es'
 ): ShoppingSuggestion[] {
   const suggestions: ShoppingSuggestion[] = [];
@@ -294,10 +343,11 @@ function getComplementarySuggestions(
 // Main smart suggestions function
 export const getSmartSuggestions = (
   currentItems: string[],
-  historyItems: GroceryHistoryItem[],
+  historyItems: PurchaseHistoryItem[],
   language: 'en' | 'he' | 'es' = 'en'
 ): ShoppingSuggestion[] => {
   const allSuggestions: ShoppingSuggestion[] = [
+    ...getPredictiveSuggestions(historyItems, language), // Prioritize predictive suggestions
     ...getTimeBasedSuggestions(historyItems, language),
     ...getFrequencyBasedSuggestions(historyItems, language),
     ...getSeasonalSuggestions(historyItems, language),
@@ -321,7 +371,7 @@ export const getSmartSuggestions = (
 
 // Get suggestions for empty list (first-time users or new shopping trip)
 export const getStarterSuggestions = (
-  historyItems: GroceryHistoryItem[],
+  historyItems: PurchaseHistoryItem[],
   language: 'en' | 'he' | 'es' = 'en'
 ): ShoppingSuggestion[] => {
   if (historyItems.length === 0) {
@@ -332,12 +382,14 @@ export const getStarterSuggestions = (
       ['leche', 'pan', 'huevos', 'plátanos', 'tomates'] :
       ['milk', 'bread', 'eggs', 'bananas', 'tomatoes'];
     
+    const now = new Date().toISOString();
     return starterItems.map(item => ({
       item: {
         name: item,
         category: language === 'he' ? 'מוצרי יסוד' : language === 'es' ? 'Esenciales' : 'Essentials',
         frequency: 1,
-        lastAdded: new Date().toISOString()
+        lastPurchased: now,
+        firstPurchased: now
       },
       reason: language === 'he' ? 'פריטים בסיסיים' : language === 'es' ? 'Elementos básicos' : 'Basic essentials',
       confidence: 0.5,

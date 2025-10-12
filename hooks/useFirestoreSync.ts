@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { subscribeToList, updateList } from '../services/firebaseService';
-import type { GroceryItem, GroceryHistoryItem, GroceryListData } from '../types';
+import type { GroceryItem, PurchaseHistoryItem, GroceryListData } from '../types';
 
 /**
  * Sanitizes raw data from Firestore or application state to ensure it is a
@@ -28,30 +28,35 @@ const sanitizeListData = (data: any): GroceryListData => {
 
     if (data && Array.isArray(data.history)) {
         cleanData.history = data.history.map((historyItem: any) => {
-            let lastAddedString = new Date().toISOString();
-            const rawLastAdded = historyItem?.lastAdded;
-
-            if (rawLastAdded) {
-                if (typeof rawLastAdded === 'string') {
-                    // It's already a string, use it.
-                    lastAddedString = rawLastAdded;
-                } else if (rawLastAdded instanceof Date) {
-                    // It's a native Date object.
-                    lastAddedString = rawLastAdded.toISOString();
-                } else if (typeof rawLastAdded === 'object' && rawLastAdded !== null && typeof rawLastAdded.toDate === 'function') {
-                    // It's a Firestore Timestamp.
-                    lastAddedString = rawLastAdded.toDate().toISOString();
-                } else if (typeof rawLastAdded === 'object' && rawLastAdded !== null && typeof rawLastAdded.seconds === 'number') {
-                    // It's a plain object representation of a Timestamp.
-                    lastAddedString = new Date(rawLastAdded.seconds * 1000).toISOString();
+            const now = new Date().toISOString();
+            
+            // Helper to convert various date formats to ISO string
+            const parseDateField = (field: any): string => {
+                if (!field) return now;
+                if (typeof field === 'string') return field;
+                if (field instanceof Date) return field.toISOString();
+                if (typeof field === 'object' && field !== null && typeof field.toDate === 'function') {
+                    return field.toDate().toISOString();
                 }
-            }
+                if (typeof field === 'object' && field !== null && typeof field.seconds === 'number') {
+                    return new Date(field.seconds * 1000).toISOString();
+                }
+                return now;
+            };
+
+            // Handle legacy data (lastAdded) and new data (lastPurchased/firstPurchased)
+            const lastPurchased = parseDateField(historyItem?.lastPurchased || historyItem?.lastAdded);
+            const firstPurchased = parseDateField(historyItem?.firstPurchased || historyItem?.lastAdded);
 
             return {
                 name: historyItem && historyItem.name ? String(historyItem.name) : '',
                 category: historyItem && historyItem.category ? String(historyItem.category) : '',
                 frequency: historyItem && historyItem.frequency ? Number(historyItem.frequency) : 0,
-                lastAdded: lastAddedString,
+                lastPurchased,
+                firstPurchased,
+                avgDaysBetween: historyItem && historyItem.avgDaysBetween ? Number(historyItem.avgDaysBetween) : undefined,
+                starred: historyItem ? !!historyItem.starred : undefined,
+                tags: historyItem && Array.isArray(historyItem.tags) ? historyItem.tags : undefined,
             };
         });
     }
@@ -137,7 +142,7 @@ export const useFirestoreSync = (listId: string | null) => {
 
 
 
-    const setHistoryItems = useCallback((historyUpdater: GroceryHistoryItem[] | ((prev: GroceryHistoryItem[]) => GroceryHistoryItem[])) => {
+    const setHistoryItems = useCallback((historyUpdater: PurchaseHistoryItem[] | ((prev: PurchaseHistoryItem[]) => PurchaseHistoryItem[])) => {
         updateData(prevData => ({
             ...prevData,
             history: typeof historyUpdater === 'function' ? historyUpdater(prevData.history) : historyUpdater,

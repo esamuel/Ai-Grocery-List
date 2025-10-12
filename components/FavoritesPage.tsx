@@ -1,12 +1,13 @@
 
-import React from 'react';
-import type { GroceryHistoryItem } from '../types';
+import React, { useState } from 'react';
+import type { PurchaseHistoryItem } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { StarIcon } from './icons/StarIcon';
 
 interface FavoritesPageProps {
-  historyItems: GroceryHistoryItem[];
-  onAddItem: (item: GroceryHistoryItem) => void;
+  historyItems: PurchaseHistoryItem[];
+  onAddItem: (item: PurchaseHistoryItem) => void;
   onDeleteItem: (itemName: string) => void;
   translations: {
     title: string;
@@ -18,7 +19,11 @@ interface FavoritesPageProps {
   };
 }
 
+type SortMode = 'frequency' | 'recent' | 'starred';
+
 export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, translations }) => {
+  const [sortMode, setSortMode] = useState<SortMode>('frequency');
+
   if (historyItems.length === 0) {
     return (
       <div className="text-center py-20">
@@ -28,41 +33,116 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
       </div>
     );
   }
+
+  // Sort items based on selected mode
+  const sortedItems = [...historyItems].sort((a, b) => {
+    if (sortMode === 'frequency') {
+      return b.frequency - a.frequency;
+    } else if (sortMode === 'recent') {
+      return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
+    } else if (sortMode === 'starred') {
+      if (a.starred && !b.starred) return -1;
+      if (!a.starred && b.starred) return 1;
+      return b.frequency - a.frequency;
+    }
+    return 0;
+  });
+
+  // Calculate days since last purchase
+  const getDaysSince = (lastPurchased: string): number => {
+    const now = new Date();
+    const last = new Date(lastPurchased);
+    return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  };
   
   return (
     <div>
-      <div className="text-center mb-8">
+      <div className="mb-6">
+        <div className="text-center mb-4">
           <h2 className="text-2xl font-bold text-gray-800">{translations.title}</h2>
           <p className="text-gray-500 mt-1">{translations.subtitle}</p>
+        </div>
+        
+        {/* Sort Controls */}
+        <div className="flex justify-center gap-2">
+          <button
+            onClick={() => setSortMode('frequency')}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sortMode === 'frequency'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Most Frequent
+          </button>
+          <button
+            onClick={() => setSortMode('recent')}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sortMode === 'recent'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Recent
+          </button>
+          <button
+            onClick={() => setSortMode('starred')}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sortMode === 'starred'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            ⭐ Starred
+          </button>
+        </div>
       </div>
+
       <div className="space-y-3">
-        {historyItems.map(item => (
-          <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
-            <div>
-                <p className="font-semibold text-gray-800">{item.name}</p>
+        {sortedItems.map(item => {
+          const daysSince = getDaysSince(item.lastPurchased);
+          const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
+          const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
+          
+          return (
+            <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {item.starred && <span className="text-yellow-500">⭐</span>}
+                  <p className="font-semibold text-gray-800">{item.name}</p>
+                  {showPredictive && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      isOverdue ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      🔮 {isOverdue ? `${daysSince - item.avgDaysBetween!}d overdue` : `Every ${item.avgDaysBetween}d`}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500">
-                    {item.category} &middot; {translations.purchased} {item.frequency} {translations.times}
+                  {item.category} &middot; {translations.purchased} {item.frequency} {translations.times}
+                  {daysSince > 0 && ` · ${daysSince}d ago`}
                 </p>
-            </div>
-            <div className="flex items-center gap-2">
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                    onClick={() => onAddItem(item)}
-                    className="flex items-center gap-1.5 text-sm bg-green-100 text-green-800 font-medium py-1 px-3 rounded-full hover:bg-green-200 transition-colors"
-                    aria-label={`${translations.add} ${item.name}`}
+                  onClick={() => onAddItem(item)}
+                  className="flex items-center gap-1.5 text-sm bg-green-100 text-green-800 font-medium py-1 px-3 rounded-full hover:bg-green-200 transition-colors"
+                  aria-label={`${translations.add} ${item.name}`}
                 >
-                    <PlusCircleIcon className="w-5 h-5" />
-                    <span>{translations.add}</span>
+                  <PlusCircleIcon className="w-5 h-5" />
+                  <span>{translations.add}</span>
                 </button>
-                 <button
-                    onClick={() => onDeleteItem(item.name)}
-                    className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label={`${translations.delete} ${item.name}`}
+                <button
+                  onClick={() => onDeleteItem(item.name)}
+                  className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`${translations.delete} ${item.name}`}
                 >
-                    <TrashIcon className="w-5 h-5" />
+                  <TrashIcon className="w-5 h-5" />
                 </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
