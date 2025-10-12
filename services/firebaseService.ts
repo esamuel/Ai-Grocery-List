@@ -161,29 +161,33 @@ export const doesListExist = async (listId: string): Promise<boolean> => {
     return docSnap.exists();
 };
 
-// TEMP: Replace realtime onSnapshot with polling via Firestore Lite to avoid WebChannel entirely.
+// Optimized polling with faster updates and smart backoff
 export const subscribeToList = (listId: string, callback: (data: GroceryListData) => void): (() => void) => {
     const { dbLite } = getFirebaseServices();
     let cancelled = false;
-    const BASE_INTERVAL = 20000; // start at 20s to be very conservative with quota
-    const MAX_INTERVAL = 300000; // cap at 5 minutes
-    let currentInterval = BASE_INTERVAL;
+    const ACTIVE_INTERVAL = 3000; // 3s when tab is active (fast updates)
+    const HIDDEN_INTERVAL = 30000; // 30s when tab is hidden (save battery/quota)
+    const MAX_INTERVAL = 60000; // cap at 1 minute (only on errors)
+    let currentInterval = ACTIVE_INTERVAL;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const scheduleNext = () => {
+    const scheduleNext = (immediate = false) => {
         if (cancelled) return;
-        const jitter = Math.random() * 300; // small jitter to avoid thundering herd
-        timer = setTimeout(poll, currentInterval + jitter);
+        if (timer) clearTimeout(timer);
+        const delay = immediate ? 0 : currentInterval + Math.random() * 500; // small jitter
+        timer = setTimeout(poll, delay);
     };
 
     const poll = async () => {
         if (cancelled) return;
-        // If tab is hidden, slow down dramatically to save quota
+        
+        // If tab is hidden, slow down to save quota
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-            currentInterval = Math.min(Math.max(currentInterval, 60000), MAX_INTERVAL); // at least 1 minute when hidden
+            currentInterval = HIDDEN_INTERVAL;
             scheduleNext();
             return;
         }
+        
         try {
             const docRefLite = docLite(dbLite, listsCollection, listId);
             const snap = await getDocLite(docRefLite);
@@ -192,18 +196,18 @@ export const subscribeToList = (listId: string, callback: (data: GroceryListData
             } else {
                 console.error(`List with ID "${listId}" does not exist!`);
             }
-            // success: reset interval
-            currentInterval = BASE_INTERVAL;
+            // Success: reset to fast interval
+            currentInterval = ACTIVE_INTERVAL;
         } catch (e: any) {
             const msg = e?.message || String(e);
             const code = e?.code || '';
-            // resource-exhausted (429) -> backoff exponentially
+            // Only slow down on quota/rate limit errors
             if (code === 'resource-exhausted' || /quota exceeded|429/i.test(msg)) {
                 currentInterval = Math.min(currentInterval * 2, MAX_INTERVAL);
-                console.warn(`Firestore quota/backoff: increasing poll interval to ${currentInterval}ms`);
+                console.warn(`⚠️ Firestore quota limit: slowing to ${currentInterval}ms`);
             } else {
-                // transient error: small backoff
-                currentInterval = Math.min(currentInterval + 2000, MAX_INTERVAL);
+                // Other errors: moderate backoff
+                currentInterval = Math.min(ACTIVE_INTERVAL * 3, MAX_INTERVAL);
                 console.warn('Polling read failed:', e);
             }
         } finally {
@@ -211,12 +215,21 @@ export const subscribeToList = (listId: string, callback: (data: GroceryListData
         }
     };
 
-    // Start immediate fetch then self-schedule
+    // Start immediate fetch
     poll();
-    return () => {
+    
+    // Return cleanup function with manual trigger capability
+    const cleanup = () => {
         cancelled = true;
         if (timer) clearTimeout(timer);
     };
+    
+    // Expose trigger for immediate poll (for optimistic updates)
+    (cleanup as any).triggerPoll = () => {
+        if (!cancelled) scheduleNext(true);
+    };
+    
+    return cleanup;
 };
 
 // Remove undefined values from an object (Firestore doesn't accept undefined)
@@ -255,7 +268,7 @@ export const updateListItems = async (listId: string, items: GroceryItem[]): Pro
         items: cleanItems,
         updatedAt: new Date().toISOString()
     });
-    console.log('✅ Items list updated in Firestore');
+    console.log('✅ Items list updated in Firestore (fast poll triggered)');
 };
 
 // User favorites functions (separate from individual lists)

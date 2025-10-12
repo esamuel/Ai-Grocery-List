@@ -106,7 +106,7 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
       history: cleanedItems,
       updatedAt: new Date().toISOString()
     });
-    console.log(`✅ Purchase history updated in Firestore (${cleanedItems.length} items)`);
+    console.log(`✅ Purchase history updated in Firestore (${cleanedItems.length} items) - UI will update in ~3s`);
   } catch (e) {
     console.error('❌ Failed to update purchase history:', e);
     throw e;
