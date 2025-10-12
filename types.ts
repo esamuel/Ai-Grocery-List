@@ -25,6 +25,30 @@ export interface PurchaseHistoryItem {
   avgDaysBetween?: number; // Average days between purchases (for predictions)
   starred?: boolean; // User can manually star favorite items
   tags?: string[]; // e.g., ['staple', 'seasonal', 'weekly']
+  
+  // 💰 Price tracking
+  prices?: PriceHistory[]; // Historical prices
+  lastPrice?: number; // Last paid price
+  avgPrice?: number; // Average price
+  lowestPrice?: number; // Best deal ever
+  highestPrice?: number; // Most expensive
+}
+
+// Price history entry
+export interface PriceHistory {
+  price: number;
+  currency: string;
+  purchaseDate: string; // ISO date string
+  store?: string; // Optional: which store
+  quantity?: number; // How many bought at this price
+}
+
+// User settings for price tracking
+export interface UserSettings {
+  enablePriceTracking: boolean;
+  currency: string; // USD, ILS, EUR, etc.
+  budgetAlerts: boolean;
+  monthlyBudget?: number;
 }
 
 // Legacy type - will be migrated to PurchaseHistoryItem

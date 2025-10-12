@@ -83,7 +83,7 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
 // Add or increment item in purchase history
 export async function addOrIncrementPurchase(
   listId: string,
-  items: { name: string; category?: string }[]
+  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number }[]
 ): Promise<void> {
   const current = await getPurchaseHistory(listId);
   const map = new Map<string, PurchaseHistoryItem>();
@@ -116,17 +116,57 @@ export async function addOrIncrementPurchase(
         );
       }
       
+      // Handle price tracking if price is provided
+      if (purchase.price !== undefined && purchase.price > 0) {
+        const priceEntry = {
+          price: purchase.price,
+          currency: purchase.currency || 'USD',
+          purchaseDate: now,
+          store: purchase.store,
+          quantity: purchase.quantity || 1,
+        };
+        
+        // Add to price history
+        updated.prices = [...(existing.prices || []), priceEntry];
+        updated.lastPrice = purchase.price;
+        
+        // Calculate price statistics
+        const allPrices = updated.prices.map(p => p.price);
+        updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+        updated.lowestPrice = Math.min(...allPrices);
+        updated.highestPrice = Math.max(...allPrices);
+      }
+      
       map.set(key, updated);
     } else {
       // Create new item
-      map.set(key, {
+      const newItem: PurchaseHistoryItem = {
         name: purchase.name,
         category: purchase.category || 'Uncategorized',
         frequency: 1,
         lastPurchased: now,
         firstPurchased: now,
         avgDaysBetween: 0,
-      });
+      };
+      
+      // Add price if provided
+      if (purchase.price !== undefined && purchase.price > 0) {
+        const priceEntry = {
+          price: purchase.price,
+          currency: purchase.currency || 'USD',
+          purchaseDate: now,
+          store: purchase.store,
+          quantity: purchase.quantity || 1,
+        };
+        
+        newItem.prices = [priceEntry];
+        newItem.lastPrice = purchase.price;
+        newItem.avgPrice = purchase.price;
+        newItem.lowestPrice = purchase.price;
+        newItem.highestPrice = purchase.price;
+      }
+      
+      map.set(key, newItem);
     }
   });
   

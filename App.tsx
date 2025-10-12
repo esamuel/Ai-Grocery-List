@@ -5,6 +5,7 @@ import { ItemInput } from './components/ItemInput';
 import { GroceryList } from './components/GroceryList';
 import { categorizeGroceries } from './services/geminiService';
 import { FavoritesPage } from './components/FavoritesPage';
+import { PriceInputModal } from './components/PriceInputModal';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
 import { InfoIcon } from './components/icons/InfoIcon';
@@ -123,6 +124,14 @@ const translations = {
     // Hints
     swipeHint: "Swipe right to favorite, left to delete.",
     gotIt: "Got it",
+    // Price Tracking
+    priceModalTitle: "Add Prices? (Optional)",
+    priceModalSubtitle: "Track your spending on completed items",
+    priceModalSkip: "Skip",
+    priceModalSave: "Save with Prices",
+    priceModalTotal: "Total",
+    enablePriceTracking: "Enable Price Tracking",
+    priceTrackingDesc: "Track what you spend on groceries",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -222,6 +231,14 @@ const translations = {
     swipeHint: "רמז: החלק ימינה למחיקה, שמאלה למועדפים.",
     gotIt: "הבנתי",
     itemAlreadyAdded: "הפריט כבר נוסף",
+    // Price Tracking
+    priceModalTitle: "להוסיף מחירים? (אופציונלי)",
+    priceModalSubtitle: "עקוב אחר ההוצאות שלך על פריטים שנרכשו",
+    priceModalSkip: "דלג",
+    priceModalSave: "שמור עם מחירים",
+    priceModalTotal: "סה״כ",
+    enablePriceTracking: "הפעל מעקב מחירים",
+    priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -320,6 +337,14 @@ const translations = {
     // Hints
     swipeHint: "Desliza a la derecha para favorito, a la izquierda para eliminar.",
     gotIt: "Entendido",
+    // Price Tracking
+    priceModalTitle: "¿Agregar Precios? (Opcional)",
+    priceModalSubtitle: "Rastrea tus gastos en artículos completados",
+    priceModalSkip: "Saltar",
+    priceModalSave: "Guardar con Precios",
+    priceModalTotal: "Total",
+    enablePriceTracking: "Habilitar Seguimiento de Precios",
+    priceTrackingDesc: "Rastrea lo que gastas en comestibles",
   }
 };
 
@@ -393,6 +418,24 @@ function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+  
+  // Price tracking
+  const [enablePriceTracking, setEnablePriceTracking] = useState(() => {
+    try {
+      return localStorage.getItem('enablePriceTracking') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [currency, setCurrency] = useState(() => {
+    try {
+      return localStorage.getItem('currency') || 'USD';
+    } catch {
+      return 'USD';
+    }
+  });
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [pendingCompletedItems, setPendingCompletedItems] = useState<GroceryItem[]>([]);
   
   // Get list ID and other states from auth
   const [listId, setListId] = useState<string | null>(null);
@@ -735,11 +778,24 @@ function App() {
 
     console.log('Moving completed items to purchase history:', completedItems);
 
-    // Add completed items to purchase history
+    // If price tracking is enabled, show the price modal
+    if (enablePriceTracking) {
+      setPendingCompletedItems(completedItems);
+      setShowPriceModal(true);
+      return;
+    }
+
+    // Otherwise, add items without prices
+    handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
+  }, [items, enablePriceTracking]);
+
+  const handleCompletedItemsWithPrices = useCallback((itemsWithPrices: { name: string; category: string; price?: number }[]) => {
     const now = new Date().toISOString();
+
+    // Add completed items to local history state
     setHistoryItems(prevHistory => {
         const newHistory = [...prevHistory];
-        completedItems.forEach(item => {
+        itemsWithPrices.forEach(item => {
             const historyIndex = newHistory.findIndex(h => h.name.toLowerCase() === item.name.toLowerCase());
             if (historyIndex > -1) {
                 newHistory[historyIndex].frequency += 1;
@@ -767,12 +823,17 @@ function App() {
         return remainingItems;
     });
 
-    // Update unified purchase history in Firestore
+    // Update unified purchase history in Firestore with prices
     if (listId) {
-      addOrIncrementPurchase(listId, completedItems.map(i => ({ name: i.name, category: i.category })))
+      addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({ 
+        name: i.name, 
+        category: i.category,
+        price: i.price,
+        currency: currency
+      })))
         .catch(e => console.warn('Failed to update purchase history from completed items', e));
     }
-  }, [items, setHistoryItems, setItems, listId]);
+  }, [setHistoryItems, setItems, listId, currency]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
@@ -1067,6 +1128,41 @@ function App() {
                 </div>
               </div>
 
+              {/* Price Tracking Toggle */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">💰 {currentText.enablePriceTracking}</h3>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm text-gray-600">{currentText.priceTrackingDesc}</span>
+                  <input
+                    type="checkbox"
+                    checked={enablePriceTracking}
+                    onChange={(e) => {
+                      setEnablePriceTracking(e.target.checked);
+                      localStorage.setItem('enablePriceTracking', String(e.target.checked));
+                    }}
+                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                  />
+                </label>
+                {enablePriceTracking && (
+                  <div className="mt-3">
+                    <label className="text-sm text-gray-700">Currency:</label>
+                    <select
+                      value={currency}
+                      onChange={(e) => {
+                        setCurrency(e.target.value);
+                        localStorage.setItem('currency', e.target.value);
+                      }}
+                      className="ml-2 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="USD">$ USD</option>
+                      <option value="ILS">₪ ILS</option>
+                      <option value="EUR">€ EUR</option>
+                      <option value="GBP">£ GBP</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => { setShowSettings(false); setCurrentView('checklist'); }}
@@ -1268,6 +1364,30 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Price Input Modal */}
+      <PriceInputModal
+        isOpen={showPriceModal}
+        completedItems={pendingCompletedItems}
+        currency={currency}
+        onClose={() => {
+          setShowPriceModal(false);
+          setPendingCompletedItems([]);
+        }}
+        onSubmit={(itemsWithPrices) => {
+          handleCompletedItemsWithPrices(itemsWithPrices);
+          setShowPriceModal(false);
+          setPendingCompletedItems([]);
+        }}
+        translations={{
+          title: currentText.priceModalTitle,
+          subtitle: currentText.priceModalSubtitle,
+          skip: currentText.priceModalSkip,
+          save: currentText.priceModalSave,
+          total: currentText.priceModalTotal,
+          optional: currentText.priceModalSubtitle,
+        }}
+      />
     </div>
   );
 }

@@ -122,6 +122,23 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                   {item.category} &middot; {translations.purchased} {item.frequency} {translations.times}
                   {daysSince > 0 && ` · ${daysSince}d ago`}
                 </p>
+                {item.lastPrice && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-semibold text-green-700">
+                      ${item.lastPrice.toFixed(2)}
+                    </span>
+                    {item.avgPrice && item.avgPrice !== item.lastPrice && (
+                      <span className="text-xs text-gray-500">
+                        Avg: ${item.avgPrice.toFixed(2)}
+                      </span>
+                    )}
+                    {item.lowestPrice && item.lastPrice > item.lowestPrice && (
+                      <span className="text-xs text-blue-600">
+                        Best: ${item.lowestPrice.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
