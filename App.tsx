@@ -19,6 +19,8 @@ import type { ShoppingSuggestion } from './services/smartSuggestionsService';
 import { ImportExportModal } from './components/ImportExportModal';
 import { LaunchChecklistPage } from './components/LaunchChecklistPage';
 import { Toast } from './components/Toast';
+import { InstallPrompt } from './components/InstallPrompt';
+import { PaywallModal } from './components/PaywallModal';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner } from './services/firebaseService';
 import type { User } from 'firebase/auth';
@@ -179,6 +181,43 @@ const translations = {
     generateReport: "Generate Report",
     copyReport: "Copy Report",
     reportCopied: "Report copied to clipboard!",
+    // PWA Install
+    installTitle: "Install AI Grocery List",
+    installMessage: "Add to your home screen for quick access and offline support",
+    installButton: "Install Now",
+    installLater: "Maybe Later",
+    // Paywall
+    paywallTitle: "Unlock Premium Features",
+    paywallSubtitle: "Choose the perfect plan for your shopping needs",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    savePercent: "Save 40%",
+    freePlan: "Free",
+    proPlan: "Pro",
+    familyPlan: "Family",
+    popularBadge: "MOST POPULAR",
+    currentBadge: "Current Plan",
+    selectButton: "Start Free Trial",
+    continueButton: "Continue Free",
+    trialInfo: "7-day free trial, cancel anytime",
+    freeFeature1: "Core grocery list",
+    freeFeature2: "Basic AI categorization (50/month)",
+    freeFeature3: "1 shared list",
+    freeFeature4: "Limited history",
+    proFeature1: "Everything in Free",
+    proFeature2: "Unlimited AI categorization",
+    proFeature3: "Unlimited shared lists",
+    proFeature4: "Full purchase history",
+    proFeature5: "Price tracking & alerts",
+    proFeature6: "Spending insights",
+    proFeature7: "Smart predictions",
+    proFeature8: "Priority support",
+    familyFeature1: "Everything in Pro",
+    familyFeature2: "Up to 5 family members",
+    familyFeature3: "Admin controls",
+    familyFeature4: "Shared favorites",
+    familyFeature5: "Family activity feed",
+    familyFeature6: "Budget management",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -331,6 +370,43 @@ const translations = {
     generateReport: "צור דוח",
     copyReport: "העתק דוח",
     reportCopied: "הדוח הועתק ללוח!",
+    // PWA Install
+    installTitle: "התקן רשימת קניות חכמה",
+    installMessage: "הוסף למסך הבית לגישה מהירה ותמיכה במצב לא מקוון",
+    installButton: "התקן עכשיו",
+    installLater: "אולי מאוחר יותר",
+    // Paywall
+    paywallTitle: "פתח תכונות פרימיום",
+    paywallSubtitle: "בחר את התוכנית המושלמת לצרכי הקניות שלך",
+    monthly: "חודשי",
+    yearly: "שנתי",
+    savePercent: "חסוך 40%",
+    freePlan: "חינם",
+    proPlan: "מקצועי",
+    familyPlan: "משפחה",
+    popularBadge: "הכי פופולרי",
+    currentBadge: "תוכנית נוכחית",
+    selectButton: "התחל ניסיון חינם",
+    continueButton: "המשך חינם",
+    trialInfo: "ניסיון חינם ל-7 ימים, ביטול בכל עת",
+    freeFeature1: "רשימת קניות בסיסית",
+    freeFeature2: "קטגוריזציה חכמה (50/חודש)",
+    freeFeature3: "רשימה משותפת אחת",
+    freeFeature4: "היסטוריה מוגבלת",
+    proFeature1: "כל מה שבחינם",
+    proFeature2: "קטגוריזציה בלתי מוגבלת",
+    proFeature3: "רשימות משותפות ללא הגבלה",
+    proFeature4: "היסטוריית קניות מלאה",
+    proFeature5: "מעקב מחירים והתראות",
+    proFeature6: "תובנות הוצאות",
+    proFeature7: "חיזויים חכמים",
+    proFeature8: "תמיכה עדיפות",
+    familyFeature1: "כל מה שבמקצועי",
+    familyFeature2: "עד 5 בני משפחה",
+    familyFeature3: "בקרות מנהל",
+    familyFeature4: "מועדפים משותפים",
+    familyFeature5: "פיד פעילות משפחתי",
+    familyFeature6: "ניהול תקציב",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -482,6 +558,43 @@ const translations = {
     generateReport: "Generar Reporte",
     copyReport: "Copiar Reporte",
     reportCopied: "¡Reporte copiado al portapapeles!",
+    // PWA Install
+    installTitle: "Instalar Lista de Compras IA",
+    installMessage: "Agregar a la pantalla de inicio para acceso rápido y soporte sin conexión",
+    installButton: "Instalar Ahora",
+    installLater: "Quizás Más Tarde",
+    // Paywall
+    paywallTitle: "Desbloquea Funciones Premium",
+    paywallSubtitle: "Elige el plan perfecto para tus necesidades de compras",
+    monthly: "Mensual",
+    yearly: "Anual",
+    savePercent: "Ahorra 40%",
+    freePlan: "Gratis",
+    proPlan: "Pro",
+    familyPlan: "Familiar",
+    popularBadge: "MÁS POPULAR",
+    currentBadge: "Plan Actual",
+    selectButton: "Iniciar Prueba Gratis",
+    continueButton: "Continuar Gratis",
+    trialInfo: "Prueba gratis de 7 días, cancela cuando quieras",
+    freeFeature1: "Lista de compras básica",
+    freeFeature2: "Categorización IA (50/mes)",
+    freeFeature3: "1 lista compartida",
+    freeFeature4: "Historial limitado",
+    proFeature1: "Todo en Gratis",
+    proFeature2: "Categorización ilimitada",
+    proFeature3: "Listas compartidas ilimitadas",
+    proFeature4: "Historial completo de compras",
+    proFeature5: "Seguimiento y alertas de precios",
+    proFeature6: "Información de gastos",
+    proFeature7: "Predicciones inteligentes",
+    proFeature8: "Soporte prioritario",
+    familyFeature1: "Todo en Pro",
+    familyFeature2: "Hasta 5 miembros familiares",
+    familyFeature3: "Controles de administrador",
+    familyFeature4: "Favoritos compartidos",
+    familyFeature5: "Feed de actividad familiar",
+    familyFeature6: "Gestión de presupuesto",
   }
 };
 
@@ -555,6 +668,10 @@ function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+  
+  // Subscription & Paywall
+  const [currentPlan, setCurrentPlan] = useState<'free' | 'pro' | 'family'>('free');
+  const [showPaywall, setShowPaywall] = useState(false);
   
   // Price tracking
   const [enablePriceTracking, setEnablePriceTracking] = useState(() => {
@@ -908,6 +1025,15 @@ function App() {
       console.error('❌ Failed to move item to favorites:', e);
     }
   };
+
+  // Paywall handler
+  const handleSelectPlan = useCallback((planId: string, isYearly: boolean) => {
+    // TODO: Integrate with Stripe Checkout
+    console.log('Selected plan:', planId, 'Yearly:', isYearly);
+    // For now, just show a message
+    showToast(`Selected ${planId} plan (${isYearly ? 'Yearly' : 'Monthly'}). Payment integration coming soon!`, 'info');
+    setShowPaywall(false);
+  }, [showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
   const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number }[]) => {
@@ -1351,6 +1477,12 @@ function App() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
+                  onClick={() => { setShowSettings(false); setShowPaywall(true); }}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-md"
+                >
+                  💎 Upgrade to Pro
+                </button>
+                <button
                   onClick={() => { setShowSettings(false); setCurrentView('checklist'); }}
                   className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
                 >
@@ -1582,6 +1714,66 @@ function App() {
           storePlaceholder: currentText.priceModalStorePlaceholder,
         }}
       />
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt
+        translations={{
+          installTitle: currentText.installTitle,
+          installMessage: currentText.installMessage,
+          installButton: currentText.installButton,
+          installLater: currentText.installLater,
+        }}
+      />
+
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <PaywallModal
+          onClose={() => setShowPaywall(false)}
+          onSelectPlan={handleSelectPlan}
+          currentPlan={currentPlan}
+          translations={{
+            title: currentText.paywallTitle,
+            subtitle: currentText.paywallSubtitle,
+            monthly: currentText.monthly,
+            yearly: currentText.yearly,
+            savePercent: currentText.savePercent,
+            freePlan: currentText.freePlan,
+            proPlan: currentText.proPlan,
+            familyPlan: currentText.familyPlan,
+            popularBadge: currentText.popularBadge,
+            currentBadge: currentText.currentBadge,
+            selectButton: currentText.selectButton,
+            continueButton: currentText.continueButton,
+            trialInfo: currentText.trialInfo,
+            features: {
+              free: [
+                currentText.freeFeature1,
+                currentText.freeFeature2,
+                currentText.freeFeature3,
+                currentText.freeFeature4,
+              ],
+              pro: [
+                currentText.proFeature1,
+                currentText.proFeature2,
+                currentText.proFeature3,
+                currentText.proFeature4,
+                currentText.proFeature5,
+                currentText.proFeature6,
+                currentText.proFeature7,
+                currentText.proFeature8,
+              ],
+              family: [
+                currentText.familyFeature1,
+                currentText.familyFeature2,
+                currentText.familyFeature3,
+                currentText.familyFeature4,
+                currentText.familyFeature5,
+                currentText.familyFeature6,
+              ],
+            },
+          }}
+        />
+      )}
     </div>
   );
 }
