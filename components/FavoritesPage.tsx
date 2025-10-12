@@ -4,6 +4,7 @@ import type { PurchaseHistoryItem } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { StarIcon } from './icons/StarIcon';
+import { analyzePriceAlert, formatPriceAlertBadge } from '../services/priceAlertService';
 
 interface FavoritesPageProps {
   historyItems: PurchaseHistoryItem[];
@@ -123,11 +124,13 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
             const daysSince = getDaysSince(item.lastPurchased);
             const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
             const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
+            const priceAlert = analyzePriceAlert(item);
+            const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert) : null;
             
             return (
             <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {item.starred && <span className="text-yellow-500">⭐</span>}
                   <p className="font-semibold text-gray-800">{item.name}</p>
                   {showPredictive && (
@@ -135,6 +138,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                       isOverdue ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
                     }`}>
                       🔮 {isOverdue ? `${daysSince - item.avgDaysBetween!}d overdue` : `Every ${item.avgDaysBetween}d`}
+                    </span>
+                  )}
+                  {alertBadge && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${alertBadge.className}`}>
+                      {alertBadge.emoji} {alertBadge.text}
                     </span>
                   )}
                 </div>

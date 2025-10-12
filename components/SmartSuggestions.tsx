@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { ShoppingSuggestion } from '../services/smartSuggestionsService';
 import { getSmartSuggestions, getStarterSuggestions } from '../services/smartSuggestionsService';
 import type { PurchaseHistoryItem } from '../types';
+import { getPriceTrend, analyzePriceAlert, formatPriceAlertBadge } from '../services/priceAlertService';
 
 interface SmartSuggestionsProps {
   currentItems: string[];
@@ -105,7 +106,12 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {displayedSuggestions.map((suggestion, index) => (
+        {displayedSuggestions.map((suggestion, index) => {
+          const priceTrend = getPriceTrend(suggestion.item);
+          const priceAlert = analyzePriceAlert(suggestion.item);
+          const alertBadge = priceAlert ? formatPriceAlertBadge(priceAlert) : null;
+          
+          return (
           <div
             key={`${suggestion.item.name}-${index}`}
             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -113,11 +119,21 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
             <div className="flex items-center gap-3 flex-1">
               <span className="text-lg">{getTypeIcon(suggestion.type)}</span>
               <div className="flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-800">{localizeName(suggestion.item.name)}</span>
                   <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
                     {suggestion.item.frequency}×
                   </span>
+                  {alertBadge && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${alertBadge.className}`}>
+                      {alertBadge.emoji} {alertBadge.text}
+                    </span>
+                  )}
+                  {priceTrend && priceTrend.badge && !alertBadge && (
+                    <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                      {priceTrend.badge}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-gray-500">{getTypeLabel(suggestion.type)}</span>
@@ -146,7 +162,8 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
               {translations.addButton}
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {suggestions.length === 0 && (
