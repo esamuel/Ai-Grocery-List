@@ -63,3 +63,39 @@ export interface GroceryListData {
     items: GroceryItem[];
     history: PurchaseHistoryItem[]; // Updated to use new unified type
 }
+
+// Subscription types
+export type PlanTier = 'free' | 'pro' | 'family';
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
+export type PaymentProvider = 'stripe' | 'paypal';
+
+export interface UserSubscription {
+  userId: string; // Firebase UID
+  plan: PlanTier;
+  status: SubscriptionStatus;
+  provider: PaymentProvider;
+
+  // Provider-specific IDs
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  paypalSubscriptionId?: string;
+
+  // Billing info
+  currentPeriodStart: string; // ISO date
+  currentPeriodEnd: string; // ISO date
+  cancelAtPeriodEnd?: boolean;
+
+  // Trial info
+  trialStart?: string;
+  trialEnd?: string;
+
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+
+  // Usage tracking (for free tier limits)
+  usageStats?: {
+    aiCategorizationsThisMonth?: number;
+    lastResetDate?: string;
+  };
+}

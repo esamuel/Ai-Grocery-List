@@ -10,6 +10,7 @@ interface PayPalSubscribeButtonProps {
   planId?: string | null;
   currency?: string; // default USD
   label?: string; // optional label above button
+  userId?: string; // Firebase user ID to associate with subscription
   onSuccess?: (subscriptionId: string) => void;
   onError?: (error: any) => void;
 }
@@ -34,6 +35,7 @@ export const PayPalSubscribeButton: React.FC<PayPalSubscribeButtonProps> = ({
   planId,
   currency = 'USD',
   label,
+  userId,
   onSuccess,
   onError,
 }) => {
@@ -58,7 +60,10 @@ export const PayPalSubscribeButton: React.FC<PayPalSubscribeButtonProps> = ({
       window.paypal.Buttons({
         style: { layout: 'horizontal', color: 'gold', shape: 'pill', height: 40 },
         createSubscription: (_data: any, actions: any) => {
-          return actions.subscription.create({ plan_id: planId });
+          return actions.subscription.create({
+            plan_id: planId,
+            custom_id: userId || '', // Pass user ID for webhook to identify user
+          });
         },
         onApprove: (data: any) => {
           if (data && data.subscriptionID) {
@@ -74,7 +79,7 @@ export const PayPalSubscribeButton: React.FC<PayPalSubscribeButtonProps> = ({
       console.error('Failed to render PayPal button', e);
       onError?.(e);
     }
-  }, [ready, planId, onSuccess, onError]);
+  }, [ready, planId, userId, onSuccess, onError]);
 
   const clientConfigured = Boolean((import.meta as any).env.VITE_PAYPAL_CLIENT_ID);
   if (!clientConfigured || !planId) return null;

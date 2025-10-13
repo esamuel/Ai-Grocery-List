@@ -15,6 +15,7 @@ interface PaywallModalProps {
   onClose: () => void;
   onSelectPlan: (planId: string, isYearly: boolean) => void;
   currentPlan: 'free' | 'pro' | 'family';
+  userId?: string; // Add userId for PayPal
   translations: {
     title: string;
     subtitle: string;
@@ -41,6 +42,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
   onClose,
   onSelectPlan,
   currentPlan,
+  userId,
   translations
 }) => {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly');
@@ -206,9 +208,11 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
                       }
                       currency="USD"
                       label="Or subscribe with PayPal"
+                      userId={userId}
                       onSuccess={() => {
                         // Simple acknowledgment; full webhook sync can be added later
-                        alert('PayPal subscription started successfully.');
+                        alert('PayPal subscription started successfully. Your plan will be activated shortly.');
+                        onClose();
                       }}
                     />
                   </div>

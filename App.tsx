@@ -28,6 +28,7 @@ import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, i
 import type { User } from 'firebase/auth';
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
+import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 type Language = 'en' | 'he' | 'es';
   type View = 'list' | 'favorites' | 'insights' | 'daily' | 'checklist' | 'legal';
@@ -858,7 +859,19 @@ function App() {
             // Check if user is the list owner
             const ownerStatus = await isListOwner();
             setIsOwner(ownerStatus);
-            
+
+            // Load user subscription
+            getUserSubscription(authUser.uid)
+              .then(subscription => {
+                if (subscription) {
+                  setCurrentPlan(subscription.plan);
+                  console.log('✅ Loaded subscription:', subscription.plan);
+                }
+              })
+              .catch(err => {
+                console.error('Failed to load subscription:', err);
+              });
+
             // Check if this is a new user (show onboarding)
             const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
             if (!hasSeenOnboarding) {
@@ -882,6 +895,7 @@ function App() {
         } else {
           setListId(null);
           setIsOwner(false);
+          setCurrentPlan('free'); // Reset to free plan on logout
         }
         setIsLoadingAuth(false);
       });
@@ -1112,11 +1126,21 @@ function App() {
 
   // Paywall handler
   const handleSelectPlan = useCallback(async (planId: string, isYearly: boolean) => {
+    if (!authUser?.uid) {
+      showToast('Please sign in to upgrade', 'error');
+      setShowPaywall(false);
+      return;
+    }
+
     try {
       const res = await fetch('/.netlify/functions/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, isYearly })
+        body: JSON.stringify({
+          planId,
+          isYearly,
+          userId: authUser.uid  // Pass user ID to checkout session
+        })
       });
       if (!res.ok) throw new Error('Failed to create checkout session');
       const data = await res.json();
@@ -1131,7 +1155,7 @@ function App() {
     } finally {
       setShowPaywall(false);
     }
-  }, [showToast]);
+  }, [authUser, showToast]);
 
   // PWA Install handler
   const handleInstallApp = useCallback(async () => {
@@ -1894,6 +1918,7 @@ function App() {
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
           currentPlan={currentPlan}
+          userId={authUser?.uid}
           translations={{
             title: currentText.paywallTitle,
             subtitle: currentText.paywallSubtitle,

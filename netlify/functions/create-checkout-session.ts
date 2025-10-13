@@ -22,9 +22,9 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { planId, isYearly } = JSON.parse(event.body || '{}');
-    if (!planId || typeof isYearly !== 'boolean') {
-      return { statusCode: 400, body: 'Missing planId or isYearly' };
+    const { planId, isYearly, userId } = JSON.parse(event.body || '{}');
+    if (!planId || typeof isYearly !== 'boolean' || !userId) {
+      return { statusCode: 400, body: 'Missing planId, isYearly, or userId' };
     }
 
     const priceMap: Record<string, { monthly?: string; yearly?: string }> = {
@@ -52,6 +52,13 @@ export const handler: Handler = async (event) => {
       success_url: `${origin}/?checkout=success`,
       cancel_url: `${origin}/?checkout=cancel`,
       allow_promotion_codes: true,
+      client_reference_id: userId, // Store user ID for webhook
+      subscription_data: {
+        metadata: {
+          userId: userId, // Also store in subscription metadata
+        },
+        trial_period_days: 7, // 7-day free trial
+      },
     });
 
     return {
