@@ -21,8 +21,8 @@ export const GroceryList: React.FC<GroceryListProps> = ({ categories, onToggleIt
     return (
       <div className="text-center py-20">
         <img src="https://picsum.photos/seed/groceries/300/200" alt="Empty grocery bag" className="mx-auto mb-6 rounded-lg shadow-md" />
-        <h2 className="text-2xl font-semibold text-gray-700">{emptyState.title}</h2>
-        <p className="text-gray-500 mt-2">{emptyState.subtitle}</p>
+        <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300">{emptyState.title}</h2>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">{emptyState.subtitle}</p>
       </div>
     );
   }

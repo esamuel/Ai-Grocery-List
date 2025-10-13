@@ -1,4 +1,4 @@
-import type { PurchaseHistoryItem, PriceHistory } from '../types';
+import type { PurchaseHistoryItem } from '../types';
 
 export interface StorePrice {
   store: string;
@@ -24,18 +24,23 @@ export function getPricesByStore(item: PurchaseHistoryItem): StorePrice[] {
   const storeMap = new Map<string, { total: number; count: number; lastPrice?: number; lastDate?: string }>();
 
   item.prices.forEach(priceEntry => {
-    const storeName = priceEntry.store || 'Unknown Store';
+    // Skip entries without a store name
+    if (!priceEntry.store || priceEntry.store.trim() === '') {
+      return;
+    }
+
+    const storeName = priceEntry.store;
     const existing = storeMap.get(storeName) || { total: 0, count: 0 };
-    
+
     existing.total += priceEntry.price * (priceEntry.quantity || 1);
     existing.count += priceEntry.quantity || 1;
-    
+
     // Track most recent price
     if (!existing.lastDate || priceEntry.purchaseDate > existing.lastDate) {
       existing.lastPrice = priceEntry.price;
       existing.lastDate = priceEntry.purchaseDate;
     }
-    
+
     storeMap.set(storeName, existing);
   });
 
@@ -149,7 +154,7 @@ export function getStoreBadge(item: PurchaseHistoryItem, translations?: StoreTra
     const cheaperText = translations?.cheaper || 'cheaper';
     
     return {
-      text: `🏪 ${bestAtText} ${bestStore.store} (${bestStore.savingsPercent.toFixed(0)}% ${cheaperText})`,
+      text: `🏪 ${bestAtText} ${bestStore.bestStore} (${bestStore.savingsPercent.toFixed(0)}% ${cheaperText})`,
       className: 'bg-blue-50 text-blue-700 border-blue-200',
     };
   }

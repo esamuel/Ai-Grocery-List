@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PayPalSubscribeButton } from './PayPalSubscribeButton';
 
 interface PricingTier {
   id: 'free' | 'pro' | 'family';
@@ -192,6 +193,25 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
                 {/* Trial Info */}
                 {tier.id !== 'free' && !tier.current && (
                   <p className="text-xs text-gray-500 text-center mt-3">{translations.trialInfo}</p>
+                )}
+
+                {/* PayPal Alternative */}
+                {tier.id !== 'free' && !tier.current && (
+                  <div className="mt-4">
+                    <PayPalSubscribeButton
+                      planId={
+                        tier.id === 'pro'
+                          ? (billingPeriod === 'yearly' ? (import.meta as any).env.VITE_PAYPAL_PLAN_PRO_YEARLY : (import.meta as any).env.VITE_PAYPAL_PLAN_PRO_MONTHLY)
+                          : (billingPeriod === 'yearly' ? (import.meta as any).env.VITE_PAYPAL_PLAN_FAMILY_YEARLY : (import.meta as any).env.VITE_PAYPAL_PLAN_FAMILY_MONTHLY)
+                      }
+                      currency="USD"
+                      label="Or subscribe with PayPal"
+                      onSuccess={() => {
+                        // Simple acknowledgment; full webhook sync can be added later
+                        alert('PayPal subscription started successfully.');
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             ))}

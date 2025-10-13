@@ -2,6 +2,22 @@
   publish = "dist"
   command = "npm run build"
 
+# Specific routes MUST come before the SPA catch-all
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200
+
+[[redirects]]
+  from = "/landing"
+  to = "/landing.html"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

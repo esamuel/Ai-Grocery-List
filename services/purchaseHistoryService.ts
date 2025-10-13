@@ -155,19 +155,19 @@ export async function addOrIncrementPurchase(
       // Handle price tracking and store information
       const shouldCreatePriceEntry = purchase.price !== undefined && purchase.price > 0;
       const shouldCreateStoreEntry = purchase.store && purchase.store.trim() !== '';
-      
+
       if (shouldCreatePriceEntry || shouldCreateStoreEntry) {
         const priceEntry: any = {
           purchaseDate: now,
           quantity: purchase.quantity || 1,
         };
-        
+
         // Add price if provided
         if (shouldCreatePriceEntry) {
           priceEntry.price = purchase.price;
           priceEntry.currency = purchase.currency || 'USD';
         }
-        
+
         // Add store if provided
         if (shouldCreateStoreEntry) {
           priceEntry.store = purchase.store;

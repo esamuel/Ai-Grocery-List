@@ -18,6 +18,7 @@ import { SmartSuggestions } from './components/SmartSuggestions';
 import type { ShoppingSuggestion } from './services/smartSuggestionsService';
 import { ImportExportModal } from './components/ImportExportModal';
 import { LaunchChecklistPage } from './components/LaunchChecklistPage';
+import { LegalPage } from './components/LegalPage';
 import { Toast } from './components/Toast';
 import { InstallPrompt } from './components/InstallPrompt';
 import { PaywallModal } from './components/PaywallModal';
@@ -27,8 +28,9 @@ import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, i
 import type { User } from 'firebase/auth';
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
+import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 type Language = 'en' | 'he' | 'es';
-type View = 'list' | 'favorites' | 'insights' | 'daily' | 'checklist';
+  type View = 'list' | 'favorites' | 'insights' | 'daily' | 'checklist' | 'legal';
 
 const translations = {
   en: {
@@ -182,6 +184,11 @@ const translations = {
     generateReport: "Generate Report",
     copyReport: "Copy Report",
     reportCopied: "Report copied to clipboard!",
+    recentShoppingDays: "Recent Shopping Days",
+    // Legal
+    legal: "Legal",
+    privacyPolicy: "Privacy Policy",
+    termsOfService: "Terms of Service",
     // PWA Install
     installTitle: "Install AI Grocery List",
     installMessage: "Add to your home screen for quick access and offline support",
@@ -377,6 +384,11 @@ const translations = {
     generateReport: "צור דוח",
     copyReport: "העתק דוח",
     reportCopied: "הדוח הועתק ללוח!",
+    recentShoppingDays: "ימי קניות אחרונים",
+    // Legal
+    legal: "מידע משפטי",
+    privacyPolicy: "מדיניות פרטיות",
+    termsOfService: "תנאי שירות",
     // PWA Install
     installTitle: "התקן רשימת קניות חכמה",
     installMessage: "הוסף למסך הבית לגישה מהירה ותמיכה במצב לא מקוון",
@@ -571,6 +583,11 @@ const translations = {
     generateReport: "Generar Reporte",
     copyReport: "Copiar Reporte",
     reportCopied: "¡Reporte copiado al portapapeles!",
+    recentShoppingDays: "Días de Compras Recientes",
+    // Legal
+    legal: "Legal",
+    privacyPolicy: "Política de Privacidad",
+    termsOfService: "Términos del Servicio",
     // PWA Install
     installTitle: "Instalar Lista de Compras IA",
     installMessage: "Agregar a la pantalla de inicio para acceso rápido y soporte sin conexión",
@@ -704,15 +721,18 @@ function App() {
     }
   });
 
-  // Apply dark mode class to document
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('darkMode', String(darkMode));
-  }, [darkMode]);
+        // Apply dark mode class to document
+        useEffect(() => {
+          console.log('🌙 Dark mode changed to:', darkMode);
+          if (darkMode) {
+            document.documentElement.classList.add('dark');
+            console.log('✅ Added dark class to document');
+          } else {
+            document.documentElement.classList.remove('dark');
+            console.log('✅ Removed dark class from document');
+          }
+          localStorage.setItem('darkMode', String(darkMode));
+        }, [darkMode]);
   
   // Price tracking
   const [enablePriceTracking, setEnablePriceTracking] = useState(() => {
@@ -760,6 +780,26 @@ function App() {
   
   // PWA Install hook
   const { isInstallable, installApp } = usePWAInstall();
+
+  // Category migration effect
+  useEffect(() => {
+    if (listId && user && historyItems && historyItems.length > 0) {
+      if (checkMigrationNeeded(historyItems)) {
+        console.log('🔄 Running category migration...');
+        migrateOtherCategoryToPantry(listId, historyItems)
+          .then(updatedHistory => {
+            if (updatedHistory !== historyItems) {
+              setHistoryItems(updatedHistory);
+              console.log('✅ Category migration completed');
+              showToast('Updated Hebrew category names', 'success');
+            }
+          })
+          .catch(error => {
+            console.error('❌ Migration failed:', error);
+          });
+      }
+    }
+  }, [listId, user, historyItems]);
   
   // Local loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -1062,7 +1102,7 @@ function App() {
       
       // SECOND: Remove from current list
       // The Firestore listener will automatically update historyItems
-      setItems(prev => prev.filter(i => i.id !== id));
+    setItems(prev => prev.filter(i => i.id !== id));
       
       console.log('✅ Item moved to favorites');
     } catch (e) {
@@ -1071,12 +1111,26 @@ function App() {
   };
 
   // Paywall handler
-  const handleSelectPlan = useCallback((planId: string, isYearly: boolean) => {
-    // TODO: Integrate with Stripe Checkout
-    console.log('Selected plan:', planId, 'Yearly:', isYearly);
-    // For now, just show a message
-    showToast(`Selected ${planId} plan (${isYearly ? 'Yearly' : 'Monthly'}). Payment integration coming soon!`, 'info');
-    setShowPaywall(false);
+  const handleSelectPlan = useCallback(async (planId: string, isYearly: boolean) => {
+    try {
+      const res = await fetch('/.netlify/functions/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, isYearly })
+      });
+      if (!res.ok) throw new Error('Failed to create checkout session');
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showToast('Checkout session created, but URL missing', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Payment integration error. Please try again later.', 'error');
+    } finally {
+      setShowPaywall(false);
+    }
   }, [showToast]);
 
   // PWA Install handler
@@ -1094,17 +1148,18 @@ function App() {
   }, [isInstallable, installApp, currentText, showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
-  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number }[]) => {
+  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string }[]) => {
     if (!listId) return;
 
     console.log('🔄 Processing completed items with prices:', itemsWithPrices);
 
     try {
-      // FIRST: Update history in Firestore (with prices)
-      await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({ 
-        name: i.name, 
+      // FIRST: Update history in Firestore (with prices and store)
+      await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({
+        name: i.name,
         category: i.category,
         price: i.price,
+        store: i.store,
         currency: currency
       })));
       
@@ -1112,11 +1167,11 @@ function App() {
 
       // SECOND: Remove completed items from current list
       // The Firestore listener will automatically update historyItems
-      setItems(prevItems => {
+    setItems(prevItems => {
         const remainingItems = prevItems.filter(item => !item.completed);
         console.log('✅ Removed completed items. Remaining:', remainingItems.length);
         return remainingItems;
-      });
+    });
 
     } catch (e) {
       console.error('❌ Failed to process completed items:', e);
@@ -1194,8 +1249,8 @@ function App() {
     try {
       // Add imported items directly to purchase history
       await addOrIncrementPurchase(listId, importedItems.map(i => ({
-        name: i.name,
-        category: i.category,
+      name: i.name,
+      category: i.category,
       })));
       setCurrentView('favorites'); // View purchase history after import
       setShowImportExport(false);
@@ -1451,6 +1506,16 @@ function App() {
                 generateReport: currentText.generateReport,
                 copyReport: currentText.copyReport,
                 reportCopied: currentText.reportCopied,
+                recentShoppingDays: currentText.recentShoppingDays,
+              }}
+            />
+        ) : currentView === 'legal' ? (
+            <LegalPage
+              initialTab={'privacy'}
+              translations={{
+                legal: currentText.legal,
+                privacyPolicy: currentText.privacyPolicy,
+                termsOfService: currentText.termsOfService,
               }}
             />
         ) : (
@@ -1551,6 +1616,19 @@ function App() {
                     </div>
                   </div>
                 )}
+                {/* Legal Links */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">⚖️ {currentText.legal}</h3>
+                <div className="flex items-center gap-3 text-sm">
+                  <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
+                    {currentText.privacyPolicy}
+                  </button>
+                  <span className="text-gray-400">•</span>
+                  <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
+                    {currentText.termsOfService}
+                  </button>
+                </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1619,9 +1697,9 @@ function App() {
       {/* Family Member Addition Modal */}
       {showAddMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Add Family Member</h2>
-            <p className="text-gray-600 mb-4">Enter the email address of a family member who has already created an account.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md transition-colors">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Add Family Member</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">Enter the email address of a family member who has already created an account.</p>
             
             {addMemberStatus && (
               <div className={`p-3 rounded-lg mb-4 ${
@@ -1730,9 +1808,9 @@ function App() {
       {/* Smart Suggestions Modal */}
       {showSmartSuggestions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowSmartSuggestions(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-3xl max-h-[80vh] overflow-y-auto transition-colors" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <span>✨</span>
                 <span>{currentText.suggestionsTitle}</span>
               </h2>
@@ -1774,7 +1852,6 @@ function App() {
           </div>
         </div>
       )}
-
       {/* Price Input Modal */}
       <PriceInputModal
         isOpen={showPriceModal}

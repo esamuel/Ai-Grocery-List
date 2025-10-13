@@ -18,6 +18,7 @@ interface DailyPurchasesProps {
     generateReport: string;
     copyReport: string;
     reportCopied: string;
+    recentShoppingDays: string;
   };
 }
 
@@ -182,7 +183,7 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
 
       {/* Recent Days Summary */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">📅 Recent Shopping Days</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-3">📅 {translations.recentShoppingDays}</h3>
         <div className="space-y-2">
           {dailyPurchases.slice(0, 7).map(daily => (
             <div 

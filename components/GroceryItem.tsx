@@ -130,7 +130,7 @@ export const GroceryItem: React.FC<GroceryItemProps> = ({ item, onToggle, onDele
         })()}
       </div>
       <div
-        className="flex items-center p-3 transition-colors rounded-lg group bg-white hover:bg-gray-50 shadow-sm select-none"
+        className="flex items-center p-3 transition-colors rounded-lg group bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm select-none"
         style={{ transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 120ms ease-out', cursor: dragging ? 'grabbing' : 'auto', userSelect: dragging ? 'none' : 'auto', willChange: 'transform' }}
       >
         {children}
@@ -207,7 +207,7 @@ export const GroceryItem: React.FC<GroceryItemProps> = ({ item, onToggle, onDele
         <div className="flex items-center gap-2">
           <label
             htmlFor={`item-${item.id}`}
-            className={`text-gray-700 transition-colors cursor-pointer flex-1 text-left ${item.completed ? 'line-through text-gray-400' : ''}`}
+            className={`text-gray-700 dark:text-gray-300 transition-colors cursor-pointer flex-1 text-left ${item.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}
           >
             {item.name}
           </label>

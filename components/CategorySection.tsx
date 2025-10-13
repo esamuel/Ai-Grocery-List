@@ -30,18 +30,18 @@ export const CategorySection: React.FC<CategorySectionProps> = ({
   return (
     <div className="mb-6">
       {/* Sticky Category Header */}
-      <div className="sticky top-16 bg-gray-50 z-10 py-2 -mx-4 px-4 border-b border-gray-200 rtl:text-right">
+      <div className="sticky top-16 bg-gray-50 dark:bg-gray-900 z-10 py-2 -mx-4 px-4 border-b border-gray-200 dark:border-gray-700 rtl:text-right transition-colors">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-full flex items-center justify-between text-left rtl:text-right hover:bg-gray-100 rounded-lg p-2 transition-colors"
+          className="w-full flex items-center justify-between text-left rtl:text-right hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors"
         >
           <div className="flex items-center gap-3 rtl:flex-row-reverse">
             <ChevronDownIcon 
-              className={`w-5 h-5 text-gray-600 transition-transform ${
+              className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${
                 isCollapsed ? '-rotate-90 rtl:rotate-90' : 'rotate-0'
               }`} 
             />
-            <h2 className="text-xl font-bold text-gray-800 capitalize text-left rtl:text-right">{category.name}</h2>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 capitalize text-left rtl:text-right">{category.name}</h2>
             <div className="flex items-center gap-2">
               {pendingCount > 0 && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
