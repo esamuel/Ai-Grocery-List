@@ -223,6 +223,8 @@ const translations = {
     installAppDesc: "Add to home screen",
     appInstalled: "App installed successfully!",
     installNotAvailable: "Install not available on this device",
+    darkMode: "Dark Mode",
+    darkModeDesc: "Switch to dark theme",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -416,6 +418,8 @@ const translations = {
     installAppDesc: "הוסף למסך הבית",
     appInstalled: "האפליקציה הותקנה בהצלחה!",
     installNotAvailable: "ההתקנה אינה זמינה במכשיר זה",
+    darkMode: "מצב כהה",
+    darkModeDesc: "עבור לעיצוב כהה",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -608,6 +612,8 @@ const translations = {
     installAppDesc: "Agregar a pantalla de inicio",
     appInstalled: "¡Aplicación instalada exitosamente!",
     installNotAvailable: "Instalación no disponible en este dispositivo",
+    darkMode: "Modo Oscuro",
+    darkModeDesc: "Cambiar a tema oscuro",
   }
 };
 
@@ -685,6 +691,28 @@ function App() {
   // Subscription & Paywall
   const [currentPlan, setCurrentPlan] = useState<'free' | 'pro' | 'family'>('free');
   const [showPaywall, setShowPaywall] = useState(false);
+  
+  // Dark Mode
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('darkMode');
+      if (saved !== null) return saved === 'true';
+      // Check system preference
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
   
   // Price tracking
   const [enablePriceTracking, setEnablePriceTracking] = useState(() => {
@@ -1254,21 +1282,21 @@ function App() {
   );
 
   const ViewButton: React.FC<{ view: View, children: React.ReactNode }> = ({ view, children }) => (
-    <button onClick={() => setCurrentView(view)} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${currentView === view ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+    <button onClick={() => setCurrentView(view)} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${currentView === view ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
       {children}
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans" dir={language === 'he' ? 'rtl' : 'ltr'}>
-      <header className="bg-white/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors" dir={language === 'he' ? 'rtl' : 'ltr'}>
+      <header className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-sm sticky top-0 z-50 transition-colors">
         <div className="max-w-3xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <div className="flex items-center space-x-3 rtl:space-x-reverse">
                     <span className="text-3xl">🛒</span>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-800">{currentText.title}</h1>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{currentText.title}</h1>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
                             <span>Welcome, {user?.email}</span>
                             {isDemoMode && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">Demo Mode</span>}
                         </div>
@@ -1433,12 +1461,12 @@ function App() {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Settings</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md transition-colors">
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Settings</h2>
 
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Language</h3>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Language</h3>
                 <div className="flex gap-2">
                   <LanguageButton lang="en">EN</LanguageButton>
                   <LanguageButton lang="he">עב</LanguageButton>
@@ -1446,8 +1474,28 @@ function App() {
                 </div>
               </div>
 
+              {/* Dark Mode Toggle */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🌙 {currentText.darkMode}</h3>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{currentText.darkModeDesc}</span>
+                  <button
+                    onClick={() => setDarkMode(!darkMode)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        darkMode ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
               {/* Price Tracking Toggle */}
-              <div className="border-t pt-4">
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">💰 {currentText.enablePriceTracking}</h3>
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-sm text-gray-600">{currentText.priceTrackingDesc}</span>
