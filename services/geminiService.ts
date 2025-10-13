@@ -200,7 +200,7 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
       
       // Last resort: return uncategorized items
       const fallbackResult: CategorizedResponse[] = [{
-        category: responseLanguage === 'he' ? 'אחר' : responseLanguage === 'es' ? 'Otros' : 'Other',
+        category: responseLanguage === 'he' ? 'מזווה' : responseLanguage === 'es' ? 'Otros' : 'Other',
         items: newItemText.split(/[,;]/).map(item => ({
           name: item.trim(),
           quantity: 1,
@@ -255,7 +255,7 @@ export const categorizeAndTranslateImportedItems = async (
       - Frozen (${targetLanguage === 'he' ? 'קפואים' : targetLanguage === 'es' ? 'Congelados' : 'Frozen'})
       - Household & Cleaning (${targetLanguage === 'he' ? 'בית וניקוי' : targetLanguage === 'es' ? 'Hogar y Limpieza' : 'Household & Cleaning'})
       - Personal Care (${targetLanguage === 'he' ? 'טיפוח אישי' : targetLanguage === 'es' ? 'Cuidado Personal' : 'Personal Care'})
-      - Other (${targetLanguage === 'he' ? 'אחר' : targetLanguage === 'es' ? 'Otros' : 'Other'})
+      - Other (${targetLanguage === 'he' ? 'מזווה' : targetLanguage === 'es' ? 'Otros' : 'Other'})
 
       Return the result as a JSON object that adheres to the provided schema.
     `;
@@ -313,7 +313,7 @@ export const categorizeAndTranslateImportedItems = async (
       // Last resort: return items in original language with translated categories
       const responseLanguage = targetLanguage === 'he' ? 'he' : targetLanguage === 'es' ? 'es' : 'en';
       const fallbackResult: CategorizedResponse[] = [{
-        category: responseLanguage === 'he' ? 'אחר' : responseLanguage === 'es' ? 'Otros' : 'Other',
+        category: responseLanguage === 'he' ? 'מזווה' : responseLanguage === 'es' ? 'Otros' : 'Other',
         items: newItemText.split(/[,;]/).map(item => ({
           name: item.trim(),
           quantity: 1,
