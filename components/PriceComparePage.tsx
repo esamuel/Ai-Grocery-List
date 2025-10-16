@@ -45,6 +45,12 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
   onTogglePriceTracking,
   historyItemsCount
 }) => {
+  // Debug logging
+  console.log('🔍 PriceComparePage Debug:');
+  console.log('Price tracking enabled:', priceTrackingEnabled);
+  console.log('History items count:', historyItemsCount);
+  console.log('Price history length:', priceHistory.length);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredItems, setFilteredItems] = useState<PriceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
@@ -118,18 +124,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
         </h1>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={translations.searchPlaceholder}
-          className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors ${rtl ? 'text-right' : ''}`}
-        />
-      </div>
-
-      {/* Price Tracking Disabled Banner */}
+      {/* Price Tracking Disabled Banner - MOVED TO TOP */}
       {!priceTrackingEnabled && (
         <div className="mb-6 p-6 rounded-xl bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-300 dark:border-yellow-700 shadow-lg">
           <div className="flex items-start gap-4">
@@ -169,6 +164,17 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={translations.searchPlaceholder}
+          className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors ${rtl ? 'text-right' : ''}`}
+        />
+      </div>
 
       {/* Best Deals Section */}
       {bestDeals.length > 0 && searchQuery === '' && (
