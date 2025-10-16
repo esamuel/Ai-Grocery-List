@@ -110,6 +110,7 @@ const translations = {
     saveDisplayName: "Save Name",
     savingDisplayName: "Saving...",
     // Onboarding
+    welcomeUser: "Welcome",
     welcome: "Welcome to Aii Grocery list!",
     onboardingSubtitle: "Let's get you started with your smart shopping companion",
     step1Title: "Smart Shopping Lists",
@@ -383,6 +384,7 @@ const translations = {
     saveDisplayName: "שמור שם",
     savingDisplayName: "שומר...",
     // Onboarding
+    welcomeUser: "שלום",
     welcome: "ברוכים הבאים לרשימת קניות חכמה!",
     onboardingSubtitle: "בואו נתחיל עם עוזר הקניות החכם שלכם",
     step1Title: "רשימות קניות חכמות",
@@ -656,6 +658,7 @@ const translations = {
     saveDisplayName: "Guardar Nombre",
     savingDisplayName: "Guardando...",
     // Onboarding
+    welcomeUser: "Bienvenido",
     welcome: "¡Bienvenido a Lista de Compras con IA!",
     onboardingSubtitle: "Comencemos con tu compañero de compras inteligente",
     step1Title: "Listas de Compras Inteligentes",
@@ -1743,7 +1746,7 @@ function App() {
                     <div>
                         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{currentText.title}</h1>
                         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            <span>Welcome, {user?.email}</span>
+                            <span>{currentText.welcomeUser}: {displayName || getFriendlyUserNameFallback(user)}</span>
                             {isDemoMode && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">Demo Mode</span>}
                         </div>
                     </div>
