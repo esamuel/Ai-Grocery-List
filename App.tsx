@@ -1937,14 +1937,20 @@ function App() {
                 date: currentText.date,
                 trend: currentText.trend,
               }}
-              priceHistory={historyItems
-                .filter(item => item.price && item.store)
-                .map(item => ({
+              priceHistory={(() => {
+                console.log('📊 Price Compare Data Debug:');
+                console.log('Total history items:', historyItems.length);
+                const itemsWithPrice = historyItems.filter(item => item.price);
+                console.log('Items with price:', itemsWithPrice.length);
+                const priceData = itemsWithPrice.map(item => ({
                   itemName: item.name,
                   price: item.price!,
-                  store: item.store || '',
+                  store: item.store || 'Unknown Store',
                   date: item.lastPurchased
-                }))}
+                }));
+                console.log('Price history data:', priceData);
+                return priceData;
+              })()}
               rtl={language === 'he'}
             />
         ) : currentView === 'list' ? (

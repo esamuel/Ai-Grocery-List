@@ -152,14 +152,50 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
 
       {/* Items List */}
       {priceHistory.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-12 px-4">
           <div className="text-6xl mb-4">📊</div>
-          <p className="text-gray-500 dark:text-gray-400 text-lg">
+          <p className="text-gray-700 dark:text-gray-300 text-xl font-bold mb-4">
             {translations.noPriceData}
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+          <p className="text-gray-500 dark:text-gray-400 text-base mb-6">
             {translations.trackNewItem}
           </p>
+          
+          {/* Step-by-step guide */}
+          <div className="max-w-md mx-auto text-left bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-700 shadow-lg">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 text-center">
+              {rtl ? 'איך להתחיל:' : 'How to Start:'}
+            </h3>
+            <ol className={`space-y-3 text-sm text-gray-700 dark:text-gray-300 ${rtl ? 'text-right' : 'text-left'}`}>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">1</span>
+                <span>{rtl ? 'לחץ על כרטיס "רשימה" בלוח הבקרה' : 'Click "List" card on dashboard'}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">2</span>
+                <span>{rtl ? 'הוסף פריטים לרשימה שלך (לדוגמה: "חלב, לחם, ביצים")' : 'Add items to your list (e.g., "milk, bread, eggs")'}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">3</span>
+                <span>{rtl ? 'סמן אותם כשקנית' : 'Check them off when you shop'}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">4</span>
+                <span>{rtl ? 'הוסף את המחיר והחנות כשתתבקש' : 'Add price and store when prompted'}</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">5</span>
+                <span>{rtl ? 'חזור לכאן כדי לראות את השוואת המחירים!' : 'Come back here to see price comparisons!'}</span>
+              </li>
+            </ol>
+            
+            <button
+              onClick={onBack}
+              className="mt-6 w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-lg hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <span>{rtl ? 'עבור לרשימה →' : '← Go to List'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
