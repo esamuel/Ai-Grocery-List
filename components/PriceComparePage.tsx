@@ -26,16 +26,24 @@ interface PriceComparePageProps {
     price: string;
     date: string;
     trend: string;
+    enablePriceTracking: string;
+    priceTrackingDesc: string;
   };
   priceHistory: PriceRecord[];
   rtl?: boolean;
+  priceTrackingEnabled: boolean;
+  onTogglePriceTracking: (enabled: boolean) => void;
+  historyItemsCount: number;
 }
 
 export const PriceComparePage: React.FC<PriceComparePageProps> = ({
   onBack,
   translations,
   priceHistory,
-  rtl = false
+  rtl = false,
+  priceTrackingEnabled,
+  onTogglePriceTracking,
+  historyItemsCount
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredItems, setFilteredItems] = useState<PriceRecord[]>([]);
@@ -120,6 +128,47 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
           className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:border-blue-500 transition-colors ${rtl ? 'text-right' : ''}`}
         />
       </div>
+
+      {/* Price Tracking Disabled Banner */}
+      {!priceTrackingEnabled && (
+        <div className="mb-6 p-6 rounded-xl bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-300 dark:border-yellow-700 shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="text-4xl">⚠️</div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
+                {rtl ? 'מעקב מחירים כבוי!' : 'Price Tracking is Disabled!'}
+              </h3>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                {rtl 
+                  ? `יש לך ${historyItemsCount} פריטים בהיסטוריה, אבל מעקב המחירים כבוי. הפעל אותו כדי להתחיל לעקוב אחר מחירים!`
+                  : `You have ${historyItemsCount} items in your history, but price tracking is OFF. Enable it to start tracking prices when you complete items!`
+                }
+              </p>
+              <label className="flex items-center gap-3 cursor-pointer bg-white dark:bg-gray-800 p-4 rounded-lg border border-yellow-200 dark:border-yellow-700 hover:bg-yellow-50 dark:hover:bg-gray-700 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={priceTrackingEnabled}
+                  onChange={(e) => onTogglePriceTracking(e.target.checked)}
+                  className="w-6 h-6 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800 dark:text-white">
+                    💰 {translations.enablePriceTracking}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {translations.priceTrackingDesc}
+                  </div>
+                </div>
+              </label>
+              <div className="mt-4 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-700">
+                <strong>{rtl ? 'טיפ:' : 'Tip:'}</strong> {rtl 
+                  ? 'לאחר הפעלה, תתבקש להוסיף מחירים בכל פעם שתסמן פריטים כהושלמו.'
+                  : 'Once enabled, you\'ll be prompted to add prices whenever you complete items.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Best Deals Section */}
       {bestDeals.length > 0 && searchQuery === '' && (

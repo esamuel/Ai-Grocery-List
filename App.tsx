@@ -1936,10 +1936,13 @@ function App() {
                 price: currentText.priceModalTotal,
                 date: currentText.date,
                 trend: currentText.trend,
+                enablePriceTracking: currentText.enablePriceTracking,
+                priceTrackingDesc: currentText.priceTrackingDesc,
               }}
               priceHistory={(() => {
                 console.log('📊 Price Compare Data Debug:');
                 console.log('Total history items:', historyItems.length);
+                console.log('Price tracking enabled:', enablePriceTracking);
                 const itemsWithPrice = historyItems.filter(item => item.price);
                 console.log('Items with price:', itemsWithPrice.length);
                 const priceData = itemsWithPrice.map(item => ({
@@ -1952,6 +1955,12 @@ function App() {
                 return priceData;
               })()}
               rtl={language === 'he'}
+              priceTrackingEnabled={enablePriceTracking}
+              onTogglePriceTracking={(enabled) => {
+                setEnablePriceTracking(enabled);
+                localStorage.setItem('enablePriceTracking', String(enabled));
+              }}
+              historyItemsCount={historyItems.length}
             />
         ) : currentView === 'list' ? (
             <>
