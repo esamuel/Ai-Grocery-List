@@ -131,11 +131,11 @@ export const getFamilyMembers = async (listId: string): Promise<FamilyMember[]> 
 };
 
 /**
- * Get recent family activities for a list
+ * Get recent family activities for a list (max 3 per member)
  */
 export const getFamilyActivities = async (
   listId: string,
-  maxActivities: number = 20
+  maxActivities: number = 50 // Fetch more to filter later
 ): Promise<FamilyActivity[]> => {
   try {
     const dbLite = getFirebaseDb();
@@ -148,11 +148,57 @@ export const getFamilyActivities = async (
     );
 
     const snapshot = await getDocsLite(activitiesQuery);
-
-    return snapshot.docs.map((doc) => ({
+    
+    const allActivities = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     } as FamilyActivity));
+
+    // Get current display names for all users in activities
+    const userIds = [...new Set(allActivities.map(a => a.userId))];
+    const displayNamesMap = new Map<string, string>();
+
+    // Fetch display names from users collection
+    for (const userId of userIds) {
+      try {
+        const userDocRef = docLite(dbLite, usersCollection, userId);
+        const userDoc = await getDocLite(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userEmail = userData.email || '';
+          const displayName = userData.displayName || 
+                              (userEmail ? getFriendlyNameFromEmail(userEmail) : 'User');
+          displayNamesMap.set(userId, displayName);
+        }
+      } catch (err) {
+        console.error(`Error fetching display name for ${userId}:`, err);
+      }
+    }
+
+    // Update activity userNames with current display names
+    const activitiesWithCurrentNames = allActivities.map(activity => ({
+      ...activity,
+      userName: displayNamesMap.get(activity.userId) || activity.userName
+    }));
+
+    // Limit to 3 activities per user
+    const activitiesByUser = new Map<string, FamilyActivity[]>();
+    
+    for (const activity of activitiesWithCurrentNames) {
+      const userActivities = activitiesByUser.get(activity.userId) || [];
+      if (userActivities.length < 3) {
+        userActivities.push(activity);
+        activitiesByUser.set(activity.userId, userActivities);
+      }
+    }
+
+    // Flatten and sort by timestamp
+    const limitedActivities = Array.from(activitiesByUser.values())
+      .flat()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return limitedActivities;
   } catch (error) {
     console.error('Error fetching family activities:', error);
     return [];

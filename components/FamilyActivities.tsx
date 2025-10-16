@@ -42,7 +42,7 @@ export const FamilyActivities: React.FC<FamilyActivitiesProps> = ({
         console.log('FamilyActivities: Loading data for listId:', listId, 'userId:', userId);
         const [membersData, activitiesData] = await Promise.all([
           getFamilyMembers(listId),
-          getFamilyActivities(listId, 20) // Get last 20 activities
+          getFamilyActivities(listId) // Get last 3 activities per member
         ]);
         console.log('FamilyActivities: Loaded members:', membersData);
         console.log('FamilyActivities: Loaded activities:', activitiesData);
