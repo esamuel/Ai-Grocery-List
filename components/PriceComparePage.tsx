@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import type { PriceHistory } from '../types';
+
+interface PriceRecord {
+  itemName: string;
+  price: number;
+  store: string;
+  date: string;
+}
 
 interface PriceComparePageProps {
   onBack: () => void;
@@ -21,7 +27,7 @@ interface PriceComparePageProps {
     date: string;
     trend: string;
   };
-  priceHistory: PriceHistory[];
+  priceHistory: PriceRecord[];
   rtl?: boolean;
 }
 
@@ -32,7 +38,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
   rtl = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredItems, setFilteredItems] = useState<PriceHistory[]>([]);
+  const [filteredItems, setFilteredItems] = useState<PriceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
   useEffect(() => {
