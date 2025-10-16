@@ -1,4 +1,5 @@
 import type { ParsedGroceryItem, CategorizedResponse } from './geminiService';
+import { CATEGORY_TRANSLATIONS, type Language } from './categoryTranslations';
 
 // Local categorization rules for offline use
 interface CategoryRule {
@@ -7,120 +8,120 @@ interface CategoryRule {
   confidence: number;
 }
 
-// Multi-language categorization rules
+// Multi-language categorization rules using standardized translations
 const categorizationRules: Record<string, CategoryRule[]> = {
   en: [
     // Fruits
-    { keywords: ['apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'pear', 'peach', 'plum', 'cherry', 'kiwi', 'mango', 'pineapple', 'watermelon', 'melon', 'avocado'], category: 'Fruits', confidence: 0.95 },
+    { keywords: ['apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'pear', 'peach', 'plum', 'cherry', 'kiwi', 'mango', 'pineapple', 'watermelon', 'melon', 'avocado'], category: CATEGORY_TRANSLATIONS['Fruits'].en, confidence: 0.95 },
     
     // Vegetables
-    { keywords: ['tomato', 'lettuce', 'carrot', 'onion', 'potato', 'cucumber', 'bell pepper', 'spinach', 'broccoli', 'cauliflower', 'zucchini', 'eggplant', 'garlic', 'ginger', 'cabbage', 'corn', 'peas', 'beans', 'celery', 'mushroom'], category: 'Vegetables', confidence: 0.95 },
+    { keywords: ['tomato', 'lettuce', 'carrot', 'onion', 'potato', 'cucumber', 'bell pepper', 'spinach', 'broccoli', 'cauliflower', 'zucchini', 'eggplant', 'garlic', 'ginger', 'cabbage', 'corn', 'peas', 'beans', 'celery', 'mushroom'], category: CATEGORY_TRANSLATIONS['Vegetables'].en, confidence: 0.95 },
     
     // Meat
-    { keywords: ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'bacon', 'ham', 'sausage', 'ground beef', 'steak', 'ribs', 'wings'], category: 'Meat', confidence: 0.95 },
+    { keywords: ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'bacon', 'ham', 'sausage', 'ground beef', 'steak', 'ribs', 'wings'], category: CATEGORY_TRANSLATIONS['Meat'].en, confidence: 0.95 },
     
     // Fish
-    { keywords: ['fish', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'cod', 'tilapia', 'sardines', 'anchovies', 'seafood'], category: 'Fish', confidence: 0.95 },
+    { keywords: ['fish', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'cod', 'tilapia', 'sardines', 'anchovies', 'seafood'], category: CATEGORY_TRANSLATIONS['Fish'].en, confidence: 0.95 },
     
     // Dairy
-    { keywords: ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cottage cheese', 'mozzarella', 'cheddar', 'parmesan'], category: 'Dairy', confidence: 0.95 },
+    { keywords: ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cottage cheese', 'mozzarella', 'cheddar', 'parmesan'], category: CATEGORY_TRANSLATIONS['Dairy'].en, confidence: 0.95 },
     
     // Bread & Bakery
-    { keywords: ['bread', 'bagel', 'croissant', 'muffin', 'donut', 'cake', 'cookie', 'pastry', 'baguette', 'roll', 'toast', 'pie', 'pita'], category: 'Bread & Bakery', confidence: 0.95 },
+    { keywords: ['bread', 'bagel', 'croissant', 'muffin', 'donut', 'cake', 'cookie', 'pastry', 'baguette', 'roll', 'toast', 'pie', 'pita'], category: CATEGORY_TRANSLATIONS['Bread & Bakery'].en, confidence: 0.95 },
     
     // Grains & Cereals
-    { keywords: ['rice', 'pasta', 'flour', 'oats', 'cereal', 'quinoa', 'barley', 'wheat', 'granola', 'muesli'], category: 'Grains & Cereals', confidence: 0.9 },
+    { keywords: ['rice', 'pasta', 'flour', 'oats', 'cereal', 'quinoa', 'barley', 'wheat', 'granola', 'muesli'], category: CATEGORY_TRANSLATIONS['Grains & Cereals'].en, confidence: 0.9 },
     
     // Beverages
-    { keywords: ['water', 'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'smoothie'], category: 'Beverages', confidence: 0.9 },
+    { keywords: ['water', 'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'smoothie'], category: CATEGORY_TRANSLATIONS['Beverages'].en, confidence: 0.9 },
     
     // Snacks
-    { keywords: ['chips', 'crackers', 'nuts', 'popcorn', 'candy', 'chocolate', 'cookies', 'pretzels', 'granola bar'], category: 'Snacks', confidence: 0.9 },
+    { keywords: ['chips', 'crackers', 'nuts', 'popcorn', 'candy', 'chocolate', 'cookies', 'pretzels', 'granola bar'], category: CATEGORY_TRANSLATIONS['Snacks'].en, confidence: 0.9 },
     
     // Frozen
-    { keywords: ['frozen', 'ice cream', 'frozen vegetables', 'frozen fruit', 'frozen pizza', 'frozen dinner', 'popsicle'], category: 'Frozen', confidence: 0.95 },
+    { keywords: ['frozen', 'ice cream', 'frozen vegetables', 'frozen fruit', 'frozen pizza', 'frozen dinner', 'popsicle'], category: CATEGORY_TRANSLATIONS['Frozen'].en, confidence: 0.95 },
     
     // Household & Cleaning
-    { keywords: ['soap', 'detergent', 'bleach', 'toilet paper', 'paper towels', 'cleaning', 'dish soap', 'laundry', 'trash bags'], category: 'Household & Cleaning', confidence: 0.95 },
+    { keywords: ['soap', 'detergent', 'bleach', 'toilet paper', 'paper towels', 'cleaning', 'dish soap', 'laundry', 'trash bags'], category: CATEGORY_TRANSLATIONS['Household & Cleaning'].en, confidence: 0.95 },
     
     // Personal Care
-    { keywords: ['shampoo', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'sunscreen', 'razor', 'makeup'], category: 'Personal Care', confidence: 0.95 }
+    { keywords: ['shampoo', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'sunscreen', 'razor', 'makeup'], category: CATEGORY_TRANSLATIONS['Personal Care'].en, confidence: 0.95 }
   ],
   
   he: [
     // Fruits - Hebrew
-    { keywords: ['תפוח', 'בננה', 'תפוז', 'לימון', 'ענבים', 'תות', 'אגס', 'אפרסק', 'שזיף', 'דובדבן', 'קיווי', 'מנגו', 'אננס', 'אבטיח', 'מלון', 'אבוקדו'], category: 'פירות', confidence: 0.95 },
+    { keywords: ['תפוח', 'בננה', 'תפוז', 'לימון', 'ענבים', 'תות', 'אגס', 'אפרסק', 'שזיף', 'דובדבן', 'קיווי', 'מנגו', 'אננס', 'אבטיח', 'מלון', 'אבוקדו'], category: CATEGORY_TRANSLATIONS['Fruits'].he, confidence: 0.95 },
     
     // Vegetables - Hebrew
-    { keywords: ['עגבניה', 'חסה', 'גזר', 'בצל', 'תפוח אדמה', 'מלפפון', 'פלפל', 'תרד', 'ברוקולי', 'כרובית', 'קישוא', 'חציל', 'שום', 'זנגביל', 'כרוב', 'תירס', 'אפונה', 'פטריות'], category: 'ירקות', confidence: 0.95 },
+    { keywords: ['עגבניה', 'חסה', 'גזר', 'בצל', 'תפוח אדמה', 'מלפפון', 'פלפל', 'תרד', 'ברוקולי', 'כרובית', 'קישוא', 'חציל', 'שום', 'זנגביל', 'כרוב', 'תירס', 'אפונה', 'פטריות'], category: CATEGORY_TRANSLATIONS['Vegetables'].he, confidence: 0.95 },
     
     // Meat - Hebrew
-    { keywords: ['עוף', 'בקר', 'חזיר', 'הודו', 'כבש', 'בייקון', 'נקניק', 'בשר טחון', 'סטייק'], category: 'בשר', confidence: 0.95 },
+    { keywords: ['עוף', 'בקר', 'חזיר', 'הודו', 'כבש', 'בייקון', 'נקניק', 'בשר טחון', 'סטייק'], category: CATEGORY_TRANSLATIONS['Meat'].he, confidence: 0.95 },
     
     // Fish - Hebrew
-    { keywords: ['דג', 'סלמון', 'טונה', 'שרימפס', 'סרטן', 'לובסטר', 'בקלה', 'טילפיה', 'פירות ים'], category: 'דגים', confidence: 0.95 },
+    { keywords: ['דג', 'סלמון', 'טונה', 'שרימפס', 'סרטן', 'לובסטר', 'בקלה', 'טילפיה', 'פירות ים'], category: CATEGORY_TRANSLATIONS['Fish'].he, confidence: 0.95 },
     
     // Dairy - Hebrew
-    { keywords: ['חלב', 'גבינה', 'יוגורט', 'חמאה', 'שמנת', 'שמנת חמוצה', 'גבינת קוטג', 'מוצרלה', 'צ\'דר'], category: 'חלב', confidence: 0.95 },
+    { keywords: ['חלב', 'גבינה', 'יוגורט', 'חמאה', 'שמנת', 'שמנת חמוצה', 'גבינת קוטג', 'מוצרלה', 'צ\'דר'], category: CATEGORY_TRANSLATIONS['Dairy'].he, confidence: 0.95 },
     
     // Bread & Bakery - Hebrew
-    { keywords: ['לחם', 'בייגל', 'קרואסון', 'מאפין', 'סופגניה', 'עוגה', 'עוגיה', 'מאפה', 'לחמניה', 'פיתה'], category: 'לחם ומאפים', confidence: 0.95 },
+    { keywords: ['לחם', 'בייגל', 'קרואסון', 'מאפין', 'סופגניה', 'עוגה', 'עוגיה', 'מאפה', 'לחמניה', 'פיתה'], category: CATEGORY_TRANSLATIONS['Bread & Bakery'].he, confidence: 0.95 },
     
     // Grains & Cereals - Hebrew
-    { keywords: ['אורז', 'פסטה', 'קמח', 'שיבולת שועל', 'דגני בוקר', 'קינואה', 'שעורה', 'חיטה', 'גרנולה'], category: 'דגנים ודגני בוקר', confidence: 0.9 },
+    { keywords: ['אורז', 'פסטה', 'קמח', 'שיבולת שועל', 'דגני בוקר', 'קינואה', 'שעורה', 'חיטה', 'גרנולה'], category: CATEGORY_TRANSLATIONS['Grains & Cereals'].he, confidence: 0.9 },
     
     // Beverages - Hebrew
-    { keywords: ['מים', 'מיץ', 'משקה קל', 'קפה', 'תה', 'בירה', 'יין', 'שייק'], category: 'משקאות', confidence: 0.9 },
+    { keywords: ['מים', 'מיץ', 'משקה קל', 'קפה', 'תה', 'בירה', 'יין', 'שייק'], category: CATEGORY_TRANSLATIONS['Beverages'].he, confidence: 0.9 },
     
     // Snacks - Hebrew
-    { keywords: ['צ\'יפס', 'קרקרים', 'אגוזים', 'פופקורן', 'ממתק', 'שוקולד', 'עוגיות', 'פרצלים'], category: 'חטיפים', confidence: 0.9 },
+    { keywords: ['צ\'יפס', 'קרקרים', 'אגוזים', 'פופקורן', 'ממתק', 'שוקולד', 'עוגיות', 'פרצלים'], category: CATEGORY_TRANSLATIONS['Snacks'].he, confidence: 0.9 },
     
     // Frozen - Hebrew
-    { keywords: ['קפוא', 'גלידה', 'ירקות קפואים', 'פירות קפואים', 'פיצה קפואה', 'ארוחה קפואה'], category: 'קפואים', confidence: 0.95 },
+    { keywords: ['קפוא', 'גלידה', 'ירקות קפואים', 'פירות קפואים', 'פיצה קפואה', 'ארוחה קפואה'], category: CATEGORY_TRANSLATIONS['Frozen'].he, confidence: 0.95 },
     
     // Household & Cleaning - Hebrew
-    { keywords: ['סבון', 'חומר ניקוי', 'אקונומיקה', 'נייר טואלט', 'מגבות נייר', 'ניקוי', 'סבון כלים', 'כביסה', 'שקיות זבל'], category: 'בית וניקוי', confidence: 0.95 },
+    { keywords: ['סבון', 'חומר ניקוי', 'אקונומיקה', 'נייר טואלט', 'מגבות נייר', 'ניקוי', 'סבון כלים', 'כביסה', 'שקיות זבל'], category: CATEGORY_TRANSLATIONS['Household & Cleaning'].he, confidence: 0.95 },
     
     // Personal Care - Hebrew
-    { keywords: ['שמפו', 'משחת שיניים', 'מברשת שיניים', 'דאודורנט', 'קרם', 'קרם הגנה', 'סכין גילוח', 'איפור'], category: 'טיפוח אישי', confidence: 0.95 }
+    { keywords: ['שמפו', 'משחת שיניים', 'מברשת שיניים', 'דאודורנט', 'קרם', 'קרם הגנה', 'סכין גילוח', 'איפור'], category: CATEGORY_TRANSLATIONS['Personal Care'].he, confidence: 0.95 }
   ],
   
   es: [
     // Fruits - Spanish
-    { keywords: ['manzana', 'plátano', 'naranja', 'limón', 'uva', 'fresa', 'pera', 'durazno', 'ciruela', 'cereza', 'kiwi', 'mango', 'piña', 'sandía', 'melón', 'aguacate'], category: 'Frutas', confidence: 0.95 },
+    { keywords: ['manzana', 'plátano', 'naranja', 'limón', 'uva', 'fresa', 'pera', 'durazno', 'ciruela', 'cereza', 'kiwi', 'mango', 'piña', 'sandía', 'melón', 'aguacate'], category: CATEGORY_TRANSLATIONS['Fruits'].es, confidence: 0.95 },
     
     // Vegetables - Spanish
-    { keywords: ['tomate', 'lechuga', 'zanahoria', 'cebolla', 'papa', 'pepino', 'pimiento', 'espinaca', 'brócoli', 'coliflor', 'calabacín', 'berenjena', 'ajo', 'jengibre', 'repollo', 'maíz', 'guisantes', 'hongos'], category: 'Verduras', confidence: 0.95 },
+    { keywords: ['tomate', 'lechuga', 'zanahoria', 'cebolla', 'papa', 'pepino', 'pimiento', 'espinaca', 'brócoli', 'coliflor', 'calabacín', 'berenjena', 'ajo', 'jengibre', 'repollo', 'maíz', 'guisantes', 'hongos'], category: CATEGORY_TRANSLATIONS['Vegetables'].es, confidence: 0.95 },
     
     // Meat - Spanish
-    { keywords: ['pollo', 'carne', 'cerdo', 'pavo', 'cordero', 'tocino', 'jamón', 'salchicha', 'carne molida', 'bistec', 'costillas', 'alitas'], category: 'Carne', confidence: 0.95 },
+    { keywords: ['pollo', 'carne', 'cerdo', 'pavo', 'cordero', 'tocino', 'jamón', 'salchicha', 'carne molida', 'bistec', 'costillas', 'alitas'], category: CATEGORY_TRANSLATIONS['Meat'].es, confidence: 0.95 },
     
     // Fish - Spanish
-    { keywords: ['pescado', 'salmón', 'atún', 'camarón', 'cangrejo', 'langosta', 'bacalao', 'tilapia', 'mariscos'], category: 'Pescado', confidence: 0.95 },
+    { keywords: ['pescado', 'salmón', 'atún', 'camarón', 'cangrejo', 'langosta', 'bacalao', 'tilapia', 'mariscos'], category: CATEGORY_TRANSLATIONS['Fish'].es, confidence: 0.95 },
     
     // Dairy - Spanish
-    { keywords: ['leche', 'queso', 'yogur', 'mantequilla', 'crema', 'crema agria', 'queso cottage', 'mozzarella', 'cheddar', 'parmesano'], category: 'Lácteos', confidence: 0.95 },
+    { keywords: ['leche', 'queso', 'yogur', 'mantequilla', 'crema', 'crema agria', 'queso cottage', 'mozzarella', 'cheddar', 'parmesano'], category: CATEGORY_TRANSLATIONS['Dairy'].es, confidence: 0.95 },
     
     // Bread & Bakery - Spanish
-    { keywords: ['pan', 'bagel', 'croissant', 'muffin', 'panecillos', 'pita', 'baguette', 'tostada', 'pastel', 'galletas'], category: 'Pan y Panadería', confidence: 0.95 },
+    { keywords: ['pan', 'bagel', 'croissant', 'muffin', 'panecillos', 'pita', 'baguette', 'tostada', 'pastel', 'galletas'], category: CATEGORY_TRANSLATIONS['Bread & Bakery'].es, confidence: 0.95 },
     
     // Grains & Cereals - Spanish
-    { keywords: ['arroz', 'pasta', 'harina', 'avena', 'cereal', 'quinoa', 'cebada', 'trigo', 'granola'], category: 'Granos y Cereales', confidence: 0.9 },
+    { keywords: ['arroz', 'pasta', 'harina', 'avena', 'cereal', 'quinoa', 'cebada', 'trigo', 'granola'], category: CATEGORY_TRANSLATIONS['Grains & Cereals'].es, confidence: 0.9 },
     
     // Beverages - Spanish
-    { keywords: ['agua', 'jugo', 'refresco', 'café', 'té', 'cerveza', 'vino', 'batido'], category: 'Bebidas', confidence: 0.9 },
+    { keywords: ['agua', 'jugo', 'refresco', 'café', 'té', 'cerveza', 'vino', 'batido'], category: CATEGORY_TRANSLATIONS['Beverages'].es, confidence: 0.9 },
     
     // Snacks - Spanish
-    { keywords: ['papas fritas', 'galletas', 'nueces', 'palomitas', 'dulces', 'chocolate', 'pretzels'], category: 'Bocadillos', confidence: 0.9 },
+    { keywords: ['papas fritas', 'galletas', 'nueces', 'palomitas', 'dulces', 'chocolate', 'pretzels'], category: CATEGORY_TRANSLATIONS['Snacks'].es, confidence: 0.9 },
     
     // Frozen - Spanish
-    { keywords: ['congelado', 'helado', 'verduras congeladas', 'frutas congeladas', 'pizza congelada', 'cena congelada'], category: 'Congelados', confidence: 0.95 },
+    { keywords: ['congelado', 'helado', 'verduras congeladas', 'frutas congeladas', 'pizza congelada', 'cena congelada'], category: CATEGORY_TRANSLATIONS['Frozen'].es, confidence: 0.95 },
     
     // Household & Cleaning - Spanish
-    { keywords: ['jabón', 'detergente', 'lejía', 'papel higiénico', 'toallas de papel', 'limpieza', 'jabón para platos', 'lavandería', 'bolsas de basura'], category: 'Hogar y Limpieza', confidence: 0.95 },
+    { keywords: ['jabón', 'detergente', 'lejía', 'papel higiénico', 'toallas de papel', 'limpieza', 'jabón para platos', 'lavandería', 'bolsas de basura'], category: CATEGORY_TRANSLATIONS['Household & Cleaning'].es, confidence: 0.95 },
     
     // Personal Care - Spanish
-    { keywords: ['champú', 'pasta de dientes', 'cepillo de dientes', 'desodorante', 'loción', 'protector solar', 'navaja', 'maquillaje'], category: 'Cuidado Personal', confidence: 0.95 }
+    { keywords: ['champú', 'pasta de dientes', 'cepillo de dientes', 'desodorante', 'loción', 'protector solar', 'navaja', 'maquillaje'], category: CATEGORY_TRANSLATIONS['Personal Care'].es, confidence: 0.95 }
   ]
 };
 

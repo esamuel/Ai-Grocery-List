@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { categorizeGroceriesLocally, getCachedCategorization, setCachedCategorization } from './localCategorizationService';
+import { normalizeCategory, getCategoryPromptList, type Language } from './categoryTranslations';
 
 let ai: GoogleGenAI | null = null;
 // Lazily initialize the AI client on first use to prevent app crash on load.
@@ -104,6 +105,8 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
     const responseLanguage = inputLanguage;
     const languageName = languageMap[responseLanguage];
 
+    const categoryList = getCategoryPromptList(responseLanguage);
+    
     const prompt = `
       You are an expert grocery list assistant. Your task is to parse and categorize new grocery items with quantity and unit information.
       
@@ -126,23 +129,13 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
 
       Please categorize ONLY the new item(s) into detailed and specific grocery categories:
       - Keep the item names in their ORIGINAL language (${languageName})
-      - Translate only the category names to ${languageName}
+      - Use ONLY the ${languageName} category names provided below
       - Do NOT translate or modify the actual grocery item names
 
-      Use these main category groups (translate to ${languageName}):
-      - Fruits
-      - Vegetables  
-      - Meat
-      - Fish
-      - Dairy
-      - Bread & Bakery
-      - Grains & Cereals
-      - Beverages
-      - Snacks
-      - Frozen
-      - Household & Cleaning
-      - Personal Care
-      - Other
+      Use ONLY these category names (in ${languageName}):
+      ${categoryList}
+
+      CRITICAL: You must use the EXACT category names listed above, in ${languageName}. Do not create new categories or use variations.
 
       Return the result as a JSON object that adheres to the provided schema. Do not include existing items in your response.
     `;
@@ -174,6 +167,13 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
       } else {
         throw new Error("AI returned unexpected format");
       }
+      
+      // Normalize category names to ensure consistency
+      parsedResponse = parsedResponse.map(item => ({
+        ...item,
+        category: normalizeCategory(item.category, responseLanguage)
+      }));
+      
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
       throw new Error("AI returned invalid JSON");
@@ -221,6 +221,7 @@ export const categorizeAndTranslateImportedItems = async (
 ): Promise<CategorizedResponse[]> => {
   const languageNames = { en: 'English', he: 'Hebrew', es: 'Spanish' };
   const languageName = languageNames[targetLanguage];
+  const categoryList = getCategoryPromptList(targetLanguage);
   
   const prompt = `
       You are an expert grocery list assistant. Your task is to parse, categorize, and translate imported grocery items.
@@ -242,20 +243,10 @@ export const categorizeAndTranslateImportedItems = async (
       - English "bread" → Hebrew "לחם", Spanish "pan"
       - English "apples" → Hebrew "תפוחים", Spanish "manzanas"
 
-      Use these main category groups (in ${languageName}):
-      - Fruits (${targetLanguage === 'he' ? 'פירות' : targetLanguage === 'es' ? 'Frutas' : 'Fruits'})
-      - Vegetables (${targetLanguage === 'he' ? 'ירקות' : targetLanguage === 'es' ? 'Verduras' : 'Vegetables'})
-      - Meat (${targetLanguage === 'he' ? 'בשר' : targetLanguage === 'es' ? 'Carne' : 'Meat'})
-      - Fish (${targetLanguage === 'he' ? 'דגים' : targetLanguage === 'es' ? 'Pescado' : 'Fish'})
-      - Dairy (${targetLanguage === 'he' ? 'חלב' : targetLanguage === 'es' ? 'Lácteos' : 'Dairy'})
-      - Bread & Bakery (${targetLanguage === 'he' ? 'לחם ומאפים' : targetLanguage === 'es' ? 'Pan y Panadería' : 'Bread & Bakery'})
-      - Grains & Cereals (${targetLanguage === 'he' ? 'דגנים ודגני בוקר' : targetLanguage === 'es' ? 'Granos y Cereales' : 'Grains & Cereals'})
-      - Beverages (${targetLanguage === 'he' ? 'משקאות' : targetLanguage === 'es' ? 'Bebidas' : 'Beverages'})
-      - Snacks (${targetLanguage === 'he' ? 'חטיפים' : targetLanguage === 'es' ? 'Bocadillos' : 'Snacks'})
-      - Frozen (${targetLanguage === 'he' ? 'קפואים' : targetLanguage === 'es' ? 'Congelados' : 'Frozen'})
-      - Household & Cleaning (${targetLanguage === 'he' ? 'בית וניקוי' : targetLanguage === 'es' ? 'Hogar y Limpieza' : 'Household & Cleaning'})
-      - Personal Care (${targetLanguage === 'he' ? 'טיפוח אישי' : targetLanguage === 'es' ? 'Cuidado Personal' : 'Personal Care'})
-      - Other (${targetLanguage === 'he' ? 'מזווה' : targetLanguage === 'es' ? 'Otros' : 'Other'})
+      Use ONLY these category names (in ${languageName}):
+      ${categoryList}
+
+      CRITICAL: You must use the EXACT category names listed above, in ${languageName}. Do not create new categories or use variations.
 
       Return the result as a JSON object that adheres to the provided schema.
     `;
@@ -287,6 +278,13 @@ export const categorizeAndTranslateImportedItems = async (
       } else {
         throw new Error("AI returned unexpected format");
       }
+      
+      // Normalize category names to ensure consistency
+      parsedResponse = parsedResponse.map(item => ({
+        ...item,
+        category: normalizeCategory(item.category, targetLanguage)
+      }));
+      
     } catch (parseError) {
       console.error("Failed to parse AI translation response:", parseError);
       throw new Error("AI returned invalid JSON for translation");
