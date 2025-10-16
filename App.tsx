@@ -25,6 +25,8 @@ import { PaywallModal } from './components/PaywallModal';
 import { AdBanner } from './components/AdBanner';
 import { LandingPage } from './components/LandingPage';
 import { FamilyActivities } from './components/FamilyActivities';
+import { DashboardPage } from './components/DashboardPage';
+import { PriceComparePage } from './components/PriceComparePage';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -51,7 +53,7 @@ import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 type Language = 'en' | 'he' | 'es';
-  type View = 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family';
+  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare';
 
 const translations = {
   en: {
@@ -327,6 +329,32 @@ const translations = {
     installNotAvailable: "Install not available on this device",
     darkMode: "Dark Mode",
     darkModeDesc: "Switch to dark theme",
+    // Dashboard
+    dashboard: "Dashboard",
+    listDesc: "Manage your shopping list",
+    historyDesc: "View purchase history",
+    familyDesc: "Family members & activities",
+    priceCompare: "Price Compare",
+    priceCompareDesc: "Track & compare prices",
+    insightsDesc: "View spending insights",
+    dailyDesc: "Daily purchase history",
+    voiceDesc: "Voice input shopping",
+    importExportDesc: "Import & export lists",
+    suggestionsDesc: "Smart AI suggestions",
+    quickSearch: "Quick Search",
+    viewAll: "View All",
+    addItem: "Add Item",
+    bestDeals: "Best Deals",
+    searchPlaceholder: "Search items...",
+    lowestPrice: "Lowest",
+    highestPrice: "Highest",
+    avgPrice: "Average",
+    lastPurchased: "Last Purchased",
+    priceHistory: "Price History",
+    trackNewItem: "Track prices by completing items",
+    itemName: "Item",
+    trend: "Trend",
+    back: "Back",
   },
   he: {
     title: "רשימת קניות חכמה",
@@ -601,6 +629,32 @@ const translations = {
     installNotAvailable: "ההתקנה אינה זמינה במכשיר זה",
     darkMode: "מצב כהה",
     darkModeDesc: "עבור לעיצוב כהה",
+    // Dashboard
+    dashboard: "לוח בקרה",
+    listDesc: "נהל את רשימת הקניות שלך",
+    historyDesc: "צפה בהיסטוריית קניות",
+    familyDesc: "בני משפחה ופעילויות",
+    priceCompare: "השוואת מחירים",
+    priceCompareDesc: "עקוב והשווה מחירים",
+    insightsDesc: "צפה בתובנות הוצאות",
+    dailyDesc: "היסטוריית קניות יומית",
+    voiceDesc: "קניות בקלט קולי",
+    importExportDesc: "יבוא ויצוא רשימות",
+    suggestionsDesc: "הצעות AI חכמות",
+    quickSearch: "חיפוש מהיר",
+    viewAll: "צפה בהכל",
+    addItem: "הוסף פריט",
+    bestDeals: "עסקאות מובילות",
+    searchPlaceholder: "חפש פריטים...",
+    lowestPrice: "הנמוך",
+    highestPrice: "הגבוה",
+    avgPrice: "ממוצע",
+    lastPurchased: "נקנה לאחרונה",
+    priceHistory: "היסטוריית מחירים",
+    trackNewItem: "עקוב אחר מחירים על ידי השלמת פריטים",
+    itemName: "פריט",
+    trend: "מגמה",
+    back: "חזור",
   },
   es: {
     title: "Lista de Compras con IA",
@@ -874,6 +928,32 @@ const translations = {
     installNotAvailable: "Instalación no disponible en este dispositivo",
     darkMode: "Modo Oscuro",
     darkModeDesc: "Cambiar a tema oscuro",
+    // Dashboard
+    dashboard: "Tablero",
+    listDesc: "Gestionar tu lista de compras",
+    historyDesc: "Ver historial de compras",
+    familyDesc: "Miembros y actividades familiares",
+    priceCompare: "Comparar Precios",
+    priceCompareDesc: "Rastrear y comparar precios",
+    insightsDesc: "Ver información de gastos",
+    dailyDesc: "Historial de compras diario",
+    voiceDesc: "Compras por voz",
+    importExportDesc: "Importar y exportar listas",
+    suggestionsDesc: "Sugerencias inteligentes de IA",
+    quickSearch: "Búsqueda Rápida",
+    viewAll: "Ver Todo",
+    addItem: "Añadir Artículo",
+    bestDeals: "Mejores Ofertas",
+    searchPlaceholder: "Buscar artículos...",
+    lowestPrice: "Más Bajo",
+    highestPrice: "Más Alto",
+    avgPrice: "Promedio",
+    lastPurchased: "Última Compra",
+    priceHistory: "Historial de Precios",
+    trackNewItem: "Rastrea precios al completar artículos",
+    itemName: "Artículo",
+    trend: "Tendencia",
+    back: "Atrás",
   }
 };
 
@@ -938,7 +1018,7 @@ const getInitialLanguage = (): Language => {
 function App() {
   const [inputValue, setInputValue] = useState('');
   const [language, setLanguage] = useState<Language>(() => getInitialLanguage());
-  const [currentView, setCurrentView] = useState<View>('list');
+  const [currentView, setCurrentView] = useState<View>('dashboard');
   const [showLandingPage, setShowLandingPage] = useState(true);
   const [showSwipeHint, setShowSwipeHint] = useState<boolean>(() => {
     try { return localStorage.getItem('swipeHintDismissed') ? false : true; } catch { return true; }
@@ -1778,13 +1858,18 @@ function App() {
             </div>
             {isSyncing && <div className="text-center text-sm text-green-600 p-1 animate-pulse">{currentText.syncing}</div>}
         </div>
-        <div className="max-w-3xl mx-auto border-t border-gray-200 flex">
-            <NavButton currentView={currentView} buttonView="list" onClick={() => setCurrentView('list')}><ListIcon className="w-6 h-6 mb-1"/><span>{currentText.list}</span></NavButton>
-            <NavButton currentView={currentView} buttonView="favorites" onClick={() => setCurrentView('favorites')}><StarIcon className="w-6 h-6 mb-1"/><span>{currentText.favorites}</span></NavButton>
-            <NavButton currentView={currentView} buttonView="family" onClick={() => setCurrentView('family')}><UsersIcon className="w-6 h-6 mb-1"/><span>{currentText.family}</span></NavButton>
-            <NavButton currentView={currentView} buttonView="insights" onClick={() => setCurrentView('insights')}><span className="text-2xl mb-1">📊</span><span>{currentText.spendingInsights}</span></NavButton>
-            <NavButton currentView={currentView} buttonView="daily" onClick={() => setCurrentView('daily')}><span className="text-2xl mb-1">📅</span><span>{currentText.dailyPurchases}</span></NavButton>
-        </div>
+        {/* Back to Dashboard Button - Only show when not on dashboard */}
+        {currentView !== 'dashboard' && (
+          <div className="max-w-3xl mx-auto border-t border-gray-200 p-3">
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:opacity-90 transition-all shadow-lg hover:scale-105"
+            >
+              <span className={`text-xl ${language === 'he' ? 'inline-block transform rotate-180' : ''}`}>←</span>
+              <span className="font-semibold">{currentText.dashboard}</span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Language Detection Notification */}
@@ -1798,7 +1883,71 @@ function App() {
       )}
 
       <main className="max-w-3xl mx-auto p-4 sm:px-6 lg:px-8 pb-32">
-        {currentView === 'list' ? (
+        {currentView === 'dashboard' ? (
+            <DashboardPage
+              onNavigate={(view) => setCurrentView(view as View)}
+              translations={{
+                list: currentText.list,
+                listDesc: currentText.listDesc,
+                history: currentText.favorites,
+                historyDesc: currentText.historyDesc,
+                family: currentText.family,
+                familyDesc: currentText.familyDesc,
+                priceCompare: currentText.priceCompare,
+                priceCompareDesc: currentText.priceCompareDesc,
+                insights: currentText.spendingInsights,
+                insightsDesc: currentText.insightsDesc,
+                daily: currentText.dailyPurchases,
+                dailyDesc: currentText.dailyDesc,
+                voice: currentText.inputPlaceholder,
+                voiceDesc: currentText.voiceDesc,
+                importExport: currentText.importExport,
+                importExportDesc: currentText.importExportDesc,
+                suggestions: currentText.suggestionsTitle,
+                suggestionsDesc: currentText.suggestionsDesc,
+                quickSearch: currentText.quickSearch,
+                viewAll: currentText.viewAll,
+                addItem: currentText.addItem,
+                bestDeals: currentText.bestDeals,
+              }}
+              itemsCount={items.length}
+              historyCount={historyItems.length}
+              familyMembersCount={0}
+              trackedPricesCount={historyItems.filter(item => item.price).length}
+              rtl={language === 'he'}
+            />
+        ) : currentView === 'priceCompare' ? (
+            <PriceComparePage
+              onBack={() => setCurrentView('dashboard')}
+              translations={{
+                priceCompare: currentText.priceCompare,
+                back: currentText.back,
+                searchPlaceholder: currentText.searchPlaceholder,
+                lowestPrice: currentText.lowestPrice,
+                highestPrice: currentText.highestPrice,
+                avgPrice: currentText.avgPrice,
+                lastPurchased: currentText.lastPurchased,
+                priceHistory: currentText.priceHistory,
+                noPriceData: currentText.noPriceData,
+                trackNewItem: currentText.trackNewItem,
+                bestDeals: currentText.bestDeals,
+                itemName: currentText.itemName,
+                store: currentText.store,
+                price: currentText.priceModalTotal,
+                date: currentText.date,
+                trend: currentText.trend,
+              }}
+              priceHistory={historyItems
+                .filter(item => item.price && item.store)
+                .map(item => ({
+                  itemName: item.name,
+                  price: item.price!,
+                  store: item.store || '',
+                  date: item.lastPurchased
+                }))}
+              rtl={language === 'he'}
+            />
+        ) : currentView === 'list' ? (
             <>
               {/* Action Buttons */}
               <div className="flex justify-between items-center mb-2 rtl:flex-row-reverse gap-2">
