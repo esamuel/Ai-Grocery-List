@@ -78,10 +78,38 @@ const usersCollection = 'users';
 
 // Authentication functions
 export const signInUser = async (email: string, password: string): Promise<User> => {
-    const { auth } = getFirebaseServices();
+    const { auth, dbLite } = getFirebaseServices();
     if (!auth) throw new Error('Auth service not initialized');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
+    
+    // Ensure user document exists with displayName field (for legacy users)
+    try {
+        const userDocRef = docLite(dbLite, usersCollection, userCredential.user.uid);
+        const userDoc = await getDocLite(userDocRef);
+        
+        if (!userDoc.exists()) {
+            // Create user document if it doesn't exist
+            await setDocLite(userDocRef, {
+                email: userCredential.user.email,
+                favorites: [],
+                displayName: '',
+                createdAt: new Date().toISOString(),
+                lastActive: new Date().toISOString()
+            });
+        } else {
+            // Update lastActive and ensure displayName field exists
+            const userData = userDoc.data();
+            await setDocLite(userDocRef, {
+                ...userData,
+                displayName: userData.displayName !== undefined ? userData.displayName : '',
+                lastActive: new Date().toISOString()
+            }, { merge: true });
+        }
+    } catch (error) {
+        console.error('Error updating user document on sign-in:', error);
+    }
+    
     return userCredential.user;
 };
 
@@ -91,11 +119,13 @@ export const signUpUser = async (email: string, password: string): Promise<User>
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
     
-    // Create user document with empty favorites
+    // Create user document with empty favorites and empty displayName
     await setDocLite(docLite(dbLite, usersCollection, userCredential.user.uid), {
         email: userCredential.user.email,
         favorites: [],
-        createdAt: new Date().toISOString()
+        displayName: '', // Initialize empty displayName field
+        createdAt: new Date().toISOString(),
+        lastActive: new Date().toISOString()
     });
     
     return userCredential.user;
@@ -589,21 +619,69 @@ export const forceRefreshUserList = async (): Promise<string> => {
 
 export const isListOwner = async (): Promise<boolean> => {
     if (!currentUser) return false;
-    
+
     try {
         const { dbLite } = getFirebaseServices();
         const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
         const userDoc = await getDocLite(userDocRef);
-        
+
         if (userDoc.exists()) {
             const userData = userDoc.data();
             // User is owner if they have a mainListId (not just sharedListId)
             return !!userData.mainListId && !userData.sharedListId;
         }
-        
+
         return false;
     } catch (error) {
         console.error('Error checking if user is list owner:', error);
+        return false;
+    }
+};
+
+export const getUserDisplayName = async (): Promise<string> => {
+    if (!currentUser) return '';
+
+    try {
+        const { dbLite } = getFirebaseServices();
+        const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
+        const userDoc = await getDocLite(userDocRef);
+
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            return userData.displayName || '';
+        }
+
+        return '';
+    } catch (error) {
+        console.error('Error getting user display name:', error);
+        return '';
+    }
+};
+
+export const updateUserDisplayName = async (displayName: string): Promise<boolean> => {
+    if (!currentUser) return false;
+
+    try {
+        const { dbLite } = getFirebaseServices();
+        const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
+        const userDoc = await getDocLite(userDocRef);
+
+        if (userDoc.exists()) {
+            await setDocLite(
+                userDocRef,
+                {
+                    ...userDoc.data(),
+                    displayName: displayName.trim(),
+                    updatedAt: new Date().toISOString(),
+                },
+                { merge: true }
+            );
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error updating user display name:', error);
         return false;
     }
 };

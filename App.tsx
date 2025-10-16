@@ -10,6 +10,7 @@ import { SpendingInsights } from './components/SpendingInsights';
 import { DailyPurchases } from './components/DailyPurchases';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
+import { UsersIcon } from './components/icons/UsersIcon';
 import { InfoIcon } from './components/icons/InfoIcon';
 import { GearIcon } from './components/icons/GearIcon';
 import { LoginPage } from './components/LoginPage';
@@ -17,21 +18,39 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { SmartSuggestions } from './components/SmartSuggestions';
 import type { ShoppingSuggestion } from './services/smartSuggestionsService';
 import { ImportExportModal } from './components/ImportExportModal';
-import { LaunchChecklistPage } from './components/LaunchChecklistPage';
 import { LegalPage } from './components/LegalPage';
 import { Toast } from './components/Toast';
 import { InstallPrompt } from './components/InstallPrompt';
 import { PaywallModal } from './components/PaywallModal';
+import { AdBanner } from './components/AdBanner';
+import { LandingPage } from './components/LandingPage';
+import { FamilyActivities } from './components/FamilyActivities';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
-import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner } from './services/firebaseService';
+import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
+import { logFamilyActivity } from './services/familyActivityService';
 import type { User } from 'firebase/auth';
+
+// Helper to get friendly name from user (fallback only)
+const getFriendlyUserNameFallback = (user: User | null): string => {
+  if (!user) return 'User';
+  if (user.displayName) return user.displayName;
+  if (user.email) {
+    const localPart = user.email.split('@')[0];
+    const parts = localPart.split(/[._-]/);
+    const capitalized = parts.map(part =>
+      part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    );
+    return capitalized.join(' ');
+  }
+  return 'User';
+};
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 type Language = 'en' | 'he' | 'es';
-  type View = 'list' | 'favorites' | 'insights' | 'daily' | 'checklist' | 'legal';
+  type View = 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family';
 
 const translations = {
   en: {
@@ -47,8 +66,25 @@ const translations = {
     clearCompleted: "Clear Completed",
     list: "List",
     favorites: "History",
+    family: "Family",
     favoritesTitle: "Purchase History",
     favoritesSubtitle: "Shop faster by adding your frequent purchases.",
+    familyTitle: "Family List",
+    familySubtitle: "Shared with family members",
+    familyMembersTitle: "Family Members",
+    familyOwner: "Owner",
+    familyMember: "Member",
+    familyActiveNow: "Active now",
+    familyRecentActivity: "Recent Activity",
+    familyNoActivity: "No recent activity",
+    familyCheckedOff: "checked off",
+    familyAdded: "added",
+    familyRemoved: "removed",
+    familyYou: "You",
+    familyMinutesAgo: "m ago",
+    familyHoursAgo: "h ago",
+    familyDaysAgo: "d ago",
+    familyJustNow: "Just now",
     purchased: "purchased",
     times: "times",
     deleteFromHistory: "Delete",
@@ -69,6 +105,10 @@ const translations = {
     signingUp: "Creating account...",
     signOut: "Sign Out",
     help: "Help",
+    displayName: "Display Name",
+    displayNameDesc: "Set your name to show in Family Activities",
+    saveDisplayName: "Save Name",
+    savingDisplayName: "Saving...",
     // Onboarding
     welcome: "Welcome to Aii Grocery list!",
     onboardingSubtitle: "Let's get you started with your smart shopping companion",
@@ -198,6 +238,9 @@ const translations = {
     // Paywall
     paywallTitle: "Unlock Premium Features",
     paywallSubtitle: "Choose the perfect plan for your shopping needs",
+    removeAdsTitle: "Remove Ads",
+    removeAdsDescription: "Upgrade to Pro or Family plan for an ad-free experience",
+    upgrade: "Upgrade",
     monthly: "Monthly",
     yearly: "Yearly",
     savePercent: "Save 40%",
@@ -212,21 +255,70 @@ const translations = {
     freeFeature1: "Core grocery list",
     freeFeature2: "Basic AI categorization (50/month)",
     freeFeature3: "1 shared list",
-    freeFeature4: "Limited history",
+    freeFeature4: "Includes ads",
     proFeature1: "Everything in Free",
-    proFeature2: "Unlimited AI categorization",
-    proFeature3: "Unlimited shared lists",
-    proFeature4: "Full purchase history",
-    proFeature5: "Price tracking & alerts",
-    proFeature6: "Spending insights",
-    proFeature7: "Smart predictions",
-    proFeature8: "Priority support",
+    proFeature2: "No ads",
+    proFeature3: "Unlimited AI categorization",
+    proFeature4: "Unlimited shared lists",
+    proFeature5: "Full purchase history",
+    proFeature6: "Price tracking & alerts",
+    proFeature7: "Spending insights",
+    proFeature8: "Smart predictions",
+    proFeature9: "Priority support",
     familyFeature1: "Everything in Pro",
     familyFeature2: "Up to 5 family members",
     familyFeature3: "Admin controls",
     familyFeature4: "Shared favorites",
     familyFeature5: "Family activity feed",
     familyFeature6: "Budget management",
+    // Landing Page
+    landingHeroTitle: "Never Forget Items or Overpay Again!",
+    landingHeroSubtitle: "AI-powered grocery list that organizes your shopping, tracks prices, and helps you save money",
+    landingHeroCta: "Start Free - 7 Days Trial",
+    landingHeroSecondaryCta: "See Pricing",
+    landingFeaturesTitle: "Everything You Need for Smarter Shopping",
+    landingFeaturesSubtitle: "Save time and money with intelligent features",
+    landingFeature1Title: "Smart AI Organization",
+    landingFeature1Desc: "Items automatically sorted by category - produce, dairy, bakery, and more",
+    landingFeature2Title: "Price Tracking",
+    landingFeature2Desc: "Track prices across stores and find the best deals automatically",
+    landingFeature3Title: "Family Sharing",
+    landingFeature3Desc: "Share lists with family members and sync in real-time",
+    landingFeature4Title: "Smart Predictions",
+    landingFeature4Desc: "AI predicts what you need based on your shopping patterns",
+    landingFeature5Title: "Voice Input",
+    landingFeature5Desc: "Add items by speaking - works in multiple languages",
+    landingFeature6Title: "Works Offline",
+    landingFeature6Desc: "Access your lists anywhere, even without internet",
+    landingHowItWorksTitle: "How It Works",
+    landingHowItWorksStep1: "Add Items",
+    landingHowItWorksStep1Desc: "Type or speak your grocery items naturally",
+    landingHowItWorksStep2: "AI Organizes",
+    landingHowItWorksStep2Desc: "Items are automatically categorized and sorted",
+    landingHowItWorksStep3: "Shop & Save",
+    landingHowItWorksStep3Desc: "Follow your organized list and track best prices",
+    landingPricingTitle: "Simple, Transparent Pricing",
+    landingPricingSubtitle: "Choose the plan that's right for you",
+    landingPricingFree: "Free",
+    landingPricingPro: "Pro",
+    landingPricingFamily: "Family",
+    landingPricingMostPopular: "MOST POPULAR",
+    landingPricingGetStarted: "Get Started",
+    landingPricingFreeFeature1: "Core grocery list features",
+    landingPricingFreeFeature2: "50 AI categorizations/month",
+    landingPricingFreeFeature3: "1 shared list",
+    landingPricingFreeFeature4: "Includes ads",
+    landingPricingProFeature1: "Everything in Free",
+    landingPricingProFeature2: "No ads",
+    landingPricingProFeature3: "Unlimited AI categorization",
+    landingPricingProFeature4: "Price tracking & alerts",
+    landingPricingProFeature5: "Smart predictions & insights",
+    landingPricingFamilyFeature1: "Everything in Pro",
+    landingPricingFamilyFeature2: "Up to 5 family members",
+    landingPricingFamilyFeature3: "Shared favorites & budgets",
+    landingCtaTitle: "Start Saving Money Today",
+    landingCtaSubtitle: "Join thousands of shoppers who never overpay or forget items",
+    landingCtaButton: "Try Free for 7 Days",
     installApp: "Install App",
     installAppDesc: "Add to home screen",
     appInstalled: "App installed successfully!",
@@ -247,8 +339,25 @@ const translations = {
     clearCompleted: "נקה פריטים שנקנו",
     list: "רשימה",
     favorites: "היסטוריה",
+    family: "משפחה",
     favoritesTitle: "היסטוריית קניות",
     favoritesSubtitle: "קנה מהר יותר על ידי הוספת הרכישות התכופות שלך.",
+    familyTitle: "רשימת משפחה",
+    familySubtitle: "משותפת עם בני משפחה",
+    familyMembersTitle: "בני משפחה",
+    familyOwner: "בעלים",
+    familyMember: "חבר",
+    familyActiveNow: "פעיל כעת",
+    familyRecentActivity: "פעילות אחרונה",
+    familyNoActivity: "אין פעילות אחרונה",
+    familyCheckedOff: "סימן כנרכש",
+    familyAdded: "הוסיף",
+    familyRemoved: "הסיר",
+    familyYou: "אתה",
+    familyMinutesAgo: "דק' לפני",
+    familyHoursAgo: "שע' לפני",
+    familyDaysAgo: "ימים לפני",
+    familyJustNow: "ממש עכשיו",
     purchased: "נקנה",
     times: "פעמים",
     deleteFromHistory: "מחק",
@@ -269,6 +378,10 @@ const translations = {
     signingUp: "יוצר חשבון...",
     signOut: "התנתק",
     help: "עזרה",
+    displayName: "שם תצוגה",
+    displayNameDesc: "הגדר את שמך להצגה בפעילות משפחתית",
+    saveDisplayName: "שמור שם",
+    savingDisplayName: "שומר...",
     // Onboarding
     welcome: "ברוכים הבאים לרשימת קניות חכמה!",
     onboardingSubtitle: "בואו נתחיל עם עוזר הקניות החכם שלכם",
@@ -398,6 +511,9 @@ const translations = {
     // Paywall
     paywallTitle: "פתח תכונות פרימיום",
     paywallSubtitle: "בחר את התוכנית המושלמת לצרכי הקניות שלך",
+    removeAdsTitle: "הסר פרסומות",
+    removeAdsDescription: "שדרג לתוכנית Pro או Family לחוויה ללא פרסומות",
+    upgrade: "שדרג",
     monthly: "חודשי",
     yearly: "שנתי",
     savePercent: "חסוך 40%",
@@ -412,21 +528,70 @@ const translations = {
     freeFeature1: "רשימת קניות בסיסית",
     freeFeature2: "קטגוריזציה חכמה (50/חודש)",
     freeFeature3: "רשימה משותפת אחת",
-    freeFeature4: "היסטוריה מוגבלת",
+    freeFeature4: "כולל פרסומות",
     proFeature1: "כל מה שבחינם",
-    proFeature2: "קטגוריזציה בלתי מוגבלת",
-    proFeature3: "רשימות משותפות ללא הגבלה",
-    proFeature4: "היסטוריית קניות מלאה",
-    proFeature5: "מעקב מחירים והתראות",
-    proFeature6: "תובנות הוצאות",
-    proFeature7: "חיזויים חכמים",
-    proFeature8: "תמיכה עדיפות",
+    proFeature2: "ללא פרסומות",
+    proFeature3: "קטגוריזציה בלתי מוגבלת",
+    proFeature4: "רשימות משותפות ללא הגבלה",
+    proFeature5: "היסטוריית קניות מלאה",
+    proFeature6: "מעקב מחירים והתראות",
+    proFeature7: "תובנות הוצאות",
+    proFeature8: "חיזויים חכמים",
+    proFeature9: "תמיכה עדיפות",
     familyFeature1: "כל מה שבמקצועי",
     familyFeature2: "עד 5 בני משפחה",
     familyFeature3: "בקרות מנהל",
     familyFeature4: "מועדפים משותפים",
     familyFeature5: "פיד פעילות משפחתי",
     familyFeature6: "ניהול תקציב",
+    // Landing Page
+    landingHeroTitle: "לא לשכוח פריטים ולא לשלם יותר מדי!",
+    landingHeroSubtitle: "רשימת קניות חכמה שמארגנת את הקניות, עוקבת אחרי מחירים ועוזרת לך לחסוך כסף",
+    landingHeroCta: "התחל חינם - 7 ימי ניסיון",
+    landingHeroSecondaryCta: "ראה מחירון",
+    landingFeaturesTitle: "כל מה שאתה צריך לקניות חכמות יותר",
+    landingFeaturesSubtitle: "חסוך זמן וכסף עם תכונות חכמות",
+    landingFeature1Title: "ארגון חכם עם בינה מלאכותית",
+    landingFeature1Desc: "פריטים ממוינים אוטומטית לפי קטגוריות - ירקות, חלב, לחם ועוד",
+    landingFeature2Title: "מעקב מחירים",
+    landingFeature2Desc: "מעקב אחר מחירים בחנויות שונות ומציאת העסקאות הטובות ביותר",
+    landingFeature3Title: "שיתוף משפחתי",
+    landingFeature3Desc: "שתף רשימות עם בני משפחה וסנכרן בזמן אמת",
+    landingFeature4Title: "חיזויים חכמים",
+    landingFeature4Desc: "בינה מלאכותית מנבאת מה אתה צריך על בסיס דפוסי הקניות שלך",
+    landingFeature5Title: "קלט קולי",
+    landingFeature5Desc: "הוסף פריטים דרך דיבור - עובד בשפות מרובות",
+    landingFeature6Title: "עובד אופליין",
+    landingFeature6Desc: "גישה לרשימות בכל מקום, גם בלי אינטרנט",
+    landingHowItWorksTitle: "איך זה עובד",
+    landingHowItWorksStep1: "הוסף פריטים",
+    landingHowItWorksStep1Desc: "הקלד או דבר את הפריטים באופן טבעי",
+    landingHowItWorksStep2: "בינה מלאכותית מארגנת",
+    landingHowItWorksStep2Desc: "פריטים מסודרים אוטומטית לפי קטגוריות",
+    landingHowItWorksStep3: "קנה וחסוך",
+    landingHowItWorksStep3Desc: "עקוב אחרי הרשימה המאורגנת ומעקב אחר המחירים הטובים",
+    landingPricingTitle: "תמחור פשוט ושקוף",
+    landingPricingSubtitle: "בחר את התוכנית המתאימה לך",
+    landingPricingFree: "חינם",
+    landingPricingPro: "Pro",
+    landingPricingFamily: "משפחה",
+    landingPricingMostPopular: "הכי פופולרי",
+    landingPricingGetStarted: "התחל",
+    landingPricingFreeFeature1: "כל התכונות הבסיסיות",
+    landingPricingFreeFeature2: "50 קטגוריזציות AI לחודש",
+    landingPricingFreeFeature3: "רשימה משותפת אחת",
+    landingPricingFreeFeature4: "כולל פרסומות",
+    landingPricingProFeature1: "כל מה שבחינם",
+    landingPricingProFeature2: "ללא פרסומות",
+    landingPricingProFeature3: "קטגוריזציה בלתי מוגבלת",
+    landingPricingProFeature4: "מעקב מחירים והתראות",
+    landingPricingProFeature5: "חיזויים ותובנות חכמות",
+    landingPricingFamilyFeature1: "כל מה שב-Pro",
+    landingPricingFamilyFeature2: "עד 5 בני משפחה",
+    landingPricingFamilyFeature3: "מועדפים ותקציבים משותפים",
+    landingCtaTitle: "התחל לחסוך כסף היום",
+    landingCtaSubtitle: "הצטרף לאלפי קונים שלא משלמים יותר מדי ולא שוכחים פריטים",
+    landingCtaButton: "נסה חינם ל-7 ימים",
     installApp: "התקן אפליקציה",
     installAppDesc: "הוסף למסך הבית",
     appInstalled: "האפליקציה הותקנה בהצלחה!",
@@ -447,8 +612,25 @@ const translations = {
     clearCompleted: "Limpiar Completados",
     list: "Lista",
     favorites: "Historial",
+    family: "Familia",
     favoritesTitle: "Historial de Compras",
     favoritesSubtitle: "Compra más rápido añadiendo tus compras frecuentes.",
+    familyTitle: "Lista Familiar",
+    familySubtitle: "Compartida con miembros de la familia",
+    familyMembersTitle: "Miembros de la Familia",
+    familyOwner: "Propietario",
+    familyMember: "Miembro",
+    familyActiveNow: "Activo ahora",
+    familyRecentActivity: "Actividad Reciente",
+    familyNoActivity: "Sin actividad reciente",
+    familyCheckedOff: "marcó como comprado",
+    familyAdded: "añadió",
+    familyRemoved: "eliminó",
+    familyYou: "Tú",
+    familyMinutesAgo: "m hace",
+    familyHoursAgo: "h hace",
+    familyDaysAgo: "d hace",
+    familyJustNow: "Justo ahora",
     purchased: "comprado",
     times: "veces",
     deleteFromHistory: "Eliminar",
@@ -469,6 +651,10 @@ const translations = {
     signingUp: "Creando cuenta...",
     signOut: "Cerrar sesión",
     help: "Ayuda",
+    displayName: "Nombre para Mostrar",
+    displayNameDesc: "Configure su nombre para mostrar en Actividades Familiares",
+    saveDisplayName: "Guardar Nombre",
+    savingDisplayName: "Guardando...",
     // Onboarding
     welcome: "¡Bienvenido a Lista de Compras con IA!",
     onboardingSubtitle: "Comencemos con tu compañero de compras inteligente",
@@ -597,6 +783,9 @@ const translations = {
     // Paywall
     paywallTitle: "Desbloquea Funciones Premium",
     paywallSubtitle: "Elige el plan perfecto para tus necesidades de compras",
+    removeAdsTitle: "Eliminar Anuncios",
+    removeAdsDescription: "Actualiza a Pro o Familiar para una experiencia sin anuncios",
+    upgrade: "Actualizar",
     monthly: "Mensual",
     yearly: "Anual",
     savePercent: "Ahorra 40%",
@@ -611,21 +800,70 @@ const translations = {
     freeFeature1: "Lista de compras básica",
     freeFeature2: "Categorización IA (50/mes)",
     freeFeature3: "1 lista compartida",
-    freeFeature4: "Historial limitado",
+    freeFeature4: "Incluye anuncios",
     proFeature1: "Todo en Gratis",
-    proFeature2: "Categorización ilimitada",
-    proFeature3: "Listas compartidas ilimitadas",
-    proFeature4: "Historial completo de compras",
-    proFeature5: "Seguimiento y alertas de precios",
-    proFeature6: "Información de gastos",
-    proFeature7: "Predicciones inteligentes",
-    proFeature8: "Soporte prioritario",
+    proFeature2: "Sin anuncios",
+    proFeature3: "Categorización ilimitada",
+    proFeature4: "Listas compartidas ilimitadas",
+    proFeature5: "Historial completo de compras",
+    proFeature6: "Seguimiento y alertas de precios",
+    proFeature7: "Información de gastos",
+    proFeature8: "Predicciones inteligentes",
+    proFeature9: "Soporte prioritario",
     familyFeature1: "Todo en Pro",
     familyFeature2: "Hasta 5 miembros familiares",
     familyFeature3: "Controles de administrador",
     familyFeature4: "Favoritos compartidos",
     familyFeature5: "Feed de actividad familiar",
     familyFeature6: "Gestión de presupuesto",
+    // Landing Page
+    landingHeroTitle: "¡Nunca Olvides Artículos ni Pagues de Más!",
+    landingHeroSubtitle: "Lista de compras con IA que organiza tus compras, rastrea precios y te ayuda a ahorrar dinero",
+    landingHeroCta: "Comenzar Gratis - 7 Días de Prueba",
+    landingHeroSecondaryCta: "Ver Precios",
+    landingFeaturesTitle: "Todo lo que Necesitas para Comprar de Forma Inteligente",
+    landingFeaturesSubtitle: "Ahorra tiempo y dinero con funciones inteligentes",
+    landingFeature1Title: "Organización Inteligente con IA",
+    landingFeature1Desc: "Artículos ordenados automáticamente por categoría - frutas, lácteos, panadería y más",
+    landingFeature2Title: "Seguimiento de Precios",
+    landingFeature2Desc: "Rastrea precios en diferentes tiendas y encuentra las mejores ofertas automáticamente",
+    landingFeature3Title: "Compartir con Familia",
+    landingFeature3Desc: "Comparte listas con familiares y sincroniza en tiempo real",
+    landingFeature4Title: "Predicciones Inteligentes",
+    landingFeature4Desc: "La IA predice lo que necesitas según tus patrones de compra",
+    landingFeature5Title: "Entrada por Voz",
+    landingFeature5Desc: "Agrega artículos hablando - funciona en múltiples idiomas",
+    landingFeature6Title: "Funciona Sin Conexión",
+    landingFeature6Desc: "Accede a tus listas en cualquier lugar, incluso sin internet",
+    landingHowItWorksTitle: "Cómo Funciona",
+    landingHowItWorksStep1: "Agregar Artículos",
+    landingHowItWorksStep1Desc: "Escribe o habla tus artículos de forma natural",
+    landingHowItWorksStep2: "La IA Organiza",
+    landingHowItWorksStep2Desc: "Los artículos se categorizan y ordenan automáticamente",
+    landingHowItWorksStep3: "Compra y Ahorra",
+    landingHowItWorksStep3Desc: "Sigue tu lista organizada y rastrea los mejores precios",
+    landingPricingTitle: "Precios Simples y Transparentes",
+    landingPricingSubtitle: "Elige el plan adecuado para ti",
+    landingPricingFree: "Gratis",
+    landingPricingPro: "Pro",
+    landingPricingFamily: "Familiar",
+    landingPricingMostPopular: "MÁS POPULAR",
+    landingPricingGetStarted: "Comenzar",
+    landingPricingFreeFeature1: "Funciones básicas de lista",
+    landingPricingFreeFeature2: "50 categorizaciones IA/mes",
+    landingPricingFreeFeature3: "1 lista compartida",
+    landingPricingFreeFeature4: "Incluye anuncios",
+    landingPricingProFeature1: "Todo en Gratis",
+    landingPricingProFeature2: "Sin anuncios",
+    landingPricingProFeature3: "Categorización ilimitada",
+    landingPricingProFeature4: "Seguimiento y alertas de precios",
+    landingPricingProFeature5: "Predicciones e insights inteligentes",
+    landingPricingFamilyFeature1: "Todo en Pro",
+    landingPricingFamilyFeature2: "Hasta 5 miembros familiares",
+    landingPricingFamilyFeature3: "Favoritos y presupuestos compartidos",
+    landingCtaTitle: "Comienza a Ahorrar Dinero Hoy",
+    landingCtaSubtitle: "Únete a miles de compradores que nunca pagan de más ni olvidan artículos",
+    landingCtaButton: "Prueba Gratis por 7 Días",
     installApp: "Instalar App",
     installAppDesc: "Agregar a pantalla de inicio",
     appInstalled: "¡Aplicación instalada exitosamente!",
@@ -697,6 +935,7 @@ function App() {
   const [inputValue, setInputValue] = useState('');
   const [language, setLanguage] = useState<Language>(() => getInitialLanguage());
   const [currentView, setCurrentView] = useState<View>('list');
+  const [showLandingPage, setShowLandingPage] = useState(true);
   const [showSwipeHint, setShowSwipeHint] = useState<boolean>(() => {
     try { return localStorage.getItem('swipeHintDismissed') ? false : true; } catch { return true; }
   });
@@ -773,6 +1012,8 @@ function App() {
   const [addMemberStatus, setAddMemberStatus] = useState<string | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
   const [toast, setToast] = useState<{ message: string; variant?: ToastVariant } | null>(null);
   
@@ -872,6 +1113,15 @@ function App() {
                 console.error('Failed to load subscription:', err);
               });
 
+            // Load user display name
+            getUserDisplayName()
+              .then(name => {
+                setDisplayName(name);
+              })
+              .catch(err => {
+                console.error('Failed to load display name:', err);
+              });
+
             // Check if this is a new user (show onboarding)
             const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
             if (!hasSeenOnboarding) {
@@ -923,7 +1173,7 @@ function App() {
 
   const handleAddFamilyMember = async () => {
     if (!memberEmail.trim()) return;
-    
+
     setAddMemberStatus('Adding...');
     try {
       const success = await addFamilyMember(memberEmail.trim());
@@ -939,6 +1189,27 @@ function App() {
       }
     } catch (error) {
       setAddMemberStatus('Error adding family member. Please try again.');
+    }
+  };
+
+  const handleUpdateDisplayName = async () => {
+    if (!displayName.trim()) {
+      showToast('Display name cannot be empty', 'warning');
+      return;
+    }
+
+    setIsUpdatingDisplayName(true);
+    try {
+      const success = await updateUserDisplayName(displayName);
+      if (success) {
+        showToast('Display name updated successfully!', 'success');
+      } else {
+        showToast('Failed to update display name', 'error');
+      }
+    } catch (error) {
+      showToast('Error updating display name', 'error');
+    } finally {
+      setIsUpdatingDisplayName(false);
     }
   };
 
@@ -973,6 +1244,16 @@ function App() {
         return true; // nothing to add, still success
       }
       setItems(prevItems => [...prevItems, ...newItems]);
+
+      // Log family activity for each added item
+      if (user && listId) {
+        // Use Firestore displayName if set, otherwise fall back to friendly name from email
+        const userName = displayName || getFriendlyUserNameFallback(user);
+        newItems.forEach(item => {
+          logFamilyActivity(listId, user.uid, userName, 'added', item.name);
+        });
+      }
+
       return true; // Success
     } catch (err) {
       if (err instanceof Error) {
@@ -1021,6 +1302,15 @@ function App() {
       if (item.id === id) {
         const updatedItem = { ...item, completed: !item.completed };
         console.log('Toggled item:', updatedItem.name, 'completed:', updatedItem.completed);
+
+        // Log family activity
+        if (user && listId) {
+          // Use Firestore displayName if set, otherwise fall back to friendly name from email
+          const userName = displayName || getFriendlyUserNameFallback(user);
+          const activityType = updatedItem.completed ? 'checked' : 'unchecked';
+          logFamilyActivity(listId, user.uid, userName, activityType, updatedItem.name);
+        }
+
         return updatedItem;
       }
       return item;
@@ -1100,7 +1390,16 @@ function App() {
   };
 
   const handleDeleteItem = (id: string) => {
+    const itemToDelete = items.find(item => item.id === id);
+
     setItems(currentItems => currentItems.filter(item => item.id !== id));
+
+    // Log family activity
+    if (itemToDelete && user && listId) {
+      // Use Firestore displayName if set, otherwise fall back to friendly name from email
+      const userName = displayName || getFriendlyUserNameFallback(user);
+      logFamilyActivity(listId, user.uid, userName, 'removed', itemToDelete.name);
+    }
   };
 
   // Swipe right: move single item to favorites and remove from list
@@ -1126,7 +1425,7 @@ function App() {
 
   // Paywall handler
   const handleSelectPlan = useCallback(async (planId: string, isYearly: boolean) => {
-    if (!authUser?.uid) {
+    if (!user?.uid) {
       showToast('Please sign in to upgrade', 'error');
       setShowPaywall(false);
       return;
@@ -1139,7 +1438,7 @@ function App() {
         body: JSON.stringify({
           planId,
           isYearly,
-          userId: authUser.uid  // Pass user ID to checkout session
+          userId: user.uid  // Pass user ID to checkout session
         })
       });
       if (!res.ok) throw new Error('Failed to create checkout session');
@@ -1155,7 +1454,7 @@ function App() {
     } finally {
       setShowPaywall(false);
     }
-  }, [authUser, showToast]);
+  }, [user, showToast]);
 
   // PWA Install handler
   const handleInstallApp = useCallback(async () => {
@@ -1343,8 +1642,76 @@ function App() {
     setShowOnboarding(true);
   };
 
-  // Show login page if user is not authenticated
+  // Show landing page or login page if user is not authenticated
   if (!user && !isDemoMode) {
+    if (showLandingPage) {
+      return (
+        <LandingPage
+          onGetStarted={() => setShowLandingPage(false)}
+          translations={{
+            hero: {
+              title: currentText.landingHeroTitle,
+              subtitle: currentText.landingHeroSubtitle,
+              cta: currentText.landingHeroCta,
+              secondaryCta: currentText.landingHeroSecondaryCta,
+            },
+            features: {
+              title: currentText.landingFeaturesTitle,
+              subtitle: currentText.landingFeaturesSubtitle,
+              feature1Title: currentText.landingFeature1Title,
+              feature1Desc: currentText.landingFeature1Desc,
+              feature2Title: currentText.landingFeature2Title,
+              feature2Desc: currentText.landingFeature2Desc,
+              feature3Title: currentText.landingFeature3Title,
+              feature3Desc: currentText.landingFeature3Desc,
+              feature4Title: currentText.landingFeature4Title,
+              feature4Desc: currentText.landingFeature4Desc,
+              feature5Title: currentText.landingFeature5Title,
+              feature5Desc: currentText.landingFeature5Desc,
+              feature6Title: currentText.landingFeature6Title,
+              feature6Desc: currentText.landingFeature6Desc,
+            },
+            pricing: {
+              title: currentText.landingPricingTitle,
+              subtitle: currentText.landingPricingSubtitle,
+              free: currentText.landingPricingFree,
+              pro: currentText.landingPricingPro,
+              family: currentText.landingPricingFamily,
+              monthly: currentText.monthly,
+              yearly: currentText.yearly,
+              mostPopular: currentText.landingPricingMostPopular,
+              getStarted: currentText.landingPricingGetStarted,
+              feature1: currentText.landingPricingFreeFeature1,
+              feature2: currentText.landingPricingFreeFeature2,
+              feature3: currentText.landingPricingFreeFeature3,
+              feature4: currentText.landingPricingFreeFeature4,
+              proFeature1: currentText.landingPricingProFeature1,
+              proFeature2: currentText.landingPricingProFeature2,
+              proFeature3: currentText.landingPricingProFeature3,
+              proFeature4: currentText.landingPricingProFeature4,
+              proFeature5: currentText.landingPricingProFeature5,
+              familyFeature1: currentText.landingPricingFamilyFeature1,
+              familyFeature2: currentText.landingPricingFamilyFeature2,
+              familyFeature3: currentText.landingPricingFamilyFeature3,
+            },
+            howItWorks: {
+              title: currentText.landingHowItWorksTitle,
+              step1: currentText.landingHowItWorksStep1,
+              step1Desc: currentText.landingHowItWorksStep1Desc,
+              step2: currentText.landingHowItWorksStep2,
+              step2Desc: currentText.landingHowItWorksStep2Desc,
+              step3: currentText.landingHowItWorksStep3,
+              step3Desc: currentText.landingHowItWorksStep3Desc,
+            },
+            cta: {
+              title: currentText.landingCtaTitle,
+              subtitle: currentText.landingCtaSubtitle,
+              button: currentText.landingCtaButton,
+            },
+          }}
+        />
+      );
+    }
     return <LoginPage onLogin={() => {}} onDemoMode={handleDemoMode} translations={currentText} />;
   }
 
@@ -1403,6 +1770,7 @@ function App() {
         <div className="max-w-3xl mx-auto border-t border-gray-200 flex">
             <NavButton currentView={currentView} buttonView="list" onClick={() => setCurrentView('list')}><ListIcon className="w-6 h-6 mb-1"/><span>{currentText.list}</span></NavButton>
             <NavButton currentView={currentView} buttonView="favorites" onClick={() => setCurrentView('favorites')}><StarIcon className="w-6 h-6 mb-1"/><span>{currentText.favorites}</span></NavButton>
+            <NavButton currentView={currentView} buttonView="family" onClick={() => setCurrentView('family')}><UsersIcon className="w-6 h-6 mb-1"/><span>{currentText.family}</span></NavButton>
             <NavButton currentView={currentView} buttonView="insights" onClick={() => setCurrentView('insights')}><span className="text-2xl mb-1">📊</span><span>{currentText.spendingInsights}</span></NavButton>
             <NavButton currentView={currentView} buttonView="daily" onClick={() => setCurrentView('daily')}><span className="text-2xl mb-1">📅</span><span>{currentText.dailyPurchases}</span></NavButton>
         </div>
@@ -1430,11 +1798,6 @@ function App() {
                   <span>✨</span>
                   <span>Smart Suggestions</span>
                 </button>
-                {hasCompletedItems && (
-                  <button onClick={handleClearCompleted} className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-sm">
-                    {currentText.clearCompleted}
-                  </button>
-                )}
               </div>
 
               {/* Swipe hint (shown once) */}
@@ -1481,18 +1844,85 @@ function App() {
                 </div>
               )}
               
-              <GroceryList 
-                categories={categorizedList} 
-                onToggleItem={handleToggleItem} 
-                onDeleteItem={handleDeleteItem} 
+              <GroceryList
+                categories={categorizedList}
+                onToggleItem={handleToggleItem}
+                onDeleteItem={handleDeleteItem}
                 onAddAllInCategory={handleAddAllInCategory}
                 onMoveToFavorites={handleMoveItemToFavorites}
                 emptyState={{ title: currentText.emptyTitle, subtitle: currentText.emptySubtitle }}
                 addAllText={currentText.addAll}
               />
+
+              {/* Ad Banner for Free Users */}
+              {currentPlan === 'free' && (
+                <>
+                  <AdBanner
+                    adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
+                    format="auto"
+                    responsive={true}
+                    className="my-6"
+                  />
+                  {/* Remove Ads Banner */}
+                  <div className="my-4 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700">
+                    <div className="flex items-center justify-between gap-4 rtl:flex-row-reverse">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                          {currentText.removeAdsTitle || 'Remove Ads'}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {currentText.removeAdsDescription || 'Upgrade to Pro or Family plan for an ad-free experience'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowPaywall(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-md whitespace-nowrap"
+                      >
+                        {currentText.upgrade || 'Upgrade'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Clear Completed Button at Bottom */}
+              {hasCompletedItems && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={handleClearCompleted}
+                    className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
+                  >
+                    {currentText.clearCompleted}
+                  </button>
+                </div>
+              )}
             </>
         ) : currentView === 'favorites' ? (
             <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
+        ) : currentView === 'family' ? (
+            <FamilyActivities
+              userId={user?.uid || ''}
+              listId={listId || ''}
+              translations={{
+                title: currentText.familyTitle,
+                subtitle: currentText.familySubtitle,
+                membersTitle: currentText.familyMembersTitle,
+                owner: currentText.familyOwner,
+                member: currentText.familyMember,
+                activeNow: currentText.familyActiveNow,
+                recentActivityTitle: currentText.familyRecentActivity,
+                noActivity: currentText.familyNoActivity,
+                checkedOff: currentText.familyCheckedOff,
+                added: currentText.familyAdded,
+                removed: currentText.familyRemoved,
+                you: currentText.familyYou,
+                minutesAgo: currentText.familyMinutesAgo,
+                hoursAgo: currentText.familyHoursAgo,
+                daysAgo: currentText.familyDaysAgo,
+                justNow: currentText.familyJustNow,
+              }}
+              rtl={language === 'he'}
+            />
         ) : currentView === 'insights' ? (
             <SpendingInsights 
               historyItems={historyItems} 
@@ -1542,9 +1972,7 @@ function App() {
                 termsOfService: currentText.termsOfService,
               }}
             />
-        ) : (
-            <LaunchChecklistPage onClose={() => setCurrentView('list')} />
-        )}
+        ) : null}
       </main>
 
       {/* Settings Modal */}
@@ -1640,6 +2068,31 @@ function App() {
                     </div>
                   </div>
                 )}
+
+                {/* Display Name Setting */}
+                {user && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">👤 {currentText.displayName}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{currentText.displayNameDesc}</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder={user.email || ''}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={handleUpdateDisplayName}
+                        disabled={isUpdatingDisplayName}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                      >
+                        {isUpdatingDisplayName ? currentText.savingDisplayName : currentText.saveDisplayName}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Legal Links */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">⚖️ {currentText.legal}</h3>
@@ -1670,12 +2123,6 @@ function App() {
                     📱 {currentText.installApp}
                   </button>
                 )}
-                <button
-                  onClick={() => { setShowSettings(false); setCurrentView('checklist'); }}
-                  className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-                >
-                  Launch Checklist
-                </button>
                 <button
                   onClick={() => { setShowSettings(false); setShowImportExport(true); }}
                   className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
@@ -1918,7 +2365,7 @@ function App() {
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
           currentPlan={currentPlan}
-          userId={authUser?.uid}
+          userId={user?.uid}
           translations={{
             title: currentText.paywallTitle,
             subtitle: currentText.paywallSubtitle,
@@ -1949,6 +2396,7 @@ function App() {
                 currentText.proFeature6,
                 currentText.proFeature7,
                 currentText.proFeature8,
+                currentText.proFeature9,
               ],
               family: [
                 currentText.familyFeature1,

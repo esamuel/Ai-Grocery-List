@@ -1,0 +1,247 @@
+import { initializeApp, getApp } from 'firebase/app';
+import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
+import {
+  collection as collectionLite,
+  query as queryLite,
+  where as whereLite,
+  orderBy as orderByLite,
+  limit as limitLite,
+  addDoc as addDocLite,
+  getDocs as getDocsLite,
+  doc as docLite,
+  getDoc as getDocLite,
+} from 'firebase/firestore/lite';
+
+// Get Firebase Firestore instance (assumes Firebase is already initialized by firebaseService)
+const getFirebaseDb = () => {
+  try {
+    const app = getApp();
+    return getFirestoreLite(app);
+  } catch (error) {
+    // If app doesn't exist, initialize it
+    const firebaseConfig = {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+    };
+    const app = initializeApp(firebaseConfig);
+    return getFirestoreLite(app);
+  }
+};
+
+export interface FamilyMember {
+  id: string;
+  name: string;
+  email: string;
+  isOwner: boolean;
+  lastActive: string;
+}
+
+export interface FamilyActivity {
+  id?: string;
+  listId: string;
+  userId: string;
+  userName: string;
+  type: 'added' | 'checked' | 'removed' | 'unchecked';
+  itemName: string;
+  timestamp: string;
+}
+
+const activitiesCollection = 'familyActivities';
+const usersCollection = 'users';
+const listsCollection = 'groceryLists';
+
+/**
+ * Extract a friendly name from email address
+ * e.g., "samuel.eskenasy@gmail.com" => "Samuel Eskenasy"
+ */
+const getFriendlyNameFromEmail = (email: string): string => {
+  const localPart = email.split('@')[0];
+
+  // Split by dots, underscores, or hyphens
+  const parts = localPart.split(/[._-]/);
+
+  // Capitalize each part
+  const capitalized = parts.map(part =>
+    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+  );
+
+  return capitalized.join(' ');
+};
+
+/**
+ * Get all family members for a list
+ */
+export const getFamilyMembers = async (listId: string): Promise<FamilyMember[]> => {
+  try {
+    const dbLite = getFirebaseDb();
+
+    // Get the list document to find member IDs
+    const listDocRef = docLite(dbLite, listsCollection, listId);
+    const listDoc = await getDocLite(listDocRef);
+
+    if (!listDoc.exists()) {
+      console.error('List not found');
+      return [];
+    }
+
+    const listData = listDoc.data();
+    const memberIds = listData.members || [];
+    const ownerId = listData.ownerId || memberIds[0];
+
+    // Get user details for each member
+    const memberPromises = memberIds.map(async (memberId: string) => {
+      const userDocRef = docLite(dbLite, usersCollection, memberId);
+      const userDoc = await getDocLite(userDocRef);
+
+      if (!userDoc.exists()) {
+        return null;
+      }
+
+      const userData = userDoc.data();
+      const userEmail = userData.email || '';
+      const displayName = userData.displayName ||
+                          (userEmail ? getFriendlyNameFromEmail(userEmail) : 'User');
+
+      console.log(`Family member ${memberId}:`, {
+        email: userEmail,
+        displayName: userData.displayName,
+        finalName: displayName,
+        isOwner: memberId === ownerId
+      });
+
+      return {
+        id: memberId,
+        name: displayName,
+        email: userEmail,
+        isOwner: memberId === ownerId,
+        lastActive: userData.lastActive || new Date().toISOString(),
+      };
+    });
+
+    const members = await Promise.all(memberPromises);
+    return members.filter((m): m is FamilyMember => m !== null);
+  } catch (error) {
+    console.error('Error fetching family members:', error);
+    return [];
+  }
+};
+
+/**
+ * Get recent family activities for a list
+ */
+export const getFamilyActivities = async (
+  listId: string,
+  maxActivities: number = 20
+): Promise<FamilyActivity[]> => {
+  try {
+    const dbLite = getFirebaseDb();
+
+    const activitiesQuery = queryLite(
+      collectionLite(dbLite, activitiesCollection),
+      whereLite('listId', '==', listId),
+      orderByLite('timestamp', 'desc'),
+      limitLite(maxActivities)
+    );
+
+    const snapshot = await getDocsLite(activitiesQuery);
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    } as FamilyActivity));
+  } catch (error) {
+    console.error('Error fetching family activities:', error);
+    return [];
+  }
+};
+
+/**
+ * Log a family activity
+ */
+export const logFamilyActivity = async (
+  listId: string,
+  userId: string,
+  userName: string,
+  type: FamilyActivity['type'],
+  itemName: string
+): Promise<void> => {
+  try {
+    console.log('logFamilyActivity: Logging activity', { listId, userId, userName, type, itemName });
+    const dbLite = getFirebaseDb();
+
+    const activity: Omit<FamilyActivity, 'id'> = {
+      listId,
+      userId,
+      userName,
+      type,
+      itemName,
+      timestamp: new Date().toISOString(),
+    };
+
+    await addDocLite(collectionLite(dbLite, activitiesCollection), activity);
+    console.log('logFamilyActivity: Activity logged successfully');
+
+    // Update user's last active timestamp
+    const userDocRef = docLite(dbLite, usersCollection, userId);
+    const userDoc = await getDocLite(userDocRef);
+
+    if (userDoc.exists()) {
+      const { setDoc: setDocLite } = await import('firebase/firestore/lite');
+      await setDocLite(
+        userDocRef,
+        {
+          ...userDoc.data(),
+          lastActive: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (error) {
+    console.error('Error logging family activity:', error);
+    // Don't throw - activity logging should be non-blocking
+  }
+};
+
+/**
+ * Clean up old activities (keep last 100 per list)
+ * This should be run periodically or via a cloud function
+ */
+export const cleanupOldActivities = async (listId: string): Promise<void> => {
+  try {
+    const dbLite = getFirebaseDb();
+
+    const activitiesQuery = queryLite(
+      collectionLite(dbLite, activitiesCollection),
+      whereLite('listId', '==', listId),
+      orderByLite('timestamp', 'desc'),
+      limitLite(100)
+    );
+
+    const snapshot = await getDocsLite(activitiesQuery);
+
+    // Get IDs of activities to keep
+    const keepIds = new Set(snapshot.docs.map((doc) => doc.id));
+
+    // Query all activities for this list
+    const allActivitiesQuery = queryLite(
+      collectionLite(dbLite, activitiesCollection),
+      whereLite('listId', '==', listId)
+    );
+
+    const allSnapshot = await getDocsLite(allActivitiesQuery);
+
+    // Delete activities not in keep list
+    const { deleteDoc: deleteDocLite } = await import('firebase/firestore/lite');
+    const deletePromises = allSnapshot.docs
+      .filter((doc) => !keepIds.has(doc.id))
+      .map((doc) => deleteDocLite(doc.ref));
+
+    await Promise.all(deletePromises);
+  } catch (error) {
+    console.error('Error cleaning up old activities:', error);
+  }
+};
