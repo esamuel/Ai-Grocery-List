@@ -29,6 +29,7 @@ import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
 import { logFamilyActivity } from './services/familyActivityService';
+import { migrateListOwnershipFields, checkListNeedsMigration } from './services/listMigration';
 import type { User } from 'firebase/auth';
 
 // Helper to get friendly name from user (fallback only)
@@ -1099,6 +1100,13 @@ function App() {
           try {
             const accessibleListId = await getAccessibleListId();
             setListId(accessibleListId);
+            
+            // Migrate list if needed (add ownerId and members fields)
+            const needsMigration = await checkListNeedsMigration(accessibleListId);
+            if (needsMigration) {
+              console.log('🔄 List needs migration - adding ownership fields');
+              await migrateListOwnershipFields(accessibleListId, authUser.uid);
+            }
             
             // Check if user is the list owner
             const ownerStatus = await isListOwner();

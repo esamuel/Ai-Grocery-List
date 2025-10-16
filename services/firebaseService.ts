@@ -384,7 +384,7 @@ export const getUserMainList = async (): Promise<string> => {
     // Create the list
     await setDocLite(docLite(dbLite, listsCollection, listId), {
         ...newListData,
-        owner: currentUser.uid,
+        ownerId: currentUser.uid,
         members: [currentUser.uid],
         createdAt: new Date().toISOString()
     } as any);
