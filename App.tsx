@@ -1913,7 +1913,9 @@ function App() {
               itemsCount={items.length}
               historyCount={historyItems.length}
               familyMembersCount={0}
-              trackedPricesCount={historyItems.filter(item => item.price).length}
+              trackedPricesCount={historyItems.filter(item => 
+                item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
+              ).length}
               rtl={language === 'he'}
             />
         ) : currentView === 'priceCompare' ? (
@@ -1943,16 +1945,42 @@ function App() {
                 console.log('📊 Price Compare Data Debug:');
                 console.log('Total history items:', historyItems.length);
                 console.log('Price tracking enabled:', enablePriceTracking);
-                const itemsWithPrice = historyItems.filter(item => item.price);
-                console.log('Items with price:', itemsWithPrice.length);
-                const priceData = itemsWithPrice.map(item => ({
-                  itemName: item.name,
-                  price: item.price!,
-                  store: item.store || 'Unknown Store',
-                  date: item.lastPurchased
-                }));
-                console.log('Price history data:', priceData);
-                return priceData;
+                
+                // Items with lastPrice OR prices array
+                const itemsWithPrice = historyItems.filter(item => 
+                  item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
+                );
+                console.log('Items with price data:', itemsWithPrice.length);
+                
+                // Flatten all price entries from all items
+                const allPriceEntries: Array<{itemName: string; price: number; store: string; date: string}> = [];
+                itemsWithPrice.forEach(item => {
+                  if (item.prices && item.prices.length > 0) {
+                    // Add all price entries for this item
+                    item.prices.forEach(priceEntry => {
+                      if (priceEntry.price !== undefined) {
+                        allPriceEntries.push({
+                          itemName: item.name,
+                          price: priceEntry.price,
+                          store: priceEntry.store || 'Unknown Store',
+                          date: priceEntry.purchaseDate || item.lastPurchased
+                        });
+                      }
+                    });
+                  } else if (item.lastPrice !== undefined) {
+                    // Fallback to lastPrice if prices array doesn't exist
+                    allPriceEntries.push({
+                      itemName: item.name,
+                      price: item.lastPrice,
+                      store: 'Unknown Store',
+                      date: item.lastPurchased
+                    });
+                  }
+                });
+                
+                console.log('Total price entries:', allPriceEntries.length);
+                console.log('Price history data:', allPriceEntries);
+                return allPriceEntries;
               })()}
               rtl={language === 'he'}
               priceTrackingEnabled={enablePriceTracking}

@@ -76,7 +76,7 @@ PayPal works perfectly in Israel and accepts payments from worldwide customers. 
    - Price: `0.00` (free trial)
 6. Click "Save" / "Create Plan"
 7. **Copy the Plan ID** (looks like `P-12ABC34DEF567GHI890`)
-8. Save it: `PRO_MONTHLY = P-12ABC34DEF567GHI890`
+8. Save it: `PRO_MONTHLY = P-2PM22359NG0373626NDYOH5Q
 
 ### Plan 2: Pro Yearly
 1. Click "Create Plan" again
@@ -87,7 +87,7 @@ PayPal works perfectly in Israel and accepts payments from worldwide customers. 
 4. Trial period: 7 days, free
 5. Click "Save"
 6. **Copy the Plan ID**
-7. Save it: `PRO_YEARLY = P-23ABC45DEF678GHI901`
+7. Save it: `PRO_YEARLY = P-0W9630956J4756900NDYLE2Y
 
 ### Plan 3: Family Monthly
 1. Click "Create Plan" again
@@ -98,7 +98,7 @@ PayPal works perfectly in Israel and accepts payments from worldwide customers. 
 4. Trial period: 7 days, free
 5. Click "Save"
 6. **Copy the Plan ID**
-7. Save it: `FAMILY_MONTHLY = P-34ABC56DEF789GHI012`
+7. Save it: `FAMILY_MONTHLY =P-81P657453P663280FNDYOM6Y
 
 ### Plan 4: Family Yearly
 1. Click "Create Plan" again
@@ -109,7 +109,7 @@ PayPal works perfectly in Israel and accepts payments from worldwide customers. 
 4. Trial period: 7 days, free
 5. Click "Save"
 6. **Copy the Plan ID**
-7. Save it: `FAMILY_YEARLY = P-45ABC67DEF890GHI123`
+7. Save it: `FAMILY_YEARLY = P-0XR96572P5190563JNDYOJ6I
 
 Now you should have 5 things:
 1. PayPal Client ID
