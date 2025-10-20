@@ -53,7 +53,7 @@ import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 type Language = 'en' | 'he' | 'es';
-  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare';
+  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions';
 
 const translations = {
   en: {
@@ -1997,12 +1997,47 @@ function App() {
               }}
               historyItemsCount={historyItems.length}
             />
+        ) : currentView === 'suggestions' ? (
+            <div className="mb-6">
+              <button
+                onClick={() => setCurrentView('list')}
+                className="flex items-center gap-2 px-4 py-2 mb-4 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to List
+              </button>
+              <SmartSuggestions
+                currentItems={items.map(item => item.name)}
+                historyItems={historyItems}
+                language={language}
+                onAddSuggestion={handleAddSuggestion}
+                translations={{
+                  title: currentText.suggestionsTitle,
+                  subtitle: currentText.suggestionsSubtitle,
+                  addButton: currentText.addSuggestion,
+                  noSuggestions: currentText.noSuggestions,
+                  predictive: currentText.predictive,
+                  timeBased: currentText.timeBased,
+                  frequencyBased: currentText.frequencyBased,
+                  seasonal: currentText.seasonal,
+                  complementary: currentText.complementary,
+                  bestPriceEver: currentText.bestPriceEver,
+                  greatDeal: currentText.greatDeal,
+                  priceIncreased: currentText.priceIncreased,
+                  higherThanUsual: currentText.higherThanUsual,
+                  bestAtStore: currentText.bestAtStore,
+                  cheaper: currentText.cheaper,
+                }}
+              />
+            </div>
         ) : currentView === 'list' ? (
             <>
               {/* Action Buttons */}
               <div className="flex justify-between items-center mb-2 rtl:flex-row-reverse gap-2">
                 <button
-                  onClick={() => setShowSmartSuggestions(true)}
+                  onClick={() => setCurrentView('suggestions')}
                   className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-purple-500 text-white hover:bg-purple-600 shadow-sm flex items-center gap-2"
                 >
                   <span>✨</span>
@@ -2188,8 +2223,23 @@ function App() {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md transition-colors">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Settings</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md transition-colors max-h-[90vh] flex flex-col">
+            {/* Sticky Header with Close Button */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Settings</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Close settings"
+              >
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 pt-4">
 
             <div className="space-y-4">
               <div>
@@ -2333,12 +2383,6 @@ function App() {
                     📱 {currentText.installApp}
                   </button>
                 )}
-                <button
-                  onClick={() => { setShowSettings(false); setShowImportExport(true); }}
-                  className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-                >
-                  {currentText.importExport}
-                </button>
                 {isOwner && (
                   <button
                     onClick={() => { setShowSettings(false); setShowAddMember(true); }}
@@ -2354,15 +2398,7 @@ function App() {
                   {currentText.signOut}
                 </button>
               </div>
-
-              <div className="flex justify-end gap-3 mt-4">
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+            </div>
             </div>
           </div>
         </div>
@@ -2486,53 +2522,6 @@ function App() {
         }}
       />
 
-      {/* Smart Suggestions Modal */}
-      {showSmartSuggestions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowSmartSuggestions(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-3xl max-h-[80vh] overflow-y-auto transition-colors" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <span>✨</span>
-                <span>{currentText.suggestionsTitle}</span>
-              </h2>
-              <button
-                onClick={() => setShowSmartSuggestions(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <SmartSuggestions
-              currentItems={items.map(item => item.name)}
-              historyItems={historyItems}
-              language={language}
-              onAddSuggestion={(suggestion) => {
-                handleAddSuggestion(suggestion);
-                // Optionally close the modal after adding
-                // setShowSmartSuggestions(false);
-              }}
-              translations={{
-                title: currentText.suggestionsTitle,
-                subtitle: currentText.suggestionsSubtitle,
-                addButton: currentText.addSuggestion,
-                noSuggestions: currentText.noSuggestions,
-                predictive: currentText.predictive,
-                timeBased: currentText.timeBased,
-                frequencyBased: currentText.frequencyBased,
-                seasonal: currentText.seasonal,
-                complementary: currentText.complementary,
-                bestPriceEver: currentText.bestPriceEver,
-                greatDeal: currentText.greatDeal,
-                priceIncreased: currentText.priceIncreased,
-                higherThanUsual: currentText.higherThanUsual,
-                bestAtStore: currentText.bestAtStore,
-                cheaper: currentText.cheaper,
-              }}
-            />
-          </div>
-        </div>
-      )}
       {/* Price Input Modal */}
       <PriceInputModal
         isOpen={showPriceModal}

@@ -69,7 +69,17 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
   }, [currentItems, historyItems, language]);
 
   if (suggestions.length === 0) {
-    return null;
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+        <div className="text-6xl mb-4">💡</div>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{translations.noSuggestions}</h3>
+        <p className="text-sm text-gray-500">
+          {language === 'en' && "Start adding items to your shopping list or complete purchases to get smart suggestions based on your shopping patterns."}
+          {language === 'he' && "התחל להוסיף פריטים לרשימת הקניות שלך או השלם רכישות כדי לקבל הצעות חכמות המבוססות על דפוסי הקנייה שלך."}
+          {language === 'es' && "Comienza a agregar artículos a tu lista de compras o completa compras para obtener sugerencias inteligentes basadas en tus patrones de compra."}
+        </p>
+      </div>
+    );
   }
 
   const getTypeIcon = (type: ShoppingSuggestion['type']) => {
