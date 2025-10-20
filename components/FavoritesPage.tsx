@@ -45,6 +45,9 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
   const currencySymbol = getCurrencySymbol(currency);
   // Default to 'starred' for new users, 'frequency' for users with history
   const [sortMode, setSortMode] = useState<SortMode>(() => historyItems.length === 0 ? 'starred' : 'frequency');
+  // Batch selection state for starred items
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isBatchMode, setIsBatchMode] = useState(false);
 
   // Get starter items for the current language (these are the 200 pre-populated items)
   const starterItems = useMemo(() => {
@@ -115,7 +118,37 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     const last = new Date(lastPurchased);
     return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
   };
-  
+
+  // Batch selection handlers
+  const toggleItemSelection = (itemName: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName);
+      } else {
+        newSet.add(itemName);
+      }
+      return newSet;
+    });
+  };
+
+  const handleAddSelected = () => {
+    // Add all selected items to the shopping list
+    sortedItems.forEach(item => {
+      if (selectedItems.has(item.name)) {
+        onAddItem(item);
+      }
+    });
+    // Clear selection and exit batch mode
+    setSelectedItems(new Set());
+    setIsBatchMode(false);
+  };
+
+  const handleCancelBatchMode = () => {
+    setSelectedItems(new Set());
+    setIsBatchMode(false);
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -200,6 +233,40 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
             </p>
           </div>
         )}
+
+        {/* Batch Mode Controls - Only show for Starred items */}
+        {sortMode === 'starred' && sortedItems.length > 0 && (
+          <div className="mt-4 flex justify-center gap-2">
+            {!isBatchMode ? (
+              <button
+                onClick={() => setIsBatchMode(true)}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+              >
+                ✓ Select Multiple Items
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleAddSelected}
+                  disabled={selectedItems.size === 0}
+                  className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
+                    selectedItems.size === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  Add Selected ({selectedItems.size})
+                </button>
+                <button
+                  onClick={handleCancelBatchMode}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {sortedItems.length === 0 && sortMode === 'recent' ? (
@@ -231,11 +298,35 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
               cheaper: translations.cheaper,
             });
 
+            const isSelected = selectedItems.has(item.name);
+            const showCheckbox = isBatchMode && sortMode === 'starred';
+
             return (
-            <div key={`${item.name}-${index}`} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
+            <div
+              key={`${item.name}-${index}`}
+              onClick={() => showCheckbox ? toggleItemSelection(item.name) : null}
+              className={`flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border-2 group ${
+                showCheckbox ? 'cursor-pointer' : ''
+              } ${
+                isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+              }`}
+            >
+              {/* Checkbox for batch mode */}
+              {showCheckbox && (
+                <div className="mr-3 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleItemSelection(item.name)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  />
+                </div>
+              )}
+
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {item.starred && <span className="text-yellow-500">⭐</span>}
+                  {item.starred && !showCheckbox && <span className="text-yellow-500">⭐</span>}
                   <p className="font-semibold text-gray-800">{item.name}</p>
                   {showPredictive && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -287,21 +378,26 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onAddItem(item)}
-                  className="flex items-center gap-1.5 text-sm bg-green-100 text-green-800 font-medium py-1 px-3 rounded-full hover:bg-green-200 transition-colors"
-                  aria-label={`${translations.add} ${item.name}`}
-                >
-                  <PlusCircleIcon className="w-5 h-5" />
-                  <span>{translations.add}</span>
-                </button>
-                <button
-                  onClick={() => onDeleteItem(item.name)}
-                  className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label={`${translations.delete} ${item.name}`}
-                >
-                  <TrashIcon className="w-5 h-5" />
-                </button>
+                {/* Hide Add and Delete buttons in batch mode for starred items */}
+                {!showCheckbox && (
+                  <>
+                    <button
+                      onClick={() => onAddItem(item)}
+                      className="flex items-center gap-1.5 text-sm bg-green-100 text-green-800 font-medium py-1 px-3 rounded-full hover:bg-green-200 transition-colors"
+                      aria-label={`${translations.add} ${item.name}`}
+                    >
+                      <PlusCircleIcon className="w-5 h-5" />
+                      <span>{translations.add}</span>
+                    </button>
+                    <button
+                      onClick={() => onDeleteItem(item.name)}
+                      className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label={`${translations.delete} ${item.name}`}
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             );
