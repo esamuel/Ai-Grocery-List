@@ -43,7 +43,8 @@ type SortMode = 'frequency' | 'recent' | 'starred' | 'category' | 'alphabetical'
 
 export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, currency, language, translations }) => {
   const currencySymbol = getCurrencySymbol(currency);
-  const [sortMode, setSortMode] = useState<SortMode>('frequency');
+  // Default to 'starred' for new users, 'frequency' for users with history
+  const [sortMode, setSortMode] = useState<SortMode>(() => historyItems.length === 0 ? 'starred' : 'frequency');
 
   // Get starter items for the current language (these are the 200 pre-populated items)
   const starterItems = useMemo(() => {
@@ -56,16 +57,6 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
       starred: true, // Mark starter items as starred
     } as PurchaseHistoryItem));
   }, [language]);
-
-  if (historyItems.length === 0) {
-    return (
-      <div className="text-center py-20">
-        <img src="https://picsum.photos/seed/favorites/300/200" alt="Empty favorites" className="mx-auto mb-6 rounded-lg shadow-md" />
-        <h2 className="text-2xl font-semibold text-gray-700">{translations.title}</h2>
-        <p className="text-gray-500 mt-2">{translations.subtitle}</p>
-      </div>
-    );
-  }
 
   // Filter and sort items based on selected mode
   const sortedItems = useMemo(() => {
@@ -216,10 +207,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
           <p className="text-lg text-gray-600">📅 No purchases today yet</p>
           <p className="text-sm text-gray-400 mt-2">Items you complete today will appear here</p>
         </div>
-      ) : sortedItems.length === 0 && sortMode === 'starred' ? (
+      ) : sortedItems.length === 0 && (sortMode === 'frequency' || sortMode === 'category' || sortMode === 'alphabetical') ? (
         <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-          <p className="text-lg text-gray-600">⭐ No starred items yet</p>
-          <p className="text-sm text-gray-400 mt-2">Star your favorite items to see them here</p>
+          <img src="https://picsum.photos/seed/favorites/300/200" alt="Empty favorites" className="mx-auto mb-6 rounded-lg shadow-md" />
+          <p className="text-lg text-gray-600">📊 No purchase history yet</p>
+          <p className="text-sm text-gray-400 mt-2">Start shopping and your frequently purchased items will appear here</p>
         </div>
       ) : (
         <div className="space-y-3">
