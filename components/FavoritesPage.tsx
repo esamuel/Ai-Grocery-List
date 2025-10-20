@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { PurchaseHistoryItem } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -7,12 +7,14 @@ import { StarIcon } from './icons/StarIcon';
 import { analyzePriceAlert, formatPriceAlertBadge } from '../services/priceAlertService';
 import { getCurrencySymbol } from '../services/spendingInsightsService';
 import { getStoreBadge } from '../services/storeComparisonService';
+import { getStarterItemsByLanguage } from '../data/starterItems';
 
 interface FavoritesPageProps {
   historyItems: PurchaseHistoryItem[];
   onAddItem: (item: PurchaseHistoryItem) => void;
   onDeleteItem: (itemName: string) => void;
   currency: string;
+  language: 'en' | 'he' | 'es';
   translations: {
     title: string;
     subtitle: string;
@@ -39,9 +41,21 @@ interface FavoritesPageProps {
 
 type SortMode = 'frequency' | 'recent' | 'starred' | 'category' | 'alphabetical';
 
-export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, currency, translations }) => {
+export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAddItem, onDeleteItem, currency, language, translations }) => {
   const currencySymbol = getCurrencySymbol(currency);
   const [sortMode, setSortMode] = useState<SortMode>('frequency');
+
+  // Get starter items for the current language (these are the 200 pre-populated items)
+  const starterItems = useMemo(() => {
+    const items = getStarterItemsByLanguage(language);
+    return items.map(item => ({
+      name: item.name,
+      category: item.category,
+      frequency: 0,
+      lastPurchased: new Date().toISOString(),
+      starred: true, // Mark starter items as starred
+    } as PurchaseHistoryItem));
+  }, [language]);
 
   if (historyItems.length === 0) {
     return (
@@ -54,30 +68,22 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
   }
 
   // Filter and sort items based on selected mode
-  const sortedItems = [...historyItems]
-    .filter(item => {
-      // For "recent" mode, show only TODAY's purchases
-      if (sortMode === 'recent') {
-        const today = new Date();
-        const lastPurchased = new Date(item.lastPurchased);
-        return (
-          today.getFullYear() === lastPurchased.getFullYear() &&
-          today.getMonth() === lastPurchased.getMonth() &&
-          today.getDate() === lastPurchased.getDate()
-        );
-      }
-      return true; // Show all items for other modes
-    })
-    .sort((a, b) => {
+  const sortedItems = useMemo(() => {
+    // For "starred" mode, show pre-populated starter items (200 items)
+    if (sortMode === 'starred') {
+      return [...starterItems].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // For all other modes, use user's purchase history
+    let items = [...historyItems];
+
+    // Sort first
+    items.sort((a, b) => {
       switch (sortMode) {
         case 'frequency':
           return b.frequency - a.frequency;
         case 'recent':
           return new Date(b.lastPurchased).getTime() - new Date(a.lastPurchased).getTime();
-        case 'starred':
-          if (a.starred && !b.starred) return -1;
-          if (!a.starred && b.starred) return 1;
-          return b.frequency - a.frequency;
         case 'category':
           // Sort by category first, then by frequency within category
           if (a.category !== b.category) {
@@ -91,6 +97,26 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
           return 0;
       }
     });
+
+    // Then filter/limit based on mode
+    if (sortMode === 'recent') {
+      // Show only TODAY's purchases
+      const today = new Date();
+      items = items.filter(item => {
+        const lastPurchased = new Date(item.lastPurchased);
+        return (
+          today.getFullYear() === lastPurchased.getFullYear() &&
+          today.getMonth() === lastPurchased.getMonth() &&
+          today.getDate() === lastPurchased.getDate()
+        );
+      });
+    } else if (sortMode === 'frequency') {
+      // Limit to top 40 most frequent items
+      items = items.slice(0, 40);
+    }
+
+    return items;
+  }, [historyItems, starterItems, sortMode]);
 
   // Calculate days since last purchase
   const getDaysSince = (lastPurchased: string): number => {
@@ -160,6 +186,29 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
             🔤 {translations.alphabetical}
           </button>
         </div>
+
+        {/* Item Count Summary */}
+        {sortedItems.length > 0 && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              {sortMode === 'starred' && (
+                <>⭐ <span className="font-semibold text-blue-600">{sortedItems.length}</span> starter {sortedItems.length === 1 ? 'item' : 'items'}</>
+              )}
+              {sortMode === 'frequency' && (
+                <>📊 Top <span className="font-semibold text-blue-600">{sortedItems.length}</span> most frequent {sortedItems.length === 1 ? 'item' : 'items'} (max 40)</>
+              )}
+              {sortMode === 'recent' && (
+                <>📅 <span className="font-semibold text-blue-600">{sortedItems.length}</span> {sortedItems.length === 1 ? 'item' : 'items'} purchased today</>
+              )}
+              {sortMode === 'category' && (
+                <>🏷️ <span className="font-semibold text-blue-600">{sortedItems.length}</span> {sortedItems.length === 1 ? 'item' : 'items'} (sorted by category)</>
+              )}
+              {sortMode === 'alphabetical' && (
+                <>🔤 <span className="font-semibold text-blue-600">{sortedItems.length}</span> {sortedItems.length === 1 ? 'item' : 'items'} (A-Z)</>
+              )}
+            </p>
+          </div>
+        )}
       </div>
 
       {sortedItems.length === 0 && sortMode === 'recent' ? (
@@ -167,9 +216,14 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
           <p className="text-lg text-gray-600">📅 No purchases today yet</p>
           <p className="text-sm text-gray-400 mt-2">Items you complete today will appear here</p>
         </div>
+      ) : sortedItems.length === 0 && sortMode === 'starred' ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <p className="text-lg text-gray-600">⭐ No starred items yet</p>
+          <p className="text-sm text-gray-400 mt-2">Star your favorite items to see them here</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {sortedItems.map(item => {
+          {sortedItems.map((item, index) => {
             const daysSince = getDaysSince(item.lastPurchased);
             const showPredictive = item.avgDaysBetween && item.avgDaysBetween > 0;
             const isOverdue = showPredictive && daysSince > item.avgDaysBetween!;
@@ -184,9 +238,9 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
               bestAtStore: translations.bestAtStore,
               cheaper: translations.cheaper,
             });
-            
+
             return (
-            <div key={item.name} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
+            <div key={`${item.name}-${index}`} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors rounded-lg shadow-sm border border-gray-200 group">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   {item.starred && <span className="text-yellow-500">⭐</span>}

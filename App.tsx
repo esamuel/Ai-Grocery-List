@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { GroceryItem, Category, PurchaseHistoryItem, GroceryHistoryItem } from './types';
+import type { GroceryItem, Category, PurchaseHistoryItem, GroceryHistoryItem, UserSubscription } from './types';
 import { ItemInput } from './components/ItemInput';
 import { GroceryList } from './components/GroceryList';
 import { categorizeGroceries } from './services/geminiService';
@@ -1030,8 +1030,20 @@ function App() {
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   
   // Subscription & Paywall
-  const [currentPlan, setCurrentPlan] = useState<'free' | 'pro' | 'family'>('free');
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+
+  // Function to refresh subscription from Firestore
+  const refreshSubscription = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const sub = await getUserSubscription(user.uid);
+      setSubscription(sub);
+      console.log('✅ Refreshed subscription:', sub?.plan);
+    } catch (err) {
+      console.error('Failed to refresh subscription:', err);
+    }
+  }, [user?.uid]);
   
   // Dark Mode
   const [darkMode, setDarkMode] = useState(() => {
@@ -1193,16 +1205,7 @@ function App() {
             setIsOwner(ownerStatus);
 
             // Load user subscription
-            getUserSubscription(authUser.uid)
-              .then(subscription => {
-                if (subscription) {
-                  setCurrentPlan(subscription.plan);
-                  console.log('✅ Loaded subscription:', subscription.plan);
-                }
-              })
-              .catch(err => {
-                console.error('Failed to load subscription:', err);
-              });
+            refreshSubscription();
 
             // Load user display name
             getUserDisplayName()
@@ -1236,7 +1239,6 @@ function App() {
         } else {
           setListId(null);
           setIsOwner(false);
-          setCurrentPlan('free'); // Reset to free plan on logout
         }
         setIsLoadingAuth(false);
       });
@@ -1513,6 +1515,8 @@ function App() {
       console.error('❌ Failed to move item to favorites:', e);
     }
   };
+
+
 
   // Paywall handler
   const handleSelectPlan = useCallback(async (planId: string, isYearly: boolean) => {
@@ -1886,8 +1890,11 @@ function App() {
         {currentView === 'dashboard' ? (
             <DashboardPage
               onNavigate={(view) => setCurrentView(view as View)}
+              subscription={subscription}
+              onUpgrade={() => setShowPaywall(true)}
+              onManageSubscription={() => { /* TODO: Implement manage subscription */ }}
               translations={{
-                list: currentText.list,
+                dashboard: currentText.dashboard,
                 listDesc: currentText.listDesc,
                 history: currentText.favorites,
                 historyDesc: currentText.historyDesc,
@@ -2058,7 +2065,7 @@ function App() {
               />
 
               {/* Ad Banner for Free Users */}
-              {currentPlan === 'free' && (
+              {(!subscription || subscription.plan === 'free') && (
                 <>
                   <AdBanner
                     adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
@@ -2101,7 +2108,7 @@ function App() {
               )}
             </>
         ) : currentView === 'favorites' ? (
-            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
+            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
         ) : currentView === 'family' ? (
             <FamilyActivities
               userId={user?.uid || ''}
@@ -2567,8 +2574,9 @@ function App() {
         <PaywallModal
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
-          currentPlan={currentPlan}
+          currentPlan={subscription?.plan || 'free'}
           userId={user?.uid}
+          onSubscriptionUpdated={refreshSubscription}
           translations={{
             title: currentText.paywallTitle,
             subtitle: currentText.paywallSubtitle,

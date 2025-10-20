@@ -31,7 +31,12 @@ This AI Grocery List app is a React + TypeScript + Vite application with Google 
 - AI categorization of items using Gemini, with local fallback and caching.
 - Multi-language UI and speech recognition (English, Hebrew, Spanish) with auto-detection on first visit.
 - Real-time sync with Firebase/Firestore and persistent authentication.
-- Favorites (history) and smart suggestions with sorting (alphabetical or by category).
+- Purchase history with smart features:
+  - **Most Frequent**: Shows user's actual purchase history (top 40 most frequent items, dynamically updated based on shopping activity)
+  - **Starred**: Pre-populated starter items (200 grocery items per language/market: Hebrew/Israel, English/USA, Spanish/Latin America)
+  - **Today**: Items purchased today
+  - **Category**: Sorted by category
+  - **Alphabetical**: A-Z sorting
 
 ## New: Settings (Gear) Modal
 
@@ -114,8 +119,10 @@ This AI Grocery List app is a React + TypeScript + Vite application with Google 
 
 - `App.tsx`: App shell, views, settings modal, toasts, add handlers
 - `components/ItemInput.tsx`: Voice input and auto-submit logic
+- `components/FavoritesPage.tsx`: Purchase history with Most Frequent (max 40) and Starred (200 pre-populated items)
 - `components/SuggestionsList.tsx`: Suggestions view and UI
 - `components/Toast.tsx`: Toast (snackbar)
+- `data/starterItems.ts`: Pre-populated starter items for Hebrew/Israel, English/USA, and Spanish/Latin America markets
 - `services/semanticDupService.ts`: Cross-language dedup
 - `services/geminiService.ts`: AI categorization and translation (import path)
 - `services/importService.ts`: Import/export and semantic dedup on import
