@@ -12,9 +12,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Users collection - users can read/write their own document
+    // Users collection - users can read other users for family member search
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      // Allow any authenticated user to read user documents (needed for family member search)
+      allow read: if isAuthenticated();
+      // Only allow users to write their own document
+      allow write: if isOwner(userId);
       allow create: if isAuthenticated() && request.auth.uid == userId;
     }
 
