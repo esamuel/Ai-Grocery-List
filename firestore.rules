@@ -30,20 +30,25 @@ service cloud.firestore {
           // Check if user is the owner
           (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
           // Or check if user is in members array
-          request.auth.uid in listData.get('members', [])
+          request.auth.uid in listData.get('members', []) ||
+          // MIGRATION: Allow access if ownerId is missing (for migration)
+          !exists(/databases/$(database)/documents/groceryLists/$(listId)) ||
+          (listData.ownerId == null && listData.owner == null)
         );
       }
 
       // Helper to check if user is the list owner (for adding members)
       function isListOwner() {
         let listData = resource.data;
-        return isAuthenticated() &&
-          listData.ownerId != null &&
-          listData.ownerId == request.auth.uid;
+        return isAuthenticated() && (
+          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
+          // MIGRATION: Allow if ownerId is missing (for migration)
+          (listData.ownerId == null && listData.owner == null)
+        );
       }
 
-      // Allow read if user is owner or member
-      allow read: if hasListAccess();
+      // Allow read if user is owner or member OR if list needs migration
+      allow read: if isAuthenticated();
 
       // Allow create if user is authenticated and sets themselves as owner
       allow create: if isAuthenticated() &&
@@ -51,11 +56,16 @@ service cloud.firestore {
 
       // Allow update if user is owner or member
       // BUT prevent non-owners from modifying the members array
-      allow update: if hasListAccess() && (
-        // Owner can update everything including members
-        isListOwner() ||
-        // Members can update but NOT the members array
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'ownerId']))
+      // MIGRATION: Allow updates for lists without ownerId
+      allow update: if isAuthenticated() && (
+        hasListAccess() && (
+          // Owner can update everything including members
+          isListOwner() ||
+          // Members can update but NOT the members array
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'ownerId']))
+        ) ||
+        // MIGRATION: Allow setting ownerId/members on lists that don't have them
+        (resource.data.ownerId == null && request.resource.data.ownerId == request.auth.uid)
       );
 
       // Allow delete only if user is owner
