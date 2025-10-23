@@ -1278,7 +1278,7 @@ function App() {
           setShowAddMember(false);
         }, 3000);
       } else {
-        setAddMemberStatus('User not found. Make sure they have created an account first.');
+        setAddMemberStatus('User not found. Please ask them to sign up at aigrocerylists.com first, then try again.');
       }
     } catch (error: any) {
       console.error('Error adding family member:', error);
@@ -2421,7 +2421,14 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md transition-colors">
             <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Add Family Member</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">Enter the email address of a family member who has already created an account.</p>
+            <div className="mb-4 space-y-2">
+              <p className="text-gray-600 dark:text-gray-300">
+                <span className="font-semibold">Step 1:</span> Ask your family member to sign up at aigrocerylists.com first
+              </p>
+              <p className="text-gray-600 dark:text-gray-300">
+                <span className="font-semibold">Step 2:</span> Enter their email address below to add them to your shared list
+              </p>
+            </div>
             
             {addMemberStatus && (
               <div className={`p-3 rounded-lg mb-4 ${
