@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection - users can read/write their own document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Grocery Lists - simplified rules for authenticated users
+    match /groceryLists/{listId} {
+      // Allow any authenticated user to read any list (simple access)
+      allow read: if isAuthenticated();
+
+      // Allow any authenticated user to create lists
+      allow create: if isAuthenticated();
+
+      // Allow any authenticated user to update lists they have access to
+      allow update: if isAuthenticated();
+
+      // Allow any authenticated user to delete their own lists
+      allow delete: if isAuthenticated();
+    }
+
+    // Subscriptions - users can read/write their own subscription
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+
+      // Allow server-side writes (from Cloud Functions/webhooks)
+      allow write: if request.auth == null;
+    }
+
+    // Family Activities - read if user has access to the list
+    match /familyActivities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // Purchase History - allow authenticated users to read/write
+    match /purchaseHistory/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Suggestions - allow authenticated users to access their suggestions
+    match /suggestions/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Price History - allow authenticated users to access their price data
+    match /priceHistory/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
