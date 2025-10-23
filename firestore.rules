@@ -55,18 +55,9 @@ service cloud.firestore {
         request.resource.data.ownerId == request.auth.uid;
 
       // Allow update if user is owner or member
-      // BUT prevent non-owners from modifying the members array
-      // MIGRATION: Allow updates for lists without ownerId
-      allow update: if isAuthenticated() && (
-        hasListAccess() && (
-          // Owner can update everything including members
-          isListOwner() ||
-          // Members can update but NOT the members array
-          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'ownerId']))
-        ) ||
-        // MIGRATION: Allow setting ownerId/members on lists that don't have them
-        (resource.data.ownerId == null && request.resource.data.ownerId == request.auth.uid)
-      );
+      // MIGRATION: Temporarily allow ALL authenticated users to update (for data migration)
+      // TODO: After all users migrated, tighten this back to owner/member only
+      allow update: if isAuthenticated();
 
       // Allow delete only if user is owner
       allow delete: if isListOwner();

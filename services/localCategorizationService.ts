@@ -67,11 +67,11 @@ const categorizationRules: Record<string, CategoryRule[]> = {
     // Bread & Bakery - Hebrew
     { keywords: ['לחם', 'בייגל', 'קרואסון', 'מאפין', 'סופגניה', 'עוגה', 'עוגיה', 'מאפה', 'לחמניה', 'פיתה'], category: CATEGORY_TRANSLATIONS['Bread & Bakery'].he, confidence: 0.95 },
     
-    // Grains & Cereals - Hebrew
-    { keywords: ['אורז', 'פסטה', 'קמח', 'שיבולת שועל', 'דגני בוקר', 'קינואה', 'שעורה', 'חיטה', 'גרנולה'], category: CATEGORY_TRANSLATIONS['Grains & Cereals'].he, confidence: 0.9 },
+    // Grains & Cereals - Hebrew (includes sweet toppings/syrups)
+    { keywords: ['אורז', 'פסטה', 'קמח', 'שיבולת שועל', 'דגני בוקר', 'קינואה', 'שעורה', 'חיטה', 'גרנולה', 'מייפל', 'סירופ', 'דבש', 'ריבה'], category: CATEGORY_TRANSLATIONS['Grains & Cereals'].he, confidence: 0.9 },
     
     // Beverages - Hebrew
-    { keywords: ['מים', 'מיץ', 'משקה קל', 'קפה', 'תה', 'בירה', 'יין', 'שייק'], category: CATEGORY_TRANSLATIONS['Beverages'].he, confidence: 0.9 },
+    { keywords: ['מים', 'מיץ', 'משקה קל', 'קפה', 'תה', 'בירה', 'יין', 'שייק', 'טוניק', 'מי טוניק', 'סודה', 'קולה', 'ספרייט'], category: CATEGORY_TRANSLATIONS['Beverages'].he, confidence: 0.9 },
     
     // Snacks - Hebrew
     { keywords: ['צ\'יפס', 'קרקרים', 'אגוזים', 'פופקורן', 'ממתק', 'שוקולד', 'עוגיות', 'פרצלים'], category: CATEGORY_TRANSLATIONS['Snacks'].he, confidence: 0.9 },

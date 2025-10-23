@@ -153,7 +153,15 @@ export const useFirestoreSync = (listId: string | null) => {
             } else {
                 // Update ONLY items field, don't touch history
                 updateListItems(listId, newItems).catch(error => {
-                    console.error("Failed to update items in Firestore:", error);
+                    console.error("❌ Failed to update items in Firestore:", error);
+                    console.error("❌ Error details:", {
+                        code: error.code,
+                        message: error.message,
+                        listId: listId,
+                        itemCount: newItems.length
+                    });
+                    // Show alert so user knows data isn't saving
+                    alert(`⚠️ Failed to save items to cloud!\n\nError: ${error.message}\n\nYour items are only saved locally and will be lost when you close the app.`);
                 });
             }
             
