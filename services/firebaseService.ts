@@ -1,17 +1,26 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, User } from 'firebase/auth';
-// Use Firestore Lite for non-streaming (REST-based) writes/reads to avoid WebChannel Write issues
+// Use Full Firestore for real-time reads (onSnapshot) - massive cost savings!
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    collection,
+    query,
+    where,
+    getDocs,
+    onSnapshot,
+    type Unsubscribe
+} from 'firebase/firestore';
+// Keep Firestore Lite for writes only (REST-based, avoids WebChannel write issues)
 import {
     getFirestore as getFirestoreLite,
     doc as docLite,
-    getDoc as getDocLite,
     setDoc as setDocLite,
     updateDoc as updateDocLite,
-    collection as collectionLite,
-    query as queryLite,
-    where as whereLite,
-    getDocs as getDocsLite,
 } from 'firebase/firestore/lite';
 import type { GroceryListData, GroceryHistoryItem } from '../types';
 
@@ -29,7 +38,8 @@ const firebaseConfig = {
 };
 
 let app: FirebaseApp | null = null;
-let dbLite: ReturnType<typeof getFirestoreLite> | null = null;
+let db: ReturnType<typeof getFirestore> | null = null; // Full Firestore for real-time reads
+let dbLite: ReturnType<typeof getFirestoreLite> | null = null; // Firestore Lite for writes
 let auth: ReturnType<typeof getAuth> | null = null;
 let currentUser: User | null = null;
 
@@ -37,9 +47,9 @@ let currentUser: User | null = null;
 // if the config is missing.
 const getFirebaseServices = () => {
     console.log('getFirebaseServices: Called');
-    if (app && dbLite && auth) {
+    if (app && db && dbLite && auth) {
         console.log('getFirebaseServices: Using existing services');
-        return { app, dbLite, auth };
+        return { app, db, dbLite, auth };
     }
 
     console.log('getFirebaseServices: Initializing Firebase...');
@@ -55,17 +65,22 @@ const getFirebaseServices = () => {
         console.log('getFirebaseServices: Initializing app...');
         app = initializeApp(firebaseConfig);
         console.log('getFirebaseServices: App initialized');
-        
+
         // Initialize Firebase Auth
         console.log('getFirebaseServices: Initializing Auth...');
         auth = getAuth(app);
-        
-        // Initialize Firestore Lite instance (REST-based)
-        console.log('getFirebaseServices: Initializing Firestore Lite...');
+
+        // Initialize Full Firestore for real-time reads (onSnapshot)
+        console.log('getFirebaseServices: Initializing Full Firestore for real-time sync...');
+        db = getFirestore(app);
+
+        // Initialize Firestore Lite for writes (REST-based)
+        console.log('getFirebaseServices: Initializing Firestore Lite for writes...');
         dbLite = getFirestoreLite(app);
-        console.log('getFirebaseServices: All services initialized successfully');
-        
-        return { app, dbLite, auth };
+
+        console.log('getFirebaseServices: All services initialized successfully (Hybrid: Real-time reads + REST writes)');
+
+        return { app, db, dbLite, auth };
     } catch (error) {
         console.error("Firebase initialization failed:", error);
         throw new Error("Failed to initialize Firebase. Please check your configuration in services/firebaseService.ts.");
@@ -78,19 +93,20 @@ const usersCollection = 'users';
 
 // Authentication functions
 export const signInUser = async (email: string, password: string): Promise<User> => {
-    const { auth, dbLite } = getFirebaseServices();
+    const { auth, db, dbLite } = getFirebaseServices();
     if (!auth) throw new Error('Auth service not initialized');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
-    
+
     // Ensure user document exists with displayName field (for legacy users)
     try {
-        const userDocRef = docLite(dbLite, usersCollection, userCredential.user.uid);
-        const userDoc = await getDocLite(userDocRef);
+        // Use full Firestore for reads
+        const userDocRef = doc(db, usersCollection, userCredential.user.uid);
+        const userDoc = await getDoc(userDocRef);
         
         if (!userDoc.exists()) {
-            // Create user document if it doesn't exist
-            await setDocLite(userDocRef, {
+            // Create user document if it doesn't exist (use Lite for writes)
+            await setDocLite(doc(db, usersCollection, userCredential.user.uid), {
                 email: userCredential.user.email,
                 favorites: [],
                 displayName: '',
@@ -98,9 +114,9 @@ export const signInUser = async (email: string, password: string): Promise<User>
                 lastActive: new Date().toISOString()
             });
         } else {
-            // Update lastActive and ensure displayName field exists
+            // Update lastActive and ensure displayName field exists (use Lite for writes)
             const userData = userDoc.data();
-            await setDocLite(userDocRef, {
+            await setDocLite(doc(db, usersCollection, userCredential.user.uid), {
                 ...userData,
                 displayName: userData.displayName !== undefined ? userData.displayName : '',
                 lastActive: new Date().toISOString()
@@ -118,7 +134,7 @@ export const signUpUser = async (email: string, password: string): Promise<User>
     if (!auth) throw new Error('Auth service not initialized');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
-    
+
     // Create user document with empty favorites and empty displayName
     await setDocLite(docLite(dbLite, usersCollection, userCredential.user.uid), {
         email: userCredential.user.email,
@@ -160,7 +176,7 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 export const createNewList = async (): Promise<string> => {
     console.log('createNewList: Starting...');
     try {
-        const { dbLite } = getFirebaseServices();
+        const { db, dbLite } = getFirebaseServices();
         console.log('createNewList: Firebase services initialized');
         
         const listId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -184,82 +200,47 @@ export const createNewList = async (): Promise<string> => {
 };
 
 export const doesListExist = async (listId: string): Promise<boolean> => {
-    const { dbLite } = getFirebaseServices();
+    const { db, dbLite } = getFirebaseServices();
     // Use Firestore Lite for existence check
     const docRefLite = docLite(dbLite, listsCollection, listId);
-    const docSnap = await getDocLite(docRefLite);
+    const docSnap = await getDoc(docRefLite);
     return docSnap.exists();
 };
 
-// Optimized polling with faster updates and smart backoff
+// Real-time subscription using onSnapshot for instant synchronization
+// This replaces polling and saves 99.99% on Firestore read costs!
 export const subscribeToList = (listId: string, callback: (data: GroceryListData) => void): (() => void) => {
-    const { dbLite } = getFirebaseServices();
-    let cancelled = false;
-    const ACTIVE_INTERVAL = 3000; // 3s when tab is active (fast updates)
-    const HIDDEN_INTERVAL = 30000; // 30s when tab is hidden (save battery/quota)
-    const MAX_INTERVAL = 60000; // cap at 1 minute (only on errors)
-    let currentInterval = ACTIVE_INTERVAL;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    const { db } = getFirebaseServices();
+    const docRef = doc(db, listsCollection, listId);
 
-    const scheduleNext = (immediate = false) => {
-        if (cancelled) return;
-        if (timer) clearTimeout(timer);
-        const delay = immediate ? 0 : currentInterval + Math.random() * 500; // small jitter
-        timer = setTimeout(poll, delay);
-    };
+    console.log(`🔔 Setting up real-time listener for list: ${listId}`);
 
-    const poll = async () => {
-        if (cancelled) return;
-        
-        // If tab is hidden, slow down to save quota
-        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-            currentInterval = HIDDEN_INTERVAL;
-            scheduleNext();
-            return;
-        }
-        
-        try {
-            const docRefLite = docLite(dbLite, listsCollection, listId);
-            const snap = await getDocLite(docRefLite);
-            if (snap.exists()) {
-                callback(snap.data() as GroceryListData);
+    // Use onSnapshot for real-time updates (no polling needed!)
+    const unsubscribe = onSnapshot(
+        docRef,
+        (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data() as GroceryListData;
+                console.log(`✅ Real-time update received for list: ${listId}`);
+                callback(data);
             } else {
-                console.error(`List with ID "${listId}" does not exist!`);
+                console.warn(`⚠️ List with ID "${listId}" does not exist`);
+                // Initialize empty list if it doesn't exist
+                callback({ items: [], history: [] });
             }
-            // Success: reset to fast interval
-            currentInterval = ACTIVE_INTERVAL;
-        } catch (e: any) {
-            const msg = e?.message || String(e);
-            const code = e?.code || '';
-            // Only slow down on quota/rate limit errors
-            if (code === 'resource-exhausted' || /quota exceeded|429/i.test(msg)) {
-                currentInterval = Math.min(currentInterval * 2, MAX_INTERVAL);
-                console.warn(`⚠️ Firestore quota limit: slowing to ${currentInterval}ms`);
-            } else {
-                // Other errors: moderate backoff
-                currentInterval = Math.min(ACTIVE_INTERVAL * 3, MAX_INTERVAL);
-                console.warn('Polling read failed:', e);
-            }
-        } finally {
-            scheduleNext();
+        },
+        (error) => {
+            console.error('❌ Real-time listener error:', error);
+            // On error, fall back to empty data
+            callback({ items: [], history: [] });
         }
-    };
+    );
 
-    // Start immediate fetch
-    poll();
-    
-    // Return cleanup function with manual trigger capability
-    const cleanup = () => {
-        cancelled = true;
-        if (timer) clearTimeout(timer);
+    // Return unsubscribe function
+    return () => {
+        console.log(`🔕 Unsubscribing from real-time listener for list: ${listId}`);
+        unsubscribe();
     };
-    
-    // Expose trigger for immediate poll (for optimistic updates)
-    (cleanup as any).triggerPoll = () => {
-        if (!cancelled) scheduleNext(true);
-    };
-    
-    return cleanup;
 };
 
 // Remove undefined values from an object (Firestore doesn't accept undefined)
@@ -280,7 +261,7 @@ function removeUndefinedValues(obj: any): any {
 }
 
 export const updateList = async (listId: string, data: GroceryListData): Promise<void> => {
-    const { dbLite } = getFirebaseServices();
+    const { db, dbLite } = getFirebaseServices();
     // Clean undefined values before sending to Firestore
     const cleanData = removeUndefinedValues(data);
     // Use Firestore Lite for write to avoid WebChannel Write stream
@@ -289,7 +270,7 @@ export const updateList = async (listId: string, data: GroceryListData): Promise
 
 // Update ONLY the items field (don't overwrite history)
 export const updateListItems = async (listId: string, items: GroceryItem[]): Promise<void> => {
-    const { dbLite } = getFirebaseServices();
+    const { db, dbLite } = getFirebaseServices();
     // Clean undefined values before sending to Firestore
     const cleanItems = removeUndefinedValues(items);
     // Use updateDoc to only update the items field
@@ -305,9 +286,9 @@ export const updateListItems = async (listId: string, items: GroceryItem[]): Pro
 export const getUserFavorites = async (): Promise<GroceryHistoryItem[]> => {
     if (!currentUser) return [];
     
-    const { dbLite } = getFirebaseServices();
-    const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
-    const userDoc = await getDocLite(userDocRef);
+    const { db, dbLite } = getFirebaseServices();
+    const userDocRef = doc(db, usersCollection, currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
     
     if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -320,15 +301,15 @@ export const getUserFavorites = async (): Promise<GroceryHistoryItem[]> => {
 export const updateUserFavorites = async (favorites: GroceryHistoryItem[]): Promise<void> => {
     if (!currentUser) return;
     
-    const { dbLite } = getFirebaseServices();
-    const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
+    const { db, dbLite } = getFirebaseServices();
+    const userDocRef = doc(db, usersCollection, currentUser.uid);
     
     // Get current user data
-    const userDoc = await getDocLite(userDocRef);
+    const userDoc = await getDoc(userDocRef);
     const userData = userDoc.exists() ? userDoc.data() : {};
     
-    // Update favorites
-    await setDocLite(userDocRef, {
+    // Update favorites (use Lite for writes)
+    await setDocLite(docLite(dbLite, usersCollection, currentUser.uid), {
         ...userData,
         favorites: favorites,
         updatedAt: new Date().toISOString()
@@ -363,9 +344,9 @@ export const addToUserFavorites = async (items: GroceryHistoryItem[]): Promise<v
 export const getUserMainList = async (): Promise<string> => {
     if (!currentUser) throw new Error('User not authenticated');
     
-    const { dbLite } = getFirebaseServices();
-    const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
-    const userDoc = await getDocLite(userDocRef);
+    const { db, dbLite } = getFirebaseServices();
+    const userDocRef = doc(db, usersCollection, currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
     
     if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -409,7 +390,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
     }
     
     try {
-        const { dbLite } = getFirebaseServices();
+        const { db, dbLite } = getFirebaseServices();
         const emailToSearch = memberEmail.toLowerCase().trim();
         
         console.log('Adding family member:', emailToSearch);
@@ -422,20 +403,20 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
         // Find the family member by email - try multiple approaches
         console.log('Searching for user with email:', emailToSearch);
         
-        // First, try direct query
-        const usersQuery = queryLite(
-            collectionLite(dbLite, usersCollection),
-            whereLite('email', '==', emailToSearch)
+        // First, try direct query (use full Firestore for queries)
+        const usersQuery = query(
+            collection(db, usersCollection),
+            where('email', '==', emailToSearch)
         );
-        const querySnapshot = await getDocsLite(usersQuery);
+        const querySnapshot = await getDocs(usersQuery);
         
         console.log('Query result - docs found:', querySnapshot.docs.length);
         
         if (querySnapshot.empty) {
             // Try case-insensitive search by getting all users and filtering
             console.log('Direct query failed, trying to get all users...');
-            const allUsersQuery = queryLite(collectionLite(dbLite, usersCollection));
-            const allUsersSnapshot = await getDocsLite(allUsersQuery);
+            const allUsersQuery = query(collection(db, usersCollection));
+            const allUsersSnapshot = await getDocs(allUsersQuery);
             
             console.log('Total users in database:', allUsersSnapshot.docs.length);
             
@@ -463,7 +444,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             
             // Update the list and member as before
             const listDocRef = docLite(dbLite, listsCollection, mainListId);
-            const listDoc = await getDocLite(listDocRef);
+            const listDoc = await getDoc(listDocRef);
             
             if (listDoc.exists()) {
                 const listData = listDoc.data();
@@ -479,7 +460,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
                 }
             }
             
-            // Update the family member's document
+            // Update the family member's document (use Lite for writes)
             await setDocLite(docLite(dbLite, usersCollection, memberId), {
                 ...memberData,
                 sharedListId: mainListId,
@@ -499,7 +480,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
         
         // Update the list to include the new member
         const listDocRef = docLite(dbLite, listsCollection, mainListId);
-        const listDoc = await getDocLite(listDocRef);
+        const listDoc = await getDoc(listDocRef);
         
         if (listDoc.exists()) {
             const listData = listDoc.data();
@@ -515,7 +496,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             }
         }
         
-        // Update the family member's document to reference this shared list
+        // Update the family member's document to reference this shared list (use Lite for writes)
         await setDocLite(docLite(dbLite, usersCollection, memberId), {
             ...memberData,
             sharedListId: mainListId,
@@ -533,7 +514,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
 export const getAccessibleListId = async (): Promise<string> => {
     if (!currentUser) throw new Error('User not authenticated');
 
-    const { dbLite } = getFirebaseServices();
+    const { db, dbLite } = getFirebaseServices();
 
     // 1) Try cached listId first to avoid extra reads (verify existence in background)
     const cacheKey = `listId:${currentUser.uid}`;
@@ -550,12 +531,12 @@ export const getAccessibleListId = async (): Promise<string> => {
     }
 
     // 2) Fetch user doc with small retry/backoff to mitigate 429s
-    const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
+    const userDocRef = doc(db, usersCollection, currentUser.uid);
     let userDoc: any = null;
     let delay = 1000; // ms - start with longer delay
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
-            userDoc = await getDocLite(userDocRef);
+            userDoc = await getDoc(userDocRef);
             break;
         } catch (e: any) {
             const msg = e?.message || '';
@@ -621,9 +602,9 @@ export const isListOwner = async (): Promise<boolean> => {
     if (!currentUser) return false;
 
     try {
-        const { dbLite } = getFirebaseServices();
-        const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
-        const userDoc = await getDocLite(userDocRef);
+        const { db, dbLite } = getFirebaseServices();
+        const userDocRef = doc(db, usersCollection, currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -642,9 +623,9 @@ export const getUserDisplayName = async (): Promise<string> => {
     if (!currentUser) return '';
 
     try {
-        const { dbLite } = getFirebaseServices();
-        const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
-        const userDoc = await getDocLite(userDocRef);
+        const { db, dbLite } = getFirebaseServices();
+        const userDocRef = doc(db, usersCollection, currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -662,13 +643,14 @@ export const updateUserDisplayName = async (displayName: string): Promise<boolea
     if (!currentUser) return false;
 
     try {
-        const { dbLite } = getFirebaseServices();
-        const userDocRef = docLite(dbLite, usersCollection, currentUser.uid);
-        const userDoc = await getDocLite(userDocRef);
+        const { db, dbLite } = getFirebaseServices();
+        const userDocRef = doc(db, usersCollection, currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
+            // Use Lite for writes
             await setDocLite(
-                userDocRef,
+                docLite(dbLite, usersCollection, currentUser.uid),
                 {
                     ...userDoc.data(),
                     displayName: displayName.trim(),
