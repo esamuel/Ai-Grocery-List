@@ -55,9 +55,14 @@ service cloud.firestore {
         request.resource.data.ownerId == request.auth.uid;
 
       // Allow update if user is owner or member
-      // MIGRATION: Temporarily allow ALL authenticated users to update (for data migration)
-      // TODO: After all users migrated, tighten this back to owner/member only
-      allow update: if isAuthenticated();
+      // BUT prevent non-owners from modifying the members array
+      allow update: if isAuthenticated() && (
+        // If ownerId exists and matches, allow (owner access)
+        (resource.data.ownerId != null && resource.data.ownerId == request.auth.uid) ||
+        // If user is in members array, allow (but not members/ownerId changes)
+        (request.auth.uid in resource.data.get('members', []) &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'ownerId']))
+      );
 
       // Allow delete only if user is owner
       allow delete: if isListOwner();

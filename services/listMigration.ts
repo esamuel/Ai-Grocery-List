@@ -78,19 +78,31 @@ export const migrateListOwnershipFields = async (listId: string, userId: string)
  */
 export const checkListNeedsMigration = async (listId: string): Promise<boolean> => {
   try {
+    console.log(`🔍 Checking if list ${listId} needs migration...`);
     const dbLite = getFirebaseDb();
     const listDocRef = docLite(dbLite, listsCollection, listId);
     const listDoc = await getDocLite(listDocRef);
-    
+
     if (!listDoc.exists()) {
+      console.log('❌ List does not exist, no migration needed');
       return false;
     }
-    
+
     const listData = listDoc.data();
+    console.log('📋 Current list data:', {
+      hasOwnerId: !!listData.ownerId,
+      hasOwner: !!listData.owner,
+      hasMembers: !!listData.members,
+      membersLength: listData.members?.length || 0
+    });
+
     const needsOwner = !listData.ownerId && !listData.owner;
     const needsMembers = !listData.members || listData.members.length === 0;
-    
-    return needsOwner || needsMembers;
+
+    const needsMigration = needsOwner || needsMembers;
+    console.log(`${needsMigration ? '⚠️ ' : '✅ '}Migration ${needsMigration ? 'NEEDED' : 'NOT needed'} - needsOwner: ${needsOwner}, needsMembers: ${needsMembers}`);
+
+    return needsMigration;
   } catch (error) {
     console.error('Error checking migration status:', error);
     return false;
