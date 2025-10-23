@@ -442,8 +442,8 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             
             console.log('Found member manually:', memberData.email, 'ID:', memberId);
             
-            // Update the list and member as before
-            const listDocRef = docLite(dbLite, listsCollection, mainListId);
+            // Update the list and member as before (use full Firestore for reads)
+            const listDocRef = doc(db, listsCollection, mainListId);
             const listDoc = await getDoc(listDocRef);
             
             if (listDoc.exists()) {
@@ -451,7 +451,8 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
                 const currentMembers = listData.members || [currentUser.uid];
                 
                 if (!currentMembers.includes(memberId)) {
-                    await setDocLite(listDocRef, {
+                    // Use Lite for writes
+                    await setDocLite(docLite(dbLite, listsCollection, mainListId), {
                         ...listData,
                         members: [...currentMembers, memberId],
                         updatedAt: new Date().toISOString()
@@ -478,8 +479,8 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
         
         console.log('Found member via direct query:', memberData.email, 'ID:', memberId);
         
-        // Update the list to include the new member
-        const listDocRef = docLite(dbLite, listsCollection, mainListId);
+        // Update the list to include the new member (use full Firestore for reads)
+        const listDocRef = doc(db, listsCollection, mainListId);
         const listDoc = await getDoc(listDocRef);
         
         if (listDoc.exists()) {
@@ -487,7 +488,8 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             const currentMembers = listData.members || [currentUser.uid];
             
             if (!currentMembers.includes(memberId)) {
-                await setDocLite(listDocRef, {
+                // Use Lite for writes
+                await setDocLite(docLite(dbLite, listsCollection, mainListId), {
                     ...listData,
                     members: [...currentMembers, memberId],
                     updatedAt: new Date().toISOString()
@@ -495,7 +497,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
                 console.log('Updated list with new member');
             }
         }
-        
+
         // Update the family member's document to reference this shared list (use Lite for writes)
         await setDocLite(docLite(dbLite, usersCollection, memberId), {
             ...memberData,

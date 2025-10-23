@@ -1,22 +1,25 @@
 import { initializeApp, getApp } from 'firebase/app';
-import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
+// Use Full Firestore for reads (queries, getDoc)
 import {
-  collection as collectionLite,
-  query as queryLite,
-  where as whereLite,
-  orderBy as orderByLite,
-  limit as limitLite,
-  addDoc as addDocLite,
-  getDocs as getDocsLite,
-  doc as docLite,
-  getDoc as getDocLite,
-} from 'firebase/firestore/lite';
+  getFirestore,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  addDoc,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+} from 'firebase/firestore';
 
 // Get Firebase Firestore instance (assumes Firebase is already initialized by firebaseService)
 const getFirebaseDb = () => {
   try {
     const app = getApp();
-    return getFirestoreLite(app);
+    return getFirestore(app);
   } catch (error) {
     // If app doesn't exist, initialize it
     const firebaseConfig = {
@@ -28,7 +31,7 @@ const getFirebaseDb = () => {
       appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
     };
     const app = initializeApp(firebaseConfig);
-    return getFirestoreLite(app);
+    return getFirestore(app);
   }
 };
 
@@ -77,11 +80,11 @@ const getFriendlyNameFromEmail = (email: string): string => {
  */
 export const getFamilyMembers = async (listId: string): Promise<FamilyMember[]> => {
   try {
-    const dbLite = getFirebaseDb();
+    const db = getFirebaseDb();
 
     // Get the list document to find member IDs
-    const listDocRef = docLite(dbLite, listsCollection, listId);
-    const listDoc = await getDocLite(listDocRef);
+    const listDocRef = doc(db, listsCollection, listId);
+    const listDoc = await getDoc(listDocRef);
 
     if (!listDoc.exists()) {
       console.error('List not found');
@@ -94,8 +97,8 @@ export const getFamilyMembers = async (listId: string): Promise<FamilyMember[]> 
 
     // Get user details for each member
     const memberPromises = memberIds.map(async (memberId: string) => {
-      const userDocRef = docLite(dbLite, usersCollection, memberId);
-      const userDoc = await getDocLite(userDocRef);
+      const userDocRef = doc(db, usersCollection, memberId);
+      const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
         return null;
@@ -138,16 +141,16 @@ export const getFamilyActivities = async (
   maxActivities: number = 50 // Fetch more to filter later
 ): Promise<FamilyActivity[]> => {
   try {
-    const dbLite = getFirebaseDb();
+    const db = getFirebaseDb();
 
-    const activitiesQuery = queryLite(
-      collectionLite(dbLite, activitiesCollection),
-      whereLite('listId', '==', listId),
-      orderByLite('timestamp', 'desc'),
-      limitLite(maxActivities)
+    const activitiesQuery = query(
+      collection(db, activitiesCollection),
+      where('listId', '==', listId),
+      orderBy('timestamp', 'desc'),
+      limit(maxActivities)
     );
 
-    const snapshot = await getDocsLite(activitiesQuery);
+    const snapshot = await getDocs(activitiesQuery);
     
     const allActivities = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -161,8 +164,8 @@ export const getFamilyActivities = async (
     // Fetch display names from users collection
     for (const userId of userIds) {
       try {
-        const userDocRef = docLite(dbLite, usersCollection, userId);
-        const userDoc = await getDocLite(userDocRef);
+        const userDocRef = doc(db, usersCollection, userId);
+        const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -217,7 +220,7 @@ export const logFamilyActivity = async (
 ): Promise<void> => {
   try {
     console.log('logFamilyActivity: Logging activity', { listId, userId, userName, type, itemName });
-    const dbLite = getFirebaseDb();
+    const db = getFirebaseDb();
 
     const activity: Omit<FamilyActivity, 'id'> = {
       listId,
@@ -228,16 +231,15 @@ export const logFamilyActivity = async (
       timestamp: new Date().toISOString(),
     };
 
-    await addDocLite(collectionLite(dbLite, activitiesCollection), activity);
+    await addDoc(collection(db, activitiesCollection), activity);
     console.log('logFamilyActivity: Activity logged successfully');
 
     // Update user's last active timestamp
-    const userDocRef = docLite(dbLite, usersCollection, userId);
-    const userDoc = await getDocLite(userDocRef);
+    const userDocRef = doc(db, usersCollection, userId);
+    const userDoc = await getDoc(userDocRef);
 
     if (userDoc.exists()) {
-      const { setDoc: setDocLite } = await import('firebase/firestore/lite');
-      await setDocLite(
+      await setDoc(
         userDocRef,
         {
           ...userDoc.data(),
@@ -258,33 +260,32 @@ export const logFamilyActivity = async (
  */
 export const cleanupOldActivities = async (listId: string): Promise<void> => {
   try {
-    const dbLite = getFirebaseDb();
+    const db = getFirebaseDb();
 
-    const activitiesQuery = queryLite(
-      collectionLite(dbLite, activitiesCollection),
-      whereLite('listId', '==', listId),
-      orderByLite('timestamp', 'desc'),
-      limitLite(100)
+    const activitiesQuery = query(
+      collection(db, activitiesCollection),
+      where('listId', '==', listId),
+      orderBy('timestamp', 'desc'),
+      limit(100)
     );
 
-    const snapshot = await getDocsLite(activitiesQuery);
+    const snapshot = await getDocs(activitiesQuery);
 
     // Get IDs of activities to keep
     const keepIds = new Set(snapshot.docs.map((doc) => doc.id));
 
     // Query all activities for this list
-    const allActivitiesQuery = queryLite(
-      collectionLite(dbLite, activitiesCollection),
-      whereLite('listId', '==', listId)
+    const allActivitiesQuery = query(
+      collection(db, activitiesCollection),
+      where('listId', '==', listId)
     );
 
-    const allSnapshot = await getDocsLite(allActivitiesQuery);
+    const allSnapshot = await getDocs(allActivitiesQuery);
 
     // Delete activities not in keep list
-    const { deleteDoc: deleteDocLite } = await import('firebase/firestore/lite');
     const deletePromises = allSnapshot.docs
       .filter((doc) => !keepIds.has(doc.id))
-      .map((doc) => deleteDocLite(doc.ref));
+      .map((doc) => deleteDoc(doc.ref));
 
     await Promise.all(deletePromises);
   } catch (error) {
