@@ -18,19 +18,45 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Grocery Lists - simplified rules for authenticated users
+    // Grocery Lists - owner and members can access
     match /groceryLists/{listId} {
-      // Allow any authenticated user to read any list (simple access)
-      allow read: if isAuthenticated();
+      // Helper to check if user is owner or member of this list
+      function hasListAccess() {
+        let listData = resource.data;
+        return isAuthenticated() && (
+          // Check if user is the owner
+          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
+          // Or check if user is in members array
+          request.auth.uid in listData.get('members', [])
+        );
+      }
 
-      // Allow any authenticated user to create lists
-      allow create: if isAuthenticated();
+      // Helper to check if user is the list owner (for adding members)
+      function isListOwner() {
+        let listData = resource.data;
+        return isAuthenticated() &&
+          listData.ownerId != null &&
+          listData.ownerId == request.auth.uid;
+      }
 
-      // Allow any authenticated user to update lists they have access to
-      allow update: if isAuthenticated();
+      // Allow read if user is owner or member
+      allow read: if hasListAccess();
 
-      // Allow any authenticated user to delete their own lists
-      allow delete: if isAuthenticated();
+      // Allow create if user is authenticated and sets themselves as owner
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Allow update if user is owner or member
+      // BUT prevent non-owners from modifying the members array
+      allow update: if hasListAccess() && (
+        // Owner can update everything including members
+        isListOwner() ||
+        // Members can update but NOT the members array
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['members', 'ownerId']))
+      );
+
+      // Allow delete only if user is owner
+      allow delete: if isListOwner();
     }
 
     // Subscriptions - users can read/write their own subscription

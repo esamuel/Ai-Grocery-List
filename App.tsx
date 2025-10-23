@@ -1280,8 +1280,13 @@ function App() {
       } else {
         setAddMemberStatus('User not found. Make sure they have created an account first.');
       }
-    } catch (error) {
-      setAddMemberStatus('Error adding family member. Please try again.');
+    } catch (error: any) {
+      console.error('Error adding family member:', error);
+      if (error?.message?.includes('PERMISSION_DENIED')) {
+        setAddMemberStatus('Only the list owner can add family members.');
+      } else {
+        setAddMemberStatus('Error adding family member. Please try again.');
+      }
     }
   };
 

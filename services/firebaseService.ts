@@ -388,14 +388,21 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
         console.error('No current user when trying to add family member');
         return false;
     }
-    
+
     try {
         const { db, dbLite } = getFirebaseServices();
         const emailToSearch = memberEmail.toLowerCase().trim();
-        
+
         console.log('Adding family member:', emailToSearch);
         console.log('Current user:', currentUser.email);
-        
+
+        // IMPORTANT: Only list owners can add family members (prevent unpaid usage)
+        const ownerStatus = await isListOwner();
+        if (!ownerStatus) {
+            console.error('User is not a list owner - cannot add family members');
+            throw new Error('PERMISSION_DENIED: Only the list owner can add family members');
+        }
+
         // Get the main user's list ID
         const mainListId = await getUserMainList();
         console.log('Main list ID:', mainListId);
