@@ -1,7 +1,7 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, User } from 'firebase/auth';
-// Use Full Firestore for real-time reads (onSnapshot) - massive cost savings!
+// Use Full Firestore for all operations (reads and writes)
 import {
     getFirestore,
     doc,
@@ -15,13 +15,6 @@ import {
     onSnapshot,
     type Unsubscribe
 } from 'firebase/firestore';
-// Keep Firestore Lite for writes only (REST-based, avoids WebChannel write issues)
-import {
-    getFirestore as getFirestoreLite,
-    doc as docLite,
-    setDoc as setDocLite,
-    updateDoc as updateDocLite,
-} from 'firebase/firestore/lite';
 import type { GroceryListData, GroceryHistoryItem } from '../types';
 
 // --- IMPORTANT ---
@@ -38,8 +31,7 @@ const firebaseConfig = {
 };
 
 let app: FirebaseApp | null = null;
-let db: ReturnType<typeof getFirestore> | null = null; // Full Firestore for real-time reads
-let dbLite: ReturnType<typeof getFirestoreLite> | null = null; // Firestore Lite for writes
+let db: ReturnType<typeof getFirestore> | null = null; // Full Firestore for all operations
 let auth: ReturnType<typeof getAuth> | null = null;
 let currentUser: User | null = null;
 
@@ -47,9 +39,9 @@ let currentUser: User | null = null;
 // if the config is missing.
 const getFirebaseServices = () => {
     console.log('getFirebaseServices: Called');
-    if (app && db && dbLite && auth) {
+    if (app && db && auth) {
         console.log('getFirebaseServices: Using existing services');
-        return { app, db, dbLite, auth };
+        return { app, db, auth };
     }
 
     console.log('getFirebaseServices: Initializing Firebase...');
@@ -70,17 +62,13 @@ const getFirebaseServices = () => {
         console.log('getFirebaseServices: Initializing Auth...');
         auth = getAuth(app);
 
-        // Initialize Full Firestore for real-time reads (onSnapshot)
-        console.log('getFirebaseServices: Initializing Full Firestore for real-time sync...');
+        // Initialize Full Firestore for all operations (reads and writes)
+        console.log('getFirebaseServices: Initializing Full Firestore...');
         db = getFirestore(app);
 
-        // Initialize Firestore Lite for writes (REST-based)
-        console.log('getFirebaseServices: Initializing Firestore Lite for writes...');
-        dbLite = getFirestoreLite(app);
+        console.log('getFirebaseServices: All services initialized successfully');
 
-        console.log('getFirebaseServices: All services initialized successfully (Hybrid: Real-time reads + REST writes)');
-
-        return { app, db, dbLite, auth };
+        return { app, db, auth };
     } catch (error) {
         console.error("Firebase initialization failed:", error);
         throw new Error("Failed to initialize Firebase. Please check your configuration in services/firebaseService.ts.");
@@ -93,20 +81,19 @@ const usersCollection = 'users';
 
 // Authentication functions
 export const signInUser = async (email: string, password: string): Promise<User> => {
-    const { auth, db, dbLite } = getFirebaseServices();
+    const { auth, db } = getFirebaseServices();
     if (!auth) throw new Error('Auth service not initialized');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
 
     // Ensure user document exists with displayName field (for legacy users)
     try {
-        // Use full Firestore for reads
         const userDocRef = doc(db, usersCollection, userCredential.user.uid);
         const userDoc = await getDoc(userDocRef);
-        
+
         if (!userDoc.exists()) {
-            // Create user document if it doesn't exist (use Lite for writes)
-            await setDocLite(doc(db, usersCollection, userCredential.user.uid), {
+            // Create user document if it doesn't exist
+            await setDoc(userDocRef, {
                 email: userCredential.user.email,
                 favorites: [],
                 displayName: '',
@@ -114,9 +101,9 @@ export const signInUser = async (email: string, password: string): Promise<User>
                 lastActive: new Date().toISOString()
             });
         } else {
-            // Update lastActive and ensure displayName field exists (use Lite for writes)
+            // Update lastActive and ensure displayName field exists
             const userData = userDoc.data();
-            await setDocLite(doc(db, usersCollection, userCredential.user.uid), {
+            await setDoc(userDocRef, {
                 ...userData,
                 displayName: userData.displayName !== undefined ? userData.displayName : '',
                 lastActive: new Date().toISOString()
@@ -125,25 +112,25 @@ export const signInUser = async (email: string, password: string): Promise<User>
     } catch (error) {
         console.error('Error updating user document on sign-in:', error);
     }
-    
+
     return userCredential.user;
 };
 
 export const signUpUser = async (email: string, password: string): Promise<User> => {
-    const { auth, dbLite } = getFirebaseServices();
+    const { auth, db } = getFirebaseServices();
     if (!auth) throw new Error('Auth service not initialized');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
 
     // Create user document with empty favorites and empty displayName
-    await setDocLite(docLite(dbLite, usersCollection, userCredential.user.uid), {
+    await setDoc(doc(db, usersCollection, userCredential.user.uid), {
         email: userCredential.user.email,
         favorites: [],
         displayName: '', // Initialize empty displayName field
         createdAt: new Date().toISOString(),
         lastActive: new Date().toISOString()
     });
-    
+
     return userCredential.user;
 };
 
@@ -176,7 +163,7 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 export const createNewList = async (): Promise<string> => {
     console.log('createNewList: Starting...');
     try {
-        const { db, dbLite } = getFirebaseServices();
+        const { db } = getFirebaseServices();
         console.log('createNewList: Firebase services initialized');
         
         const listId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -189,7 +176,7 @@ export const createNewList = async (): Promise<string> => {
         
         console.log('createNewList: About to write to Firestore Lite...');
         // Use Firestore Lite for write to avoid WebChannel Write stream
-        await setDocLite(docLite(dbLite, listsCollection, listId), newListData as any);
+        await setDoc(doc(db, listsCollection, listId), newListData as any);
         console.log('createNewList: Successfully wrote to Firestore');
         
         return listId;
@@ -200,10 +187,9 @@ export const createNewList = async (): Promise<string> => {
 };
 
 export const doesListExist = async (listId: string): Promise<boolean> => {
-    const { db, dbLite } = getFirebaseServices();
-    // Use Firestore Lite for existence check
-    const docRefLite = docLite(dbLite, listsCollection, listId);
-    const docSnap = await getDoc(docRefLite);
+    const { db } = getFirebaseServices();
+    const docRef = doc(db, listsCollection, listId);
+    const docSnap = await getDoc(docRef);
     return docSnap.exists();
 };
 
@@ -261,21 +247,21 @@ function removeUndefinedValues(obj: any): any {
 }
 
 export const updateList = async (listId: string, data: GroceryListData): Promise<void> => {
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
     // Clean undefined values before sending to Firestore
     const cleanData = removeUndefinedValues(data);
     // Use Firestore Lite for write to avoid WebChannel Write stream
-    await setDocLite(docLite(dbLite, listsCollection, listId), cleanData);
+    await setDoc(doc(db, listsCollection, listId), cleanData);
 };
 
 // Update ONLY the items field (don't overwrite history)
 export const updateListItems = async (listId: string, items: GroceryItem[]): Promise<void> => {
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
     // Clean undefined values before sending to Firestore
     const cleanItems = removeUndefinedValues(items);
     // Use updateDoc to only update the items field
-    const docRef = docLite(dbLite, listsCollection, listId);
-    await updateDocLite(docRef, { 
+    const docRef = doc(db, listsCollection, listId);
+    await updateDoc(docRef, { 
         items: cleanItems,
         updatedAt: new Date().toISOString()
     });
@@ -286,7 +272,7 @@ export const updateListItems = async (listId: string, items: GroceryItem[]): Pro
 export const getUserFavorites = async (): Promise<GroceryHistoryItem[]> => {
     if (!currentUser) return [];
     
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
     const userDocRef = doc(db, usersCollection, currentUser.uid);
     const userDoc = await getDoc(userDocRef);
     
@@ -301,7 +287,7 @@ export const getUserFavorites = async (): Promise<GroceryHistoryItem[]> => {
 export const updateUserFavorites = async (favorites: GroceryHistoryItem[]): Promise<void> => {
     if (!currentUser) return;
     
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
     const userDocRef = doc(db, usersCollection, currentUser.uid);
     
     // Get current user data
@@ -309,7 +295,7 @@ export const updateUserFavorites = async (favorites: GroceryHistoryItem[]): Prom
     const userData = userDoc.exists() ? userDoc.data() : {};
     
     // Update favorites (use Lite for writes)
-    await setDocLite(docLite(dbLite, usersCollection, currentUser.uid), {
+    await setDoc(doc(db, usersCollection, currentUser.uid), {
         ...userData,
         favorites: favorites,
         updatedAt: new Date().toISOString()
@@ -344,7 +330,7 @@ export const addToUserFavorites = async (items: GroceryHistoryItem[]): Promise<v
 export const getUserMainList = async (): Promise<string> => {
     if (!currentUser) throw new Error('User not authenticated');
     
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
     const userDocRef = doc(db, usersCollection, currentUser.uid);
     const userDoc = await getDoc(userDocRef);
     
@@ -363,7 +349,7 @@ export const getUserMainList = async (): Promise<string> => {
     };
     
     // Create the list
-    await setDocLite(docLite(dbLite, listsCollection, listId), {
+    await setDoc(doc(db, listsCollection, listId), {
         ...newListData,
         ownerId: currentUser.uid,
         members: [currentUser.uid],
@@ -372,7 +358,7 @@ export const getUserMainList = async (): Promise<string> => {
     
     // Update user document with main list ID
     const currentUserData = userDoc.exists() ? userDoc.data() : {};
-    await setDocLite(userDocRef, {
+    await setDoc(userDocRef, {
         ...currentUserData,
         email: currentUser.email,
         mainListId: listId,
@@ -390,7 +376,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
     }
 
     try {
-        const { db, dbLite } = getFirebaseServices();
+        const { db } = getFirebaseServices();
         const emailToSearch = memberEmail.toLowerCase().trim();
 
         console.log('Adding family member:', emailToSearch);
@@ -459,7 +445,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
                 
                 if (!currentMembers.includes(memberId)) {
                     // Use Lite for writes
-                    await setDocLite(docLite(dbLite, listsCollection, mainListId), {
+                    await setDoc(doc(db, listsCollection, mainListId), {
                         ...listData,
                         members: [...currentMembers, memberId],
                         updatedAt: new Date().toISOString()
@@ -469,7 +455,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             }
             
             // Update the family member's document (use Lite for writes)
-            await setDocLite(docLite(dbLite, usersCollection, memberId), {
+            await setDoc(doc(db, usersCollection, memberId), {
                 ...memberData,
                 sharedListId: mainListId,
                 updatedAt: new Date().toISOString()
@@ -496,7 +482,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
             
             if (!currentMembers.includes(memberId)) {
                 // Use Lite for writes
-                await setDocLite(docLite(dbLite, listsCollection, mainListId), {
+                await setDoc(doc(db, listsCollection, mainListId), {
                     ...listData,
                     members: [...currentMembers, memberId],
                     updatedAt: new Date().toISOString()
@@ -506,7 +492,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
         }
 
         // Update the family member's document to reference this shared list (use Lite for writes)
-        await setDocLite(docLite(dbLite, usersCollection, memberId), {
+        await setDoc(doc(db, usersCollection, memberId), {
             ...memberData,
             sharedListId: mainListId,
             updatedAt: new Date().toISOString()
@@ -523,7 +509,7 @@ export const addFamilyMember = async (memberEmail: string): Promise<boolean> => 
 export const getAccessibleListId = async (): Promise<string> => {
     if (!currentUser) throw new Error('User not authenticated');
 
-    const { db, dbLite } = getFirebaseServices();
+    const { db } = getFirebaseServices();
 
     // 1) Try cached listId first to avoid extra reads (verify existence in background)
     const cacheKey = `listId:${currentUser.uid}`;
@@ -611,7 +597,7 @@ export const isListOwner = async (): Promise<boolean> => {
     if (!currentUser) return false;
 
     try {
-        const { db, dbLite } = getFirebaseServices();
+        const { db } = getFirebaseServices();
         const userDocRef = doc(db, usersCollection, currentUser.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -632,7 +618,7 @@ export const getUserDisplayName = async (): Promise<string> => {
     if (!currentUser) return '';
 
     try {
-        const { db, dbLite } = getFirebaseServices();
+        const { db } = getFirebaseServices();
         const userDocRef = doc(db, usersCollection, currentUser.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -652,14 +638,14 @@ export const updateUserDisplayName = async (displayName: string): Promise<boolea
     if (!currentUser) return false;
 
     try {
-        const { db, dbLite } = getFirebaseServices();
+        const { db } = getFirebaseServices();
         const userDocRef = doc(db, usersCollection, currentUser.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
             // Use Lite for writes
-            await setDocLite(
-                docLite(dbLite, usersCollection, currentUser.uid),
+            await setDoc(
+                doc(db, usersCollection, currentUser.uid),
                 {
                     ...userDoc.data(),
                     displayName: displayName.trim(),
