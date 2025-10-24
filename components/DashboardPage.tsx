@@ -60,6 +60,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   rtl = false
 }) => {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [showInfoFor, setShowInfoFor] = useState<string | null>(null);
 
   const features: FeatureCard[] = [
     {
@@ -134,20 +135,63 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Dashboard Grid */}
       <div className="px-4 pb-4 grid grid-cols-2 gap-4 max-w-2xl mx-auto">
         {features.map((feature) => {
+          const isInfoShown = showInfoFor === feature.id;
+
           return (
             <div
               key={feature.id}
-              onClick={feature.onClick}
               className="relative cursor-pointer group"
             >
               {/* Card Container */}
-              <div className="relative rounded-3xl overflow-hidden bg-gray-50 dark:bg-gradient-to-br dark:from-gray-800/90 dark:to-gray-900/90 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-lg dark:shadow-2xl transform transition-all duration-300 active:scale-95">
+              <div
+                onClick={feature.onClick}
+                className="relative rounded-3xl overflow-visible bg-gray-50 dark:bg-gradient-to-br dark:from-gray-800/90 dark:to-gray-900/90 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-lg dark:shadow-2xl transform transition-all duration-300 active:scale-95"
+              >
                 {/* Badge */}
                 {feature.badge && (
                   <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full z-10">
                     {feature.badge}
                   </div>
                 )}
+
+                {/* Info Button (Mobile - Top Left) */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowInfoFor(isInfoShown ? null : feature.id);
+                  }}
+                  className="md:hidden absolute top-2 left-2 w-6 h-6 rounded-full bg-white/80 dark:bg-gray-700/80 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xs font-bold z-20 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                >
+                  ℹ️
+                </button>
+
+                {/* Mobile Info Popup */}
+                {isInfoShown && (
+                  <div className="md:hidden absolute top-10 left-2 right-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 z-30 border-2 border-blue-500 dark:border-blue-400">
+                    <p className="text-xs text-gray-700 dark:text-gray-200">
+                      {feature.description}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowInfoFor(null);
+                      }}
+                      className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-semibold"
+                    >
+                      {rtl ? 'סגור' : 'Close'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Desktop Tooltip (Hover) */}
+                <div className="hidden md:block absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-30">
+                  <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg py-2 px-3 shadow-xl max-w-[200px] text-center">
+                    {feature.description}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Card Content */}
                 <div className="flex flex-col items-center justify-center p-6 min-h-[160px]">
