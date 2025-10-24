@@ -167,39 +167,9 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
                   ))}
                 </ul>
 
-                {/* CTA Button */}
-                <button
-                  onClick={() => {
-                    if (tier.id !== 'free' && !tier.current) {
-                      onSelectPlan(tier.id, billingPeriod === 'yearly');
-                    }
-                  }}
-                  disabled={tier.current || tier.id === 'free'}
-                  className={`w-full py-3 rounded-lg font-bold transition-colors ${
-                    tier.current
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : tier.id === 'free'
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      : tier.popular
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-900 text-white hover:bg-gray-800'
-                  }`}
-                >
-                  {tier.current
-                    ? translations.currentBadge
-                    : tier.id === 'free'
-                    ? translations.continueButton
-                    : translations.selectButton}
-                </button>
-
-                {/* Trial Info */}
+                {/* PayPal Subscribe Button (Only Payment Option) */}
                 {tier.id !== 'free' && !tier.current && (
-                  <p className="text-xs text-gray-500 text-center mt-3">{translations.trialInfo}</p>
-                )}
-
-                {/* PayPal Alternative */}
-                {tier.id !== 'free' && !tier.current && (
-                  <div className="mt-4">
+                  <div className="space-y-3">
                     <PayPalSubscribeButton
                       planId={
                         tier.id === 'pro'
@@ -207,15 +177,25 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
                           : (billingPeriod === 'yearly' ? (import.meta as any).env.VITE_PAYPAL_PLAN_FAMILY_YEARLY : (import.meta as any).env.VITE_PAYPAL_PLAN_FAMILY_MONTHLY)
                       }
                       currency="USD"
-                      label="Or subscribe with PayPal"
+                      label={translations.selectButton}
                       userId={userId}
                       onSuccess={() => {
-                        // Simple acknowledgment; full webhook sync can be added later
                         alert('PayPal subscription started successfully. Your plan will be activated shortly.');
                         onClose();
                       }}
                     />
+                    <p className="text-xs text-gray-500 text-center">{translations.trialInfo}</p>
                   </div>
+                )}
+
+                {/* Current Plan or Free Plan Button */}
+                {(tier.current || tier.id === 'free') && (
+                  <button
+                    disabled={true}
+                    className="w-full py-3 rounded-lg font-bold bg-gray-100 text-gray-400 cursor-not-allowed"
+                  >
+                    {tier.current ? translations.currentBadge : translations.continueButton}
+                  </button>
                 )}
               </div>
             ))}
