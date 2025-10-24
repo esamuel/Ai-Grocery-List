@@ -61,6 +61,11 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     } as PurchaseHistoryItem));
   }, [language]);
 
+  // Create a Set of starter item names for the current language to filter purchase history
+  const currentLanguageItemNames = useMemo(() => {
+    return new Set(starterItems.map(item => item.name));
+  }, [starterItems]);
+
   // Filter and sort items based on selected mode
   const sortedItems = useMemo(() => {
     // For "starred" mode, show pre-populated starter items (200 items)
@@ -69,7 +74,8 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     }
 
     // For all other modes, use user's purchase history
-    let items = [...historyItems];
+    // Filter to only show items from the current language
+    let items = historyItems.filter(item => currentLanguageItemNames.has(item.name));
 
     // Sort first
     items.sort((a, b) => {
@@ -110,7 +116,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     }
 
     return items;
-  }, [historyItems, starterItems, sortMode]);
+  }, [historyItems, starterItems, sortMode, currentLanguageItemNames]);
 
   // Calculate days since last purchase
   const getDaysSince = (lastPurchased: string): number => {

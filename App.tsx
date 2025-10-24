@@ -345,6 +345,7 @@ const translations = {
     viewAll: "View All",
     addItem: "Add Item",
     bestDeals: "Best Deals",
+    dashboardHelpText: "Click a card to open, hover for quick actions",
     searchPlaceholder: "Search items...",
     lowestPrice: "Lowest",
     highestPrice: "Highest",
@@ -645,6 +646,7 @@ const translations = {
     viewAll: "צפה בהכל",
     addItem: "הוסף פריט",
     bestDeals: "עסקאות מובילות",
+    dashboardHelpText: "לחץ על כרטיס כדי לפתוח, רחף לפעולות מהירות",
     searchPlaceholder: "חפש פריטים...",
     lowestPrice: "הנמוך",
     highestPrice: "הגבוה",
@@ -944,6 +946,7 @@ const translations = {
     viewAll: "Ver Todo",
     addItem: "Añadir Artículo",
     bestDeals: "Mejores Ofertas",
+    dashboardHelpText: "Haz clic en una tarjeta para abrir, pasa el cursor para acciones rápidas",
     searchPlaceholder: "Buscar artículos...",
     lowestPrice: "Más Bajo",
     highestPrice: "Más Alto",
@@ -1895,11 +1898,9 @@ function App() {
         {currentView === 'dashboard' ? (
             <DashboardPage
               onNavigate={(view) => setCurrentView(view as View)}
-              subscription={subscription}
-              onUpgrade={() => setShowPaywall(true)}
-              onManageSubscription={() => { /* TODO: Implement manage subscription */ }}
               translations={{
                 dashboard: currentText.dashboard,
+                list: currentText.list,
                 listDesc: currentText.listDesc,
                 history: currentText.favorites,
                 historyDesc: currentText.historyDesc,
@@ -1921,11 +1922,12 @@ function App() {
                 viewAll: currentText.viewAll,
                 addItem: currentText.addItem,
                 bestDeals: currentText.bestDeals,
+                dashboardHelpText: currentText.dashboardHelpText,
               }}
               itemsCount={items.length}
               historyCount={historyItems.length}
               familyMembersCount={0}
-              trackedPricesCount={historyItems.filter(item => 
+              trackedPricesCount={historyItems.filter(item =>
                 item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
               ).length}
               rtl={language === 'he'}

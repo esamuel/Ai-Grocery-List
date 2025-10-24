@@ -3,7 +3,8 @@
  * This ensures AI-generated categories are standardized and consistent
  */
 
-export type StandardCategory = 
+export type StandardCategory =
+  | 'Produce' // Fruits & Vegetables combined
   | 'Fruits'
   | 'Vegetables'
   | 'Meat'
@@ -22,40 +23,45 @@ export type Language = 'en' | 'he' | 'es';
 
 // Standard category translations
 export const CATEGORY_TRANSLATIONS: Record<StandardCategory, Record<Language, string>> = {
+  'Produce': {
+    en: 'Produce',
+    he: 'פירות וירקות',
+    es: 'Frutas y Verduras'
+  },
   'Fruits': {
     en: 'Fruits',
-    he: 'פירות',
-    es: 'Frutas'
+    he: 'פירות וירקות', // Map to combined category in Hebrew
+    es: 'Frutas y Verduras'
   },
   'Vegetables': {
     en: 'Vegetables',
-    he: 'ירקות',
-    es: 'Verduras'
+    he: 'פירות וירקות', // Map to combined category in Hebrew
+    es: 'Frutas y Verduras'
   },
   'Meat': {
-    en: 'Meat',
-    he: 'בשר',
-    es: 'Carne'
+    en: 'Meat & Seafood',
+    he: 'בשר ודגים',
+    es: 'Carnes y Pescados'
   },
   'Fish': {
-    en: 'Fish',
-    he: 'דגים',
-    es: 'Pescado'
+    en: 'Meat & Seafood',
+    he: 'בשר ודגים', // Map to combined category in Hebrew
+    es: 'Carnes y Pescados'
   },
   'Dairy': {
-    en: 'Dairy',
-    he: 'חלב',
-    es: 'Lácteos'
+    en: 'Dairy & Eggs',
+    he: 'חלב וביצים',
+    es: 'Lácteos y Huevos'
   },
   'Bread & Bakery': {
-    en: 'Bread & Bakery',
-    he: 'לחם ומאפים',
-    es: 'Pan y Panadería'
+    en: 'Pantry',
+    he: 'מוצרי מזווה',
+    es: 'Despensa'
   },
   'Grains & Cereals': {
-    en: 'Grains & Cereals',
-    he: 'דגנים ודגני בוקר',
-    es: 'Granos y Cereales'
+    en: 'Breakfast & Snacks',
+    he: 'דגני בוקר וחטיפים',
+    es: 'Desayuno y Bocadillos'
   },
   'Beverages': {
     en: 'Beverages',
@@ -63,9 +69,9 @@ export const CATEGORY_TRANSLATIONS: Record<StandardCategory, Record<Language, st
     es: 'Bebidas'
   },
   'Snacks': {
-    en: 'Snacks',
-    he: 'חטיפים',
-    es: 'Bocadillos'
+    en: 'Breakfast & Snacks',
+    he: 'דגני בוקר וחטיפים',
+    es: 'Desayuno y Bocadillos'
   },
   'Frozen': {
     en: 'Frozen',
@@ -75,7 +81,7 @@ export const CATEGORY_TRANSLATIONS: Record<StandardCategory, Record<Language, st
   'Household & Cleaning': {
     en: 'Household & Cleaning',
     he: 'בית וניקוי',
-    es: 'Hogar y Limpieza'
+    es: 'Limpieza del Hogar'
   },
   'Personal Care': {
     en: 'Personal Care',
@@ -83,9 +89,9 @@ export const CATEGORY_TRANSLATIONS: Record<StandardCategory, Record<Language, st
     es: 'Cuidado Personal'
   },
   'Other': {
-    en: 'Other',
-    he: 'מזווה',
-    es: 'Otros'
+    en: 'Pantry',
+    he: 'מוצרי מזווה',
+    es: 'Despensa'
   }
 };
 
@@ -160,12 +166,18 @@ export const normalizeCategory = (categoryName: string, language: Language): str
     'misc': 'Other',
     
     // Hebrew variations
-    'פרי': 'Fruits',
-    'ירק': 'Vegetables',
+    'פרי': 'Produce',
+    'ירק': 'Produce',
+    'פירות וירקות': 'Produce', // Combined category from starter items
+    'פירות טריים': 'Produce',
+    'ירקות טריים': 'Produce',
+    'פירות': 'Produce',
+    'ירקות': 'Produce',
     'בשרים': 'Meat',
     'דג': 'Fish',
     'חלבי': 'Dairy',
     'מוצרי חלב': 'Dairy',
+    'חלב וביצים': 'Dairy',
     'לחמים': 'Bread & Bakery',
     'מאפים': 'Bread & Bakery',
     'דגן': 'Grains & Cereals',
@@ -175,6 +187,8 @@ export const normalizeCategory = (categoryName: string, language: Language): str
     'ניקיון': 'Household & Cleaning',
     'טיפוח': 'Personal Care',
     'אחר': 'Other',
+    'בשר ודגים': 'Meat',
+    'מוצרי מזווה': 'Other',
     
     // Spanish variations
     'fruta': 'Fruits',

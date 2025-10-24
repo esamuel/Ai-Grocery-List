@@ -172,6 +172,107 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
             </div>
           ))}
         </div>
+
+        {/* Visual Chart - Pie Chart */}
+        {categoryBreakdown.length > 0 && (
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-600 mb-4 text-center">Visual Breakdown</h4>
+
+            {/* Pie Chart */}
+            <div className="flex flex-col items-center">
+              <svg viewBox="0 0 200 200" className="w-64 h-64 mb-6">
+                {categoryBreakdown.map((cat, index) => {
+                  // Generate consistent colors for each category
+                  const colors = [
+                    '#3B82F6', // blue-500
+                    '#10B981', // green-500
+                    '#A855F7', // purple-500
+                    '#F97316', // orange-500
+                    '#EC4899', // pink-500
+                    '#EAB308', // yellow-500
+                    '#EF4444', // red-500
+                    '#6366F1', // indigo-500
+                    '#14B8A6', // teal-500
+                    '#06B6D4', // cyan-500
+                  ];
+                  const color = colors[index % colors.length];
+
+                  // Calculate the start and end angles for this slice
+                  let startAngle = 0;
+                  for (let i = 0; i < index; i++) {
+                    startAngle += (categoryBreakdown[i].percentage / 100) * 360;
+                  }
+                  const endAngle = startAngle + (cat.percentage / 100) * 360;
+
+                  // Convert angles to radians and calculate path
+                  const startRad = (startAngle - 90) * (Math.PI / 180);
+                  const endRad = (endAngle - 90) * (Math.PI / 180);
+                  const radius = 80;
+                  const centerX = 100;
+                  const centerY = 100;
+
+                  const x1 = centerX + radius * Math.cos(startRad);
+                  const y1 = centerY + radius * Math.sin(startRad);
+                  const x2 = centerX + radius * Math.cos(endRad);
+                  const y2 = centerY + radius * Math.sin(endRad);
+
+                  const largeArcFlag = cat.percentage > 50 ? 1 : 0;
+
+                  const pathData = [
+                    `M ${centerX} ${centerY}`,
+                    `L ${x1} ${y1}`,
+                    `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                    'Z',
+                  ].join(' ');
+
+                  return (
+                    <path
+                      key={index}
+                      d={pathData}
+                      fill={color}
+                      stroke="white"
+                      strokeWidth="2"
+                      className="transition-all duration-300 hover:opacity-80"
+                    />
+                  );
+                })}
+              </svg>
+
+              {/* Legend */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 w-full max-w-md">
+                {categoryBreakdown.map((cat, index) => {
+                  const colors = [
+                    'bg-blue-500',
+                    'bg-green-500',
+                    'bg-purple-500',
+                    'bg-orange-500',
+                    'bg-pink-500',
+                    'bg-yellow-500',
+                    'bg-red-500',
+                    'bg-indigo-500',
+                    'bg-teal-500',
+                    'bg-cyan-500',
+                  ];
+                  const color = colors[index % colors.length];
+
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${color} flex-shrink-0`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-gray-700 truncate">
+                          {cat.category}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {cat.percentage.toFixed(0)}% · {currencySymbol}{cat.total.toFixed(0)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

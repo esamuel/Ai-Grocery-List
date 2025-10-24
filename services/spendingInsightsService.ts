@@ -1,4 +1,5 @@
 import type { PurchaseHistoryItem } from '../types';
+import { normalizeCategory } from './categoryTranslations';
 
 export interface SpendingInsight {
   totalSpent: number;
@@ -120,6 +121,19 @@ export function getMonthlySpending(
   };
 }
 
+// Detect language from category names
+function detectLanguage(items: PurchaseHistoryItem[]): 'en' | 'he' | 'es' {
+  for (const item of items) {
+    if (item.category) {
+      // Hebrew Unicode range
+      if (/[\u0590-\u05FF]/.test(item.category)) return 'he';
+      // Spanish specific characters
+      if (/[ñáéíóúüÑÁÉÍÓÚÜ¿¡]/.test(item.category)) return 'es';
+    }
+  }
+  return 'en';
+}
+
 // Get spending by category for current month
 export function getCategoryBreakdown(
   historyItems: PurchaseHistoryItem[],
@@ -128,13 +142,16 @@ export function getCategoryBreakdown(
   const { start, end } = getCurrentMonthRange();
   const categoryTotals = new Map<string, { total: number; count: number }>();
   let grandTotal = 0;
-  
+
+  // Detect the language from items
+  const language = detectLanguage(historyItems);
+
   historyItems.forEach(item => {
     if (!item.prices || item.prices.length === 0) return;
-    
+
     let itemTotal = 0;
     let itemCount = 0;
-    
+
     item.prices.forEach(priceEntry => {
       const purchaseDate = new Date(priceEntry.purchaseDate);
       if (purchaseDate >= start && purchaseDate <= end && priceEntry.currency === currency) {
@@ -144,9 +161,11 @@ export function getCategoryBreakdown(
         grandTotal += amount;
       }
     });
-    
+
     if (itemTotal > 0) {
-      const category = item.category || 'Uncategorized';
+      // Normalize the category name to combine similar categories
+      const rawCategory = item.category || 'Uncategorized';
+      const category = normalizeCategory(rawCategory, language);
       const existing = categoryTotals.get(category) || { total: 0, count: 0 };
       categoryTotals.set(category, {
         total: existing.total + itemTotal,
