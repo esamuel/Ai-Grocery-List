@@ -124,6 +124,19 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
         </h1>
       </div>
 
+      {/* Price Comparison Disclaimer */}
+      <div className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
+        <div className="flex items-start gap-2">
+          <span className="text-lg flex-shrink-0">ℹ️</span>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            {rtl
+              ? 'שים לב: השוואת מחירים מדויקת רק כאשר קונים את אותה כמות (למשל 1 ליטר חלב, 1 ק"ג עגבניות). מחירים שונים עשויים להשתנות בגלל כמויות או משקל שונה של המוצר.'
+              : 'Note: Price comparisons are only accurate when buying the same quantity (e.g., 1L milk, 1kg tomatoes). Prices may vary due to different product quantities or weights.'
+            }
+          </p>
+        </div>
+      </div>
+
       {/* Price Tracking Disabled Banner - MOVED TO TOP */}
       {!priceTrackingEnabled && (
         <div className="mb-6 p-6 rounded-xl bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-300 dark:border-yellow-700 shadow-lg">
