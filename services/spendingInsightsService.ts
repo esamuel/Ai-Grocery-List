@@ -22,11 +22,26 @@ export interface WeeklyTrend {
   changePercent: number;
 }
 
+export interface MonthlyTrend {
+  thisMonth: number;
+  lastMonth: number;
+  change: number;
+  changePercent: number;
+}
+
 // Get start and end of current month
 function getCurrentMonthRange(): { start: Date; end: Date } {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  return { start, end };
+}
+
+// Get last month range
+function getLastMonthRange(): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
   return { start, end };
 }
 
@@ -65,19 +80,29 @@ function calculateSpendingInRange(
   currency: string
 ): number {
   let total = 0;
-  
+
   items.forEach(item => {
     if (!item.prices || item.prices.length === 0) return;
-    
+
     // Sum up all purchases within the date range
     item.prices.forEach(priceEntry => {
+      // Skip entries without purchaseDate
+      if (!priceEntry.purchaseDate) return;
+
       const purchaseDate = new Date(priceEntry.purchaseDate);
-      if (purchaseDate >= start && purchaseDate <= end && priceEntry.currency === currency) {
+
+      // Skip entries with invalid dates
+      if (isNaN(purchaseDate.getTime())) return;
+
+      // Only count entries with price data and matching currency
+      if (purchaseDate >= start && purchaseDate <= end &&
+          priceEntry.price !== undefined &&
+          priceEntry.currency === currency) {
         total += priceEntry.price * (priceEntry.quantity || 1);
       }
     });
   });
-  
+
   return total;
 }
 
@@ -88,18 +113,25 @@ function countItemsInRange(
   end: Date
 ): number {
   let count = 0;
-  
+
   items.forEach(item => {
     if (!item.prices || item.prices.length === 0) return;
-    
+
     item.prices.forEach(priceEntry => {
+      // Skip entries without purchaseDate
+      if (!priceEntry.purchaseDate) return;
+
       const purchaseDate = new Date(priceEntry.purchaseDate);
+
+      // Skip entries with invalid dates
+      if (isNaN(purchaseDate.getTime())) return;
+
       if (purchaseDate >= start && purchaseDate <= end) {
         count += priceEntry.quantity || 1;
       }
     });
   });
-  
+
   return count;
 }
 
@@ -153,8 +185,18 @@ export function getCategoryBreakdown(
     let itemCount = 0;
 
     item.prices.forEach(priceEntry => {
+      // Skip entries without purchaseDate
+      if (!priceEntry.purchaseDate) return;
+
       const purchaseDate = new Date(priceEntry.purchaseDate);
-      if (purchaseDate >= start && purchaseDate <= end && priceEntry.currency === currency) {
+
+      // Skip entries with invalid dates
+      if (isNaN(purchaseDate.getTime())) return;
+
+      // Only count entries with price data
+      if (purchaseDate >= start && purchaseDate <= end &&
+          priceEntry.price !== undefined &&
+          priceEntry.currency === currency) {
         const amount = priceEntry.price * (priceEntry.quantity || 1);
         itemTotal += amount;
         itemCount += priceEntry.quantity || 1;
@@ -198,16 +240,38 @@ export function getWeeklyTrend(
 ): WeeklyTrend {
   const thisWeek = getCurrentWeekRange();
   const lastWeek = getLastWeekRange();
-  
+
   const thisWeekSpending = calculateSpendingInRange(historyItems, thisWeek.start, thisWeek.end, currency);
   const lastWeekSpending = calculateSpendingInRange(historyItems, lastWeek.start, lastWeek.end, currency);
-  
+
   const change = thisWeekSpending - lastWeekSpending;
   const changePercent = lastWeekSpending > 0 ? (change / lastWeekSpending) * 100 : 0;
-  
+
   return {
     thisWeek: thisWeekSpending,
     lastWeek: lastWeekSpending,
+    change,
+    changePercent,
+  };
+}
+
+// Get monthly spending trend
+export function getMonthlyTrend(
+  historyItems: PurchaseHistoryItem[],
+  currency: string
+): MonthlyTrend {
+  const thisMonth = getCurrentMonthRange();
+  const lastMonth = getLastMonthRange();
+
+  const thisMonthSpending = calculateSpendingInRange(historyItems, thisMonth.start, thisMonth.end, currency);
+  const lastMonthSpending = calculateSpendingInRange(historyItems, lastMonth.start, lastMonth.end, currency);
+
+  const change = thisMonthSpending - lastMonthSpending;
+  const changePercent = lastMonthSpending > 0 ? (change / lastMonthSpending) * 100 : 0;
+
+  return {
+    thisMonth: thisMonthSpending,
+    lastMonth: lastMonthSpending,
     change,
     changePercent,
   };

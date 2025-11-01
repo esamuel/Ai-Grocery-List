@@ -152,41 +152,38 @@ export async function addOrIncrementPurchase(
         );
       }
       
-      // Handle price tracking and store information
-      const shouldCreatePriceEntry = purchase.price !== undefined && purchase.price > 0;
-      const shouldCreateStoreEntry = purchase.store && purchase.store.trim() !== '';
+      // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
+      // Even if no price/store is provided, we need the purchaseDate for the calendar
+      const priceEntry: any = {
+        purchaseDate: now,
+        quantity: purchase.quantity || 1,
+      };
 
-      if (shouldCreatePriceEntry || shouldCreateStoreEntry) {
-        const priceEntry: any = {
-          purchaseDate: now,
-          quantity: purchase.quantity || 1,
-        };
+      // Add price if provided
+      const hasPriceData = purchase.price !== undefined && purchase.price > 0;
+      if (hasPriceData) {
+        priceEntry.price = purchase.price;
+        priceEntry.currency = purchase.currency || 'USD';
+      }
 
-        // Add price if provided
-        if (shouldCreatePriceEntry) {
-          priceEntry.price = purchase.price;
-          priceEntry.currency = purchase.currency || 'USD';
-        }
+      // Add store if provided
+      if (purchase.store && purchase.store.trim() !== '') {
+        priceEntry.store = purchase.store;
+      }
 
-        // Add store if provided
-        if (shouldCreateStoreEntry) {
-          priceEntry.store = purchase.store;
-        }
-        
-        // Add to price history
-        updated.prices = [...(existing.prices || []), priceEntry];
-        
-        // Update price statistics only if price was provided
-        if (shouldCreatePriceEntry) {
-          updated.lastPrice = purchase.price;
-          
-          // Calculate price statistics
-          const allPrices = updated.prices.map(p => p.price).filter(p => p !== undefined);
-          if (allPrices.length > 0) {
-            updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
-            updated.lowestPrice = Math.min(...allPrices);
-            updated.highestPrice = Math.max(...allPrices);
-          }
+      // Add to price history
+      updated.prices = [...(existing.prices || []), priceEntry];
+
+      // Update price statistics only if price was provided
+      if (hasPriceData) {
+        updated.lastPrice = purchase.price;
+
+        // Calculate price statistics
+        const allPrices = updated.prices.map(p => p.price).filter(p => p !== undefined);
+        if (allPrices.length > 0) {
+          updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+          updated.lowestPrice = Math.min(...allPrices);
+          updated.highestPrice = Math.max(...allPrices);
         }
       }
       
@@ -204,36 +201,32 @@ export async function addOrIncrementPurchase(
         avgDaysBetween: 0,
       };
       
-      // Handle price tracking and store information for new items
-      const shouldCreatePriceEntry = purchase.price !== undefined && purchase.price > 0;
-      const shouldCreateStoreEntry = purchase.store && purchase.store.trim() !== '';
-      
-      if (shouldCreatePriceEntry || shouldCreateStoreEntry) {
-        const priceEntry: any = {
-          purchaseDate: now,
-          quantity: purchase.quantity || 1,
-        };
-        
-        // Add price if provided
-        if (shouldCreatePriceEntry) {
-          priceEntry.price = purchase.price;
-          priceEntry.currency = purchase.currency || 'USD';
-        }
-        
-        // Add store if provided
-        if (shouldCreateStoreEntry) {
-          priceEntry.store = purchase.store;
-        }
-        
-        newItem.prices = [priceEntry];
-        
-        // Set price statistics only if price was provided
-        if (shouldCreatePriceEntry) {
-          newItem.lastPrice = purchase.price;
-          newItem.avgPrice = purchase.price;
-          newItem.lowestPrice = purchase.price;
-          newItem.highestPrice = purchase.price;
-        }
+      // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
+      const priceEntry: any = {
+        purchaseDate: now,
+        quantity: purchase.quantity || 1,
+      };
+
+      // Add price if provided
+      const hasPriceData = purchase.price !== undefined && purchase.price > 0;
+      if (hasPriceData) {
+        priceEntry.price = purchase.price;
+        priceEntry.currency = purchase.currency || 'USD';
+      }
+
+      // Add store if provided
+      if (purchase.store && purchase.store.trim() !== '') {
+        priceEntry.store = purchase.store;
+      }
+
+      newItem.prices = [priceEntry];
+
+      // Set price statistics only if price was provided
+      if (hasPriceData) {
+        newItem.lastPrice = purchase.price;
+        newItem.avgPrice = purchase.price;
+        newItem.lowestPrice = purchase.price;
+        newItem.highestPrice = purchase.price;
       }
       
       map.set(key, newItem);

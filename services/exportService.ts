@@ -32,10 +32,24 @@ export function getDailyPurchases(
   
   historyItems.forEach(item => {
     if (!item.prices) return;
-    
+
     item.prices.forEach(priceEntry => {
-      const date = new Date(priceEntry.purchaseDate).toISOString().split('T')[0]; // YYYY-MM-DD
-      
+      // Validate date before processing
+      if (!priceEntry.purchaseDate) {
+        console.warn(`Skipping price entry with no purchaseDate for item: ${item.name}`);
+        return;
+      }
+
+      const purchaseDate = new Date(priceEntry.purchaseDate);
+
+      // Check if date is valid
+      if (isNaN(purchaseDate.getTime())) {
+        console.warn(`Invalid purchaseDate "${priceEntry.purchaseDate}" for item: ${item.name}`);
+        return;
+      }
+
+      const date = purchaseDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
       if (!dailyMap.has(date)) {
         dailyMap.set(date, {
           date,
@@ -44,21 +58,21 @@ export function getDailyPurchases(
           currency: priceEntry.currency || currency
         });
       }
-      
+
       const daily = dailyMap.get(date)!;
-      const itemPrice = priceEntry.price || 0;
+      const itemPrice = priceEntry.price; // Keep as undefined if not provided
       const quantity = priceEntry.quantity || 1;
-      const totalPrice = itemPrice * quantity;
-      
+      const totalPrice = itemPrice ? (itemPrice * quantity) : 0;
+
       daily.items.push({
         name: item.name,
         category: item.category,
-        price: itemPrice,
+        price: itemPrice, // Can be undefined
         currency: priceEntry.currency || currency,
         store: priceEntry.store,
         quantity
       });
-      
+
       daily.totalSpent += totalPrice;
     });
   });

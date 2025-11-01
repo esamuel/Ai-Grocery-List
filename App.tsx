@@ -8,6 +8,7 @@ import { FavoritesPage } from './components/FavoritesPage';
 import { PriceInputModal } from './components/PriceInputModal';
 import { SpendingInsights } from './components/SpendingInsights';
 import { DailyPurchases } from './components/DailyPurchases';
+import { MonthlyPurchasesView } from './components/MonthlyPurchasesView';
 import { ListIcon } from './components/icons/ListIcon';
 import { StarIcon } from './components/icons/StarIcon';
 import { UsersIcon } from './components/icons/UsersIcon';
@@ -27,6 +28,7 @@ import { LandingPage } from './components/LandingPage';
 import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
+import { PurchaseHistory } from './components/PurchaseHistory';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -52,8 +54,10 @@ import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
+import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
+import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
 type Language = 'en' | 'he' | 'es';
-  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions';
+  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
 
 const translations = {
   en: {
@@ -194,6 +198,9 @@ const translations = {
     weeklyTrend: "Weekly Trend",
     thisWeek: "This Week",
     lastWeek: "Last Week",
+    monthlyTrend: "Monthly Trend",
+    thisMonth: "This Month",
+    lastMonth: "Last Month",
     categoryBreakdown: "Category Breakdown",
     budget: "Monthly Budget",
     remaining: "Remaining",
@@ -1139,6 +1146,46 @@ function App() {
             console.error('❌ Migration failed:', error);
           });
       }
+
+      // Purchase History Migration - Recover missing price entries for Daily Purchases
+      checkPurchaseHistoryNeedsMigration(listId).then(needsMigration => {
+        if (needsMigration) {
+          console.log('🔄 Running purchase history migration...');
+          migrateMissingPriceEntries(listId)
+            .then(result => {
+              console.log(`✅ Purchase history migration completed: ${result.migrated} items migrated, ${result.skipped} skipped`);
+              if (result.migrated > 0) {
+                showToast(`Recovered ${result.migrated} purchase records for Daily Purchases`, 'success');
+              }
+              if (result.errors.length > 0) {
+                console.error('Migration errors:', result.errors);
+              }
+            })
+            .catch(error => {
+              console.error('❌ Purchase history migration failed:', error);
+            });
+        }
+      });
+
+      // Fix incorrect purchase date years (2025 -> 2024)
+      console.log('🔍 Checking for incorrect purchase date years...');
+      fixPurchaseDateYears(listId)
+        .then(result => {
+          if (result.fixed > 0) {
+            console.log(`✅ Fixed ${result.fixed} items with incorrect year`);
+            showToast(`Fixed ${result.fixed} purchase dates - refresh to see Daily Purchases`, 'success');
+            // Refresh the page after a delay to show the corrected data
+            setTimeout(() => window.location.reload(), 2000);
+          } else {
+            console.log('✅ All purchase dates have correct years');
+          }
+          if (result.errors.length > 0) {
+            console.error('Date fix errors:', result.errors);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Date year fix failed:', error);
+        });
     }
   }, [listId, user, historyItems]);
   
@@ -1257,7 +1304,6 @@ function App() {
       }
     };
   }, []);
-
 
   const handleSignOut = async () => {
     try {
@@ -1397,7 +1443,18 @@ function App() {
   const handleDeleteHistoryItem = useCallback((itemName: string) => {
     setHistoryItems(prev => prev.filter(item => item.name.toLowerCase() !== itemName.toLowerCase()));
   }, [setHistoryItems]);
-  
+
+  const handleLoadHistoryItems = useCallback(async () => {
+    // Reload history items from Firestore after a purchase is deleted
+    try {
+      const { getPurchaseHistory } = await import('./services/purchaseHistoryService');
+      const updatedHistory = await getPurchaseHistory(listId);
+      setHistoryItems(updatedHistory);
+    } catch (error) {
+      console.error('Failed to reload history:', error);
+    }
+  }, [listId, setHistoryItems]);
+
   const handleToggleItem = (id: string) => {
     setItems(currentItems => currentItems.map(item => {
       if (item.id === id) {
@@ -1582,11 +1639,11 @@ function App() {
     try {
       // FIRST: Update history in Firestore (with prices and store)
       await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({
-        name: i.name,
-        category: i.category,
-        price: i.price,
-        store: i.store,
-        currency: currency
+      name: i.name,
+      category: i.category,
+      price: i.price,
+      store: i.store,
+      currency: currency
       })));
       
       console.log('✅ Purchase history updated in Firestore');
@@ -2008,7 +2065,7 @@ function App() {
             <div className="mb-6">
               <button
                 onClick={() => setCurrentView('list')}
-                className="flex items-center gap-2 px-4 py-2 mb-4 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2188,6 +2245,9 @@ function App() {
                 weeklyTrend: currentText.weeklyTrend,
                 thisWeek: currentText.thisWeek,
                 lastWeek: currentText.lastWeek,
+                monthlyTrend: currentText.monthlyTrend,
+                thisMonth: currentText.thisMonth,
+                lastMonth: currentText.lastMonth,
                 categoryBreakdown: currentText.categoryBreakdown,
                 budget: currentText.budget,
                 remaining: currentText.remaining,
@@ -2196,25 +2256,50 @@ function App() {
               }}
             />
         ) : currentView === 'daily' ? (
-            <DailyPurchases 
-              historyItems={historyItems} 
+            <MonthlyPurchasesView
+              historyItems={historyItems}
               currency={currency}
+              listId={listId}
+              onDataChange={handleLoadHistoryItems}
               translations={{
-                title: currentText.dailyPurchases,
-                subtitle: currentText.dailyPurchasesSubtitle,
-                date: currentText.date,
+                selectMonth: currentText.selectMonth || 'Select a Month',
+                noMonths: currentText.noMonths || 'No purchase history yet',
                 items: currentText.items,
                 totalSpent: currentText.totalSpent,
-                store: currentText.store,
-                noPurchases: currentText.noPurchases,
-                selectDate: currentText.selectDate,
-                exportCSV: currentText.exportCSV,
-                generateReport: currentText.generateReport,
-                copyReport: currentText.copyReport,
-                reportCopied: currentText.reportCopied,
-                recentShoppingDays: currentText.recentShoppingDays,
+                shoppingDays: currentText.shoppingDays || 'shopping days',
+                backToMonths: currentText.backToMonths || 'Back to months',
+                deletePurchase: currentText.deletePurchase || 'Delete purchase',
+                confirmDelete: currentText.confirmDelete || 'Are you sure you want to delete this purchase?',
+                deleteDay: currentText.deleteDay || 'Delete entire day',
+                confirmDeleteDay: currentText.confirmDeleteDay || 'Are you sure you want to delete all purchases from this day?',
               }}
             />
+        ) : currentView === 'history' ? (
+            <div className="p-4">
+              <button
+                onClick={() => setCurrentView('list')}
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to List
+              </button>
+              <PurchaseHistory
+                historyItems={historyItems}
+                onAddItem={handleAddItemFromHistory}
+                translations={{
+                  title: currentText.purchaseHistory || 'Purchase History',
+                  noHistory: currentText.noPurchaseHistory || 'No purchase history found.',
+                  name: currentText.name || 'Name',
+                  category: currentText.category || 'Category',
+                  lastPurchased: currentText.lastPurchased || 'Last Purchased',
+                  timesPurchased: currentText.timesPurchased || 'times',
+                  addToList: currentText.addToList || 'Add to List',
+                  dateFormat: currentText.dateFormat || 'MMMM d, yyyy'
+                }}
+              />
+            </div>
         ) : currentView === 'legal' ? (
             <LegalPage
               initialTab={'privacy'}

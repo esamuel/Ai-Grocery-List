@@ -160,14 +160,20 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
                   </div>
                 </div>
                 <div className="text-right">
-                  {item.price && (
-                    <div className="font-semibold text-gray-800">
-                      {getCurrencySymbol()}{item.price.toFixed(2)}
-                    </div>
-                  )}
-                  {item.quantity && item.quantity > 1 && (
-                    <div className="text-xs text-gray-500">
-                      ×{item.quantity}
+                  {item.price ? (
+                    <>
+                      <div className="font-semibold text-gray-800">
+                        {getCurrencySymbol()}{item.price.toFixed(2)}
+                      </div>
+                      {item.quantity && item.quantity > 1 && (
+                        <div className="text-xs text-gray-500">
+                          ×{item.quantity}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic">
+                      {item.quantity && item.quantity > 1 ? `×${item.quantity}` : 'No price'}
                     </div>
                   )}
                 </div>

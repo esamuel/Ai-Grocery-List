@@ -4,6 +4,7 @@ import {
   getMonthlySpending,
   getCategoryBreakdown,
   getWeeklyTrend,
+  getMonthlyTrend,
   getCurrencySymbol,
 } from '../services/spendingInsightsService';
 
@@ -19,6 +20,9 @@ interface SpendingInsightsProps {
     weeklyTrend: string;
     thisWeek: string;
     lastWeek: string;
+    monthlyTrend: string;
+    thisMonth: string;
+    lastMonth: string;
     categoryBreakdown: string;
     budget: string;
     remaining: string;
@@ -42,6 +46,11 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
 
   const weeklyTrend = useMemo(
     () => getWeeklyTrend(historyItems, currency),
+    [historyItems, currency]
+  );
+
+  const monthlyTrend = useMemo(
+    () => getMonthlyTrend(historyItems, currency),
     [historyItems, currency]
   );
 
@@ -143,6 +152,44 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
                 <span className="text-2xl">📉</span>
                 <span className="text-sm text-green-600 font-medium">
                   {currencySymbol}{weeklyTrend.change.toFixed(2)} ({weeklyTrend.changePercent.toFixed(1)}%)
+                </span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Monthly Trend */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">{translations.monthlyTrend}</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-sm text-gray-500 mb-1">{translations.thisMonth}</div>
+            <div className="text-2xl font-bold text-gray-800">
+              {currencySymbol}{monthlyTrend.thisMonth.toFixed(2)}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-gray-500 mb-1">{translations.lastMonth}</div>
+            <div className="text-2xl font-bold text-gray-400">
+              {currencySymbol}{monthlyTrend.lastMonth.toFixed(2)}
+            </div>
+          </div>
+        </div>
+        {monthlyTrend.lastMonth > 0 && (
+          <div className="mt-4 flex items-center gap-2">
+            {monthlyTrend.change >= 0 ? (
+              <>
+                <span className="text-2xl">📈</span>
+                <span className="text-sm text-red-600 font-medium">
+                  +{currencySymbol}{monthlyTrend.change.toFixed(2)} ({monthlyTrend.changePercent.toFixed(1)}%)
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-2xl">📉</span>
+                <span className="text-sm text-green-600 font-medium">
+                  {currencySymbol}{monthlyTrend.change.toFixed(2)} ({monthlyTrend.changePercent.toFixed(1)}%)
                 </span>
               </>
             )}
