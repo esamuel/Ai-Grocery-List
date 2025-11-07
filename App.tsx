@@ -25,6 +25,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { PaywallModal } from './components/PaywallModal';
 import { AdBanner } from './components/AdBanner';
 import { LandingPage } from './components/LandingPage';
+import { EnhancedLandingPage } from './components/EnhancedLandingPage';
 import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
@@ -188,6 +189,20 @@ const translations = {
     priceModalTotal: "Total",
     priceModalStore: "Store",
     priceModalStorePlaceholder: "e.g., Rami Levy, Shufersal, Mega...",
+    priceModalQuantity: "Quantity",
+    priceModalUnit: "Unit",
+    priceModalUnitPrice: "Unit Price",
+    priceModalTotalPrice: "Total Price",
+    priceModalOptional: "optional",
+    priceModalUnits: [
+      { value: "kg", label: "kg" },
+      { value: "g", label: "g" },
+      { value: "lb", label: "lb" },
+      { value: "oz", label: "oz" },
+      { value: "l", label: "liter" },
+      { value: "ml", label: "ml" },
+      { value: "piece", label: "piece" }
+    ],
     enablePriceTracking: "Enable Price Tracking",
     priceTrackingDesc: "Track what you spend on groceries",
     // Spending Insights
@@ -202,6 +217,7 @@ const translations = {
     thisMonth: "This Month",
     lastMonth: "Last Month",
     categoryBreakdown: "Category Breakdown",
+    visualBreakdown: "Visual Breakdown",
     budget: "Monthly Budget",
     remaining: "Remaining",
     overBudget: "Over Budget",
@@ -237,6 +253,20 @@ const translations = {
     copyReport: "Copy Report",
     reportCopied: "Report copied to clipboard!",
     recentShoppingDays: "Recent Shopping Days",
+    selectMonth: "Select a Month",
+    noMonths: "No purchase history yet",
+    shoppingDays: "shopping days",
+    backToMonths: "Back to months",
+    deletePurchase: "Delete purchase",
+    confirmDelete: "Are you sure you want to delete this purchase?",
+    deleteDay: "Delete entire day",
+    confirmDeleteDay: "Are you sure you want to delete all purchases from this day?",
+    // Purchase History
+    purchaseHistory: "Purchase History",
+    noPurchaseHistory: "No purchase history found.",
+    name: "Name",
+    timesPurchased: "times",
+    dateFormat: "MMMM d, yyyy",
     // Legal
     legal: "Legal",
     privacyPolicy: "Privacy Policy",
@@ -492,6 +522,20 @@ const translations = {
     priceModalTotal: "סה״כ",
     priceModalStore: "חנות",
     priceModalStorePlaceholder: "למשל, רמי לוי, שופרסל, מגה...",
+    priceModalQuantity: "כמות",
+    priceModalUnit: "יחידה",
+    priceModalUnitPrice: "מחיר ליחידה",
+    priceModalTotalPrice: "מחיר כולל",
+    priceModalOptional: "אופציונלי",
+    priceModalUnits: [
+      { value: "kg", label: "ק״ג" },
+      { value: "g", label: "גרם" },
+      { value: "lb", label: "ליברה" },
+      { value: "oz", label: "אונקייה" },
+      { value: "l", label: "ליטר" },
+      { value: "ml", label: "מ״ל" },
+      { value: "piece", label: "חתיכה" }
+    ],
     enablePriceTracking: "הפעל מעקב מחירים",
     priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
     // Spending Insights
@@ -502,7 +546,11 @@ const translations = {
     weeklyTrend: "מגמה שבועית",
     thisWeek: "השבוע",
     lastWeek: "שבוע שעבר",
+    monthlyTrend: "מגמה חודשית",
+    thisMonth: "החודש",
+    lastMonth: "חודש שעבר",
     categoryBreakdown: "פירוט לפי קטגוריה",
+    visualBreakdown: "פירוט חזותי",
     budget: "תקציב חודשי",
     remaining: "נותר",
     overBudget: "חריגה מהתקציב",
@@ -538,6 +586,20 @@ const translations = {
     copyReport: "העתק דוח",
     reportCopied: "הדוח הועתק ללוח!",
     recentShoppingDays: "ימי קניות אחרונים",
+    selectMonth: "בחר חודש",
+    noMonths: "אין עדיין היסטוריית קניות",
+    shoppingDays: "ימי קניות",
+    backToMonths: "חזור לחודשים",
+    deletePurchase: "מחק רכישה",
+    confirmDelete: "האם אתה בטוח שברצונך למחוק רכישה זו?",
+    deleteDay: "מחק יום שלם",
+    confirmDeleteDay: "האם אתה בטוח שברצונך למחוק את כל הרכישות מיום זה?",
+    // Purchase History
+    purchaseHistory: "היסטוריית קניות",
+    noPurchaseHistory: "לא נמצאה היסטוריית קניות.",
+    name: "שם",
+    timesPurchased: "פעמים",
+    dateFormat: "d MMMM yyyy",
     // Legal
     legal: "מידע משפטי",
     privacyPolicy: "מדיניות פרטיות",
@@ -792,6 +854,20 @@ const translations = {
     priceModalTotal: "Total",
     priceModalStore: "Tienda",
     priceModalStorePlaceholder: "ej., Rami Levy, Shufersal, Mega...",
+    priceModalQuantity: "Cantidad",
+    priceModalUnit: "Unidad",
+    priceModalUnitPrice: "Precio por Unidad",
+    priceModalTotalPrice: "Precio Total",
+    priceModalOptional: "opcional",
+    priceModalUnits: [
+      { value: "kg", label: "kg" },
+      { value: "g", label: "g" },
+      { value: "lb", label: "lb" },
+      { value: "oz", label: "oz" },
+      { value: "l", label: "litro" },
+      { value: "ml", label: "ml" },
+      { value: "piece", label: "pieza" }
+    ],
     enablePriceTracking: "Habilitar Seguimiento de Precios",
     priceTrackingDesc: "Rastrea lo que gastas en comestibles",
     // Spending Insights
@@ -802,7 +878,11 @@ const translations = {
     weeklyTrend: "Tendencia Semanal",
     thisWeek: "Esta Semana",
     lastWeek: "Semana Pasada",
+    monthlyTrend: "Tendencia Mensual",
+    thisMonth: "Este Mes",
+    lastMonth: "Mes Pasado",
     categoryBreakdown: "Desglose por Categoría",
+    visualBreakdown: "Desglose Visual",
     budget: "Presupuesto Mensual",
     remaining: "Restante",
     overBudget: "Sobre Presupuesto",
@@ -838,6 +918,20 @@ const translations = {
     copyReport: "Copiar Reporte",
     reportCopied: "¡Reporte copiado al portapapeles!",
     recentShoppingDays: "Días de Compras Recientes",
+    selectMonth: "Seleccionar un Mes",
+    noMonths: "Aún no hay historial de compras",
+    shoppingDays: "días de compras",
+    backToMonths: "Volver a meses",
+    deletePurchase: "Eliminar compra",
+    confirmDelete: "¿Estás seguro de que quieres eliminar esta compra?",
+    deleteDay: "Eliminar día completo",
+    confirmDeleteDay: "¿Estás seguro de que quieres eliminar todas las compras de este día?",
+    // Purchase History
+    purchaseHistory: "Historial de Compras",
+    noPurchaseHistory: "No se encontró historial de compras.",
+    name: "Nombre",
+    timesPurchased: "veces",
+    dateFormat: "d 'de' MMMM 'de' yyyy",
     // Legal
     legal: "Legal",
     privacyPolicy: "Política de Privacidad",
@@ -1631,7 +1725,7 @@ function App() {
   }, [isInstallable, installApp, currentText, showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
-  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string }[]) => {
+  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string; quantity?: number; unit?: string; unitPrice?: number }[]) => {
     if (!listId) return;
 
     console.log('🔄 Processing completed items with prices:', itemsWithPrices);
@@ -1643,7 +1737,10 @@ function App() {
       category: i.category,
       price: i.price,
       store: i.store,
-      currency: currency
+      currency: currency,
+      quantity: i.quantity,
+      unit: i.unit,
+      unitPrice: i.unitPrice
       })));
       
       console.log('✅ Purchase history updated in Firestore');
@@ -1806,6 +1903,19 @@ function App() {
   if (!user && !isDemoMode) {
     if (showLandingPage) {
       return (
+        <EnhancedLandingPage
+          onGetStarted={() => setShowLandingPage(false)}
+          onLogin={() => setShowLandingPage(false)}
+          language={language}
+          onLanguageChange={setLanguage}
+        />
+      );
+    }
+
+    // Keep old landing page as fallback (commented out for reference)
+    /*
+    if (false) {
+      return (
         <LandingPage
           onGetStarted={() => setShowLandingPage(false)}
           translations={{
@@ -1872,6 +1982,8 @@ function App() {
         />
       );
     }
+    */
+
     return <LoginPage onLogin={() => {}} onDemoMode={handleDemoMode} translations={currentText} />;
   }
 
@@ -2024,7 +2136,7 @@ function App() {
                 console.log('Items with price data:', itemsWithPrice.length);
                 
                 // Flatten all price entries from all items
-                const allPriceEntries: Array<{itemName: string; price: number; store: string; date: string}> = [];
+                const allPriceEntries: Array<{itemName: string; price: number; store: string; date: string; unitPrice?: number; unit?: string; quantity?: number}> = [];
                 itemsWithPrice.forEach(item => {
                   if (item.prices && item.prices.length > 0) {
                     // Add all price entries for this item
@@ -2034,7 +2146,10 @@ function App() {
                           itemName: item.name,
                           price: priceEntry.price,
                           store: priceEntry.store || 'Unknown Store',
-                          date: priceEntry.purchaseDate || item.lastPurchased
+                          date: priceEntry.purchaseDate || item.lastPurchased,
+                          unitPrice: priceEntry.unitPrice,
+                          unit: priceEntry.unit,
+                          quantity: priceEntry.quantity
                         });
                       }
                     });
@@ -2237,6 +2352,7 @@ function App() {
               historyItems={historyItems} 
               currency={currency}
               budget={monthlyBudget > 0 ? monthlyBudget : undefined}
+              language={language}
               translations={{
                 title: currentText.spendingInsights,
                 monthlySpending: currentText.monthlySpending,
@@ -2249,6 +2365,7 @@ function App() {
                 thisMonth: currentText.thisMonth,
                 lastMonth: currentText.lastMonth,
                 categoryBreakdown: currentText.categoryBreakdown,
+                visualBreakdown: currentText.visualBreakdown,
                 budget: currentText.budget,
                 remaining: currentText.remaining,
                 overBudget: currentText.overBudget,
@@ -2261,6 +2378,7 @@ function App() {
               currency={currency}
               listId={listId}
               onDataChange={handleLoadHistoryItems}
+              language={language}
               translations={{
                 selectMonth: currentText.selectMonth || 'Select a Month',
                 noMonths: currentText.noMonths || 'No purchase history yet',
@@ -2640,9 +2758,14 @@ function App() {
           skip: currentText.priceModalSkip,
           save: currentText.priceModalSave,
           total: currentText.priceModalTotal,
-          optional: currentText.priceModalSubtitle,
+          optional: currentText.priceModalOptional,
           store: currentText.priceModalStore,
           storePlaceholder: currentText.priceModalStorePlaceholder,
+          quantity: currentText.priceModalQuantity,
+          unit: currentText.priceModalUnit,
+          unitPrice: currentText.priceModalUnitPrice,
+          totalPrice: currentText.priceModalTotalPrice,
+          units: currentText.priceModalUnits,
         }}
       />
 

@@ -98,7 +98,8 @@ function calculateSpendingInRange(
       if (purchaseDate >= start && purchaseDate <= end &&
           priceEntry.price !== undefined &&
           priceEntry.currency === currency) {
-        total += priceEntry.price * (priceEntry.quantity || 1);
+        // price is already the TOTAL price paid, not unit price
+        total += priceEntry.price;
       }
     });
   });
@@ -197,7 +198,8 @@ export function getCategoryBreakdown(
       if (purchaseDate >= start && purchaseDate <= end &&
           priceEntry.price !== undefined &&
           priceEntry.currency === currency) {
-        const amount = priceEntry.price * (priceEntry.quantity || 1);
+        // price is already the TOTAL price paid, not unit price
+        const amount = priceEntry.price;
         itemTotal += amount;
         itemCount += priceEntry.quantity || 1;
         grandTotal += amount;

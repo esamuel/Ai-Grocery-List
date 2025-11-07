@@ -2,12 +2,15 @@ import React, { useState, useMemo } from 'react';
 import type { PurchaseHistoryItem } from '../types';
 import { getDailyPurchases, type DailyPurchase } from '../services/exportService';
 import { getPurchaseHistory, setPurchaseHistory } from '../services/purchaseHistoryService';
+import { format } from 'date-fns';
+import { he, es } from 'date-fns/locale';
 
 interface MonthlyPurchasesViewProps {
   historyItems: PurchaseHistoryItem[];
   currency: string;
   listId: string;
   onDataChange: () => void;
+  language?: 'en' | 'he' | 'es';
   translations: {
     selectMonth: string;
     noMonths: string;
@@ -36,6 +39,7 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   currency,
   listId,
   onDataChange,
+  language = 'en',
   translations
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -54,7 +58,8 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
     dailyPurchases.forEach(daily => {
       const date = new Date(daily.date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const locale = language === 'he' ? he : language === 'es' ? es : undefined;
+      const monthLabel = format(date, 'MMMM yyyy', { locale });
 
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, {
@@ -90,12 +95,10 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-    });
+    const locale = language === 'he' ? he : language === 'es' ? es : undefined;
+    const showYear = date.getFullYear() !== new Date().getFullYear();
+    const formatStr = showYear ? 'EEE, MMM d, yyyy' : 'EEE, MMM d';
+    return format(date, formatStr, { locale });
   };
 
   const handleDeletePurchase = async (itemName: string, purchaseDate: string, itemPrice?: number, itemStore?: string) => {

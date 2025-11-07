@@ -7,11 +7,14 @@ import {
   getMonthlyTrend,
   getCurrencySymbol,
 } from '../services/spendingInsightsService';
+import { format } from 'date-fns';
+import { he, es } from 'date-fns/locale';
 
 interface SpendingInsightsProps {
   historyItems: PurchaseHistoryItem[];
   currency: string;
   budget?: number;
+  language?: 'en' | 'he' | 'es';
   translations: {
     title: string;
     monthlySpending: string;
@@ -24,6 +27,7 @@ interface SpendingInsightsProps {
     thisMonth: string;
     lastMonth: string;
     categoryBreakdown: string;
+    visualBreakdown: string;
     budget: string;
     remaining: string;
     overBudget: string;
@@ -35,6 +39,7 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
   historyItems,
   currency,
   budget,
+  language = 'en',
   translations,
 }) => {
   const currencySymbol = getCurrencySymbol(currency);
@@ -80,8 +85,8 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
       {/* Header */}
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">{translations.title}</h2>
-        <p className="text-gray-500 mt-1">
-          {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
+          {format(new Date(), 'MMMM yyyy', { locale: language === 'he' ? he : language === 'es' ? es : undefined })}
         </p>
       </div>
 
@@ -122,18 +127,18 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
       )}
 
       {/* Weekly Trend */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">{translations.weeklyTrend}</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">{translations.weeklyTrend}</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="text-sm text-gray-500 mb-1">{translations.thisWeek}</div>
-            <div className="text-2xl font-bold text-gray-800">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{translations.thisWeek}</div>
+            <div className="text-2xl font-bold text-gray-800 dark:text-white">
               {currencySymbol}{weeklyTrend.thisWeek.toFixed(2)}
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-500 mb-1">{translations.lastWeek}</div>
-            <div className="text-2xl font-bold text-gray-400">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{translations.lastWeek}</div>
+            <div className="text-2xl font-bold text-gray-400 dark:text-gray-500">
               {currencySymbol}{weeklyTrend.lastWeek.toFixed(2)}
             </div>
           </div>
@@ -160,18 +165,18 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
       </div>
 
       {/* Monthly Trend */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">{translations.monthlyTrend}</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">{translations.monthlyTrend}</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="text-sm text-gray-500 mb-1">{translations.thisMonth}</div>
-            <div className="text-2xl font-bold text-gray-800">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{translations.thisMonth}</div>
+            <div className="text-2xl font-bold text-gray-800 dark:text-white">
               {currencySymbol}{monthlyTrend.thisMonth.toFixed(2)}
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-500 mb-1">{translations.lastMonth}</div>
-            <div className="text-2xl font-bold text-gray-400">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{translations.lastMonth}</div>
+            <div className="text-2xl font-bold text-gray-400 dark:text-gray-500">
               {currencySymbol}{monthlyTrend.lastMonth.toFixed(2)}
             </div>
           </div>
@@ -223,7 +228,7 @@ export const SpendingInsights: React.FC<SpendingInsightsProps> = ({
         {/* Visual Chart - Pie Chart */}
         {categoryBreakdown.length > 0 && (
           <div className="mt-8 pt-6 border-t border-gray-200">
-            <h4 className="text-sm font-semibold text-gray-600 mb-4 text-center">Visual Breakdown</h4>
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-4 text-center">{translations.visualBreakdown}</h4>
 
             {/* Pie Chart */}
             <div className="flex flex-col items-center">

@@ -5,6 +5,9 @@ interface PriceRecord {
   price: number;
   store: string;
   date: string;
+  unitPrice?: number;
+  unit?: string;
+  quantity?: number;
 }
 
 interface PriceComparePageProps {
@@ -67,46 +70,147 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
     }
   }, [searchQuery, priceHistory]);
 
-  const getItemStats = (itemName: string) => {
+  // Helpers to normalize unit prices to a standard unit per item
+  // Normalize a unit price to a standard unit label
+
+  const normalizePriceToStandard = (unitPrice: number, unit?: string, standardUnit?: string) => {
+    if (!unit || !standardUnit) return { price: unitPrice, unit: unit };
+    const u = unit.toLowerCase();
+    const s = standardUnit.toLowerCase();
+    // Weight conversions to kg or lb
+    if (s === 'kg') {
+      if (u === 'g') return { price: unitPrice * 1000, unit: 'kg' };
+      if (u === 'kg') return { price: unitPrice, unit: 'kg' };
+      if (u === 'lb') return { price: unitPrice / 2.2046226218, unit: 'kg' }; // per lb -> per kg
+      if (u === 'oz') return { price: unitPrice / 0.03527396195, unit: 'kg' }; // per oz -> per kg
+    }
+    if (s === 'lb') {
+      if (u === 'oz') return { price: unitPrice * 16, unit: 'lb' };
+      if (u === 'lb') return { price: unitPrice, unit: 'lb' };
+      if (u === 'kg') return { price: unitPrice / 2.2046226218, unit: 'lb' };
+      if (u === 'g') return { price: unitPrice / 453.59237, unit: 'lb' };
+    }
+    // Volume conversions to liter
+    if (s === 'l') {
+      if (u === 'ml') return { price: unitPrice * 1000, unit: 'l' };
+      if (u === 'l' || u === 'liter') return { price: unitPrice, unit: 'l' };
+    }
+    // Pieces unchanged
+    if (s === 'piece') {
+      return { price: unitPrice, unit: 'piece' };
+    }
+    return { price: unitPrice, unit: unit };
+  };
+
+  const chooseStandardUnit = (history: PriceRecord[]): 'kg' | 'l' | 'piece' | undefined => {
+    const units = history.map(h => h.unit?.toLowerCase()).filter(Boolean) as string[];
+    if (units.some(u => ['kg','g','lb','oz'].includes(u))) return 'kg';
+    if (units.some(u => ['l','liter','ml'].includes(u))) return 'l';
+    if (units.some(u => ['piece','pc'].includes(u))) return 'piece';
+    return undefined;
+  };
+
+  const prettyUnit = (u?: string) => {
+    if (!u) return '';
+    const m: Record<string,string> = { liter: 'l', l: 'l', ml: 'l', kg: 'kg', g: 'kg', lb: 'lb', oz: 'lb', piece: 'pc', pc: 'pc' };
+    return m[u.toLowerCase()] || u;
+  };
+
+  const normalizeItemLabel = (itemName: string, standardUnit?: string) => {
+    if (!standardUnit) return itemName;
+    const unitLabel = standardUnit === 'piece' ? '1 pc' : `1${standardUnit}`;
+    return `${unitLabel} ${itemName}`;
+  };
+
+  type Trend = 'down' | 'up' | 'stable';
+  type CompareMode = 'unit' | 'total';
+  interface Stats {
+    lowest: number;
+    highest: number;
+    average: number;
+    lastPurchase: PriceRecord;
+    history: PriceRecord[];
+    trend: Trend;
+    compareMode: CompareMode;
+    hasUnitPrices: boolean;
+    standardUnit?: 'kg' | 'l' | 'piece';
+  }
+
+  const getItemStats = (itemName: string): Stats | null => {
     const itemHistory = priceHistory.filter(p => p.itemName === itemName);
     if (itemHistory.length === 0) return null;
 
-    const prices = itemHistory.map(h => h.price);
-    const lowest = Math.min(...prices);
-    const highest = Math.max(...prices);
-    const average = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const lastPurchase = itemHistory.sort((a, b) => 
+    // Standard unit for this item
+    const standardUnit = chooseStandardUnit(itemHistory);
+
+    // Check if we have unit prices available for comparison
+    const hasUnitPrices = itemHistory.some(h => h.unitPrice !== undefined && h.unit);
+    const itemsWithUnitPrice = itemHistory
+      .filter(h => h.unitPrice !== undefined && h.unit)
+      .map(h => {
+        const normalized = normalizePriceToStandard(h.unitPrice!, h.unit, standardUnit);
+        return { ...h, unitPrice: normalized.price, unit: normalized.unit };
+      });
+
+    let lowest: number, highest: number, average: number, compareMode: 'unit' | 'total';
+
+    if (hasUnitPrices && itemsWithUnitPrice.length > 0) {
+      // Use unit price for comparison (more accurate)
+      const unitPrices = itemsWithUnitPrice.map(h => h.unitPrice!);
+      lowest = Math.min(...unitPrices);
+      highest = Math.max(...unitPrices);
+      average = unitPrices.reduce((a, b) => a + b, 0) / unitPrices.length;
+      compareMode = 'unit';
+    } else {
+      // Fallback to total price comparison
+      const prices = itemHistory.map(h => h.price);
+      lowest = Math.min(...prices);
+      highest = Math.max(...prices);
+      average = prices.reduce((a, b) => a + b, 0) / prices.length;
+      compareMode = 'total';
+    }
+
+    const lastPurchase = itemHistory.sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )[0];
 
-    // Calculate trend (comparing last price to average)
-    const lastPrice = lastPurchase.price;
-    const trend = lastPrice < average ? 'down' : lastPrice > average ? 'up' : 'stable';
+    // Calculate trend based on comparison mode
+    const lastValue = compareMode === 'unit' && lastPurchase.unitPrice
+      ? normalizePriceToStandard(lastPurchase.unitPrice, lastPurchase.unit, standardUnit).price
+      : lastPurchase.price;
+    const trend = lastValue < average ? 'down' : lastValue > average ? 'up' : 'stable';
 
     return {
       lowest,
       highest,
       average,
       lastPurchase,
-      history: itemHistory.sort((a, b) => 
+      history: (hasUnitPrices ? itemsWithUnitPrice : itemHistory).sort((a, b) =>
         new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
-      trend
+      trend,
+      compareMode,
+      hasUnitPrices,
+      standardUnit
     };
   };
 
   // Get unique items
-  const uniqueItems = Array.from(new Set(priceHistory.map(p => p.itemName)));
+  const uniqueItems: string[] = Array.from(new Set<string>(priceHistory.map((p) => p.itemName)));
 
   // Get best deals (items currently at their lowest price)
+  type ItemStats = (Stats & { itemName: string }) | null;
   const bestDeals = uniqueItems
-    .map(itemName => {
+    .map<ItemStats>((itemName) => {
       const stats = getItemStats(itemName);
       if (!stats) return null;
-      const isLowest = stats.lastPurchase.price === stats.lowest;
-      return isLowest ? { itemName, ...stats } : null;
+      const lastValue = stats.compareMode === 'unit' && stats.lastPurchase.unitPrice
+        ? normalizePriceToStandard(stats.lastPurchase.unitPrice, stats.lastPurchase.unit, stats.standardUnit).price
+        : stats.lastPurchase.price;
+      const isLowest = lastValue === stats.lowest;
+      return isLowest ? ({ itemName, ...stats }) : null;
     })
-    .filter(Boolean)
+    .filter((x): x is NonNullable<ItemStats> => x !== null)
     .slice(0, 5);
 
   return (
@@ -204,10 +308,13 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                 onClick={() => setSelectedItem(deal.itemName)}
               >
                 <div className="font-bold text-gray-800 dark:text-white mb-2">
-                  {deal.itemName}
+                  {normalizeItemLabel(deal.itemName, deal.standardUnit)}
                 </div>
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   ₪{deal.lowest.toFixed(2)}
+                  {deal.compareMode === 'unit' && (
+                    <span className="text-sm font-normal text-gray-600 dark:text-gray-400">/{prettyUnit(deal.standardUnit)}</span>
+                  )}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   {deal.lastPurchase.store}
@@ -293,7 +400,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-gray-800 dark:text-white">
-                        {itemName}
+                        {normalizeItemLabel(itemName, stats.standardUnit)}
                       </h3>
                       <span className="text-2xl">
                         {stats.trend === 'down' ? '📉' : stats.trend === 'up' ? '📈' : '➡️'}
@@ -307,6 +414,9 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                         </div>
                         <div className="text-lg font-bold text-green-600 dark:text-green-400">
                           ₪{stats.lowest.toFixed(2)}
+                          {stats.compareMode === 'unit' && (
+                            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/{prettyUnit(stats.standardUnit)}</span>
+                          )}
                         </div>
                       </div>
                       <div>
@@ -315,6 +425,9 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                         </div>
                         <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                           ₪{stats.average.toFixed(2)}
+                          {stats.compareMode === 'unit' && (
+                            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/{prettyUnit(stats.standardUnit)}</span>
+                          )}
                         </div>
                       </div>
                       <div>
@@ -323,6 +436,9 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                         </div>
                         <div className="text-lg font-bold text-red-600 dark:text-red-400">
                           ₪{stats.highest.toFixed(2)}
+                          {stats.compareMode === 'unit' && (
+                            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/{prettyUnit(stats.standardUnit)}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -344,27 +460,49 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                         {translations.priceHistory}
                       </h4>
                       <div className="space-y-2">
-                        {stats.history.map((record, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 shadow-sm"
-                          >
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-800 dark:text-white">
-                                {record.store}
+                        {stats.history.map((record: any, idx: number) => {
+                          const isLowestInComparison = stats.compareMode === 'unit'
+                            ? record.unitPrice === stats.lowest
+                            : record.price === stats.lowest;
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 shadow-sm"
+                            >
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-800 dark:text-white">
+                                  {record.store}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(record.date).toLocaleDateString()}
+                                  {record.quantity && record.unit && (
+                                    <span className="ml-2">• {record.quantity} {prettyUnit(record.unit)}</span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(record.date).toLocaleDateString()}
+                              <div className="text-right">
+                                {record.unitPrice && record.unit ? (
+                                  <>
+                                    <div className="text-lg font-bold text-gray-800 dark:text-white">
+                                      ₪{record.unitPrice.toFixed(2)}/{prettyUnit(stats.standardUnit || record.unit)}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      ₪{record.price.toFixed(2)} total
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-lg font-bold text-gray-800 dark:text-white">
+                                    ₪{record.price.toFixed(2)}
+                                  </div>
+                                )}
                               </div>
+                              {isLowestInComparison && (
+                                <span className="ml-2 text-green-500">🏆</span>
+                              )}
                             </div>
-                            <div className="text-lg font-bold text-gray-800 dark:text-white">
-                              ₪{record.price.toFixed(2)}
-                            </div>
-                            {record.price === stats.lowest && (
-                              <span className="ml-2 text-green-500">🏆</span>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

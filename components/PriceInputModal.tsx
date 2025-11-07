@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import type { GroceryItem } from '../types';
 
+interface UnitOption {
+  value: string;
+  label: string;
+}
+
 interface PriceInputModalProps {
   isOpen: boolean;
   completedItems: GroceryItem[];
   currency: string;
   onClose: () => void;
-  onSubmit: (itemsWithPrices: { name: string; category: string; price?: number; store?: string }[]) => void;
+  onSubmit: (itemsWithPrices: {
+    name: string;
+    category: string;
+    price?: number;
+    store?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+  }[]) => void;
   translations: {
     title: string;
     subtitle: string;
@@ -16,6 +29,11 @@ interface PriceInputModalProps {
     optional: string;
     store?: string;
     storePlaceholder?: string;
+    quantity?: string;
+    unit?: string;
+    unitPrice?: string;
+    totalPrice?: string;
+    units?: UnitOption[];
   };
 }
 
@@ -28,6 +46,9 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
   translations
 }) => {
   const [prices, setPrices] = useState<Record<string, string>>({});
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [units, setUnits] = useState<Record<string, string>>({});
+  const [unitPrices, setUnitPrices] = useState<Record<string, string>>({});
   const [storeName, setStoreName] = useState<string>('');
 
   if (!isOpen) return null;
@@ -36,6 +57,42 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
     // Only allow numbers and one decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setPrices(prev => ({ ...prev, [itemName]: value }));
+
+      // Auto-calculate unit price if quantity and unit exist
+      if (quantities[itemName] && units[itemName] && value) {
+        const quantity = parseFloat(quantities[itemName]);
+        const totalPrice = parseFloat(value);
+        if (quantity > 0) {
+          const unitPrice = totalPrice / quantity;
+          setUnitPrices(prev => ({ ...prev, [itemName]: unitPrice.toFixed(2) }));
+        }
+      }
+    }
+  };
+
+  const handleQuantityChange = (itemName: string, value: string) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setQuantities(prev => ({ ...prev, [itemName]: value }));
+      // Auto-calculate total if unit price exists
+      if (unitPrices[itemName] && value) {
+        const total = parseFloat(value) * parseFloat(unitPrices[itemName]);
+        setPrices(prev => ({ ...prev, [itemName]: total.toFixed(2) }));
+      }
+    }
+  };
+
+  const handleUnitChange = (itemName: string, value: string) => {
+    setUnits(prev => ({ ...prev, [itemName]: value }));
+  };
+
+  const handleUnitPriceChange = (itemName: string, value: string) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setUnitPrices(prev => ({ ...prev, [itemName]: value }));
+      // Auto-calculate total if quantity exists
+      if (quantities[itemName] && value) {
+        const total = parseFloat(quantities[itemName]) * parseFloat(value);
+        setPrices(prev => ({ ...prev, [itemName]: total.toFixed(2) }));
+      }
     }
   };
 
@@ -47,6 +104,9 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
     }));
     onSubmit(itemsWithoutPrices);
     setPrices({});
+    setQuantities({});
+    setUnits({});
+    setUnitPrices({});
     setStoreName('');
     onClose();
   };
@@ -57,9 +117,15 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
       category: item.category,
       price: prices[item.name] ? parseFloat(prices[item.name]) : undefined,
       store: storeName || undefined,
+      quantity: quantities[item.name] ? parseFloat(quantities[item.name]) : undefined,
+      unit: units[item.name] || undefined,
+      unitPrice: unitPrices[item.name] ? parseFloat(unitPrices[item.name]) : undefined,
     }));
     onSubmit(itemsWithPrices);
     setPrices({});
+    setQuantities({});
+    setUnits({});
+    setUnitPrices({});
     setStoreName('');
     onClose();
   };
@@ -108,22 +174,88 @@ export const PriceInputModal: React.FC<PriceInputModalProps> = ({
           />
         </div>
 
-        <div className="space-y-3 mb-4">
+        <div className="space-y-4 mb-4">
           {completedItems.map((item) => (
-            <div key={item.id} className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="font-medium text-gray-800">{item.name}</p>
-                <p className="text-xs text-gray-500">{item.category}</p>
+            <div key={item.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{item.name}</p>
+                  <p className="text-xs text-gray-500">{item.category}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-600">{symbol}</span>
+
+              {/* Quantity, Unit, and Unit Price Row */}
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">
+                    {translations.quantity || 'Qty'} <span className="text-gray-400">({translations.optional})</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={quantities[item.name] || ''}
+                    onChange={(e) => handleQuantityChange(item.name, e.target.value)}
+                    placeholder="2"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">
+                    {translations.unit || 'Unit'} <span className="text-gray-400">({translations.optional})</span>
+                  </label>
+                  <select
+                    value={units[item.name] || ''}
+                    onChange={(e) => handleUnitChange(item.name, e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">-</option>
+                    {translations.units?.map((unitOpt) => (
+                      <option key={unitOpt.value} value={unitOpt.value}>
+                        {unitOpt.label}
+                      </option>
+                    )) || (
+                      <>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="lb">lb</option>
+                        <option value="oz">oz</option>
+                        <option value="l">liter</option>
+                        <option value="ml">ml</option>
+                        <option value="piece">piece</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">
+                    {translations.unitPrice || 'Unit Price'} <span className="text-gray-400">({translations.optional})</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-600">{symbol}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={unitPrices[item.name] || ''}
+                      onChange={(e) => handleUnitPriceChange(item.name, e.target.value)}
+                      placeholder="6.00"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Price Row */}
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">
+                  {translations.totalPrice || 'Total Price'} {symbol}
+                </label>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={prices[item.name] || ''}
                   onChange={(e) => handlePriceChange(item.name, e.target.value)}
-                  placeholder="0.00"
-                  className="w-20 px-2 py-1.5 border border-gray-300 rounded-md text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="12.00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>

@@ -116,7 +116,7 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
 // Add or increment item in purchase history
 export async function addOrIncrementPurchase(
   listId: string,
-  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number }[]
+  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number; unit?: string; unitPrice?: number }[]
 ): Promise<void> {
   const current = await getPurchaseHistory(listId);
   const map = new Map<string, PurchaseHistoryItem>();
@@ -166,9 +166,33 @@ export async function addOrIncrementPurchase(
         priceEntry.currency = purchase.currency || 'USD';
       }
 
+      // Add unit information if provided
+      if (purchase.unit) {
+        priceEntry.unit = purchase.unit;
+      }
+
+      // Add/compute unitPrice when possible
+      if (purchase.unitPrice !== undefined && purchase.unitPrice > 0) {
+        priceEntry.unitPrice = purchase.unitPrice;
+      } else if (hasPriceData && purchase.quantity && purchase.quantity > 0) {
+        priceEntry.unitPrice = Number((purchase.price! / purchase.quantity).toFixed(4));
+      }
+
       // Add store if provided
       if (purchase.store && purchase.store.trim() !== '') {
         priceEntry.store = purchase.store;
+      }
+
+      // Add unit information if provided
+      if (purchase.unit) {
+        priceEntry.unit = purchase.unit;
+      }
+
+      // Add/compute unitPrice when possible
+      if (purchase.unitPrice !== undefined && purchase.unitPrice > 0) {
+        priceEntry.unitPrice = purchase.unitPrice;
+      } else if (hasPriceData && purchase.quantity && purchase.quantity > 0) {
+        priceEntry.unitPrice = Number((purchase.price! / purchase.quantity).toFixed(4));
       }
 
       // Add to price history

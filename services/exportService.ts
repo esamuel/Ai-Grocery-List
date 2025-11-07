@@ -60,9 +60,11 @@ export function getDailyPurchases(
       }
 
       const daily = dailyMap.get(date)!;
-      const itemPrice = priceEntry.price; // Keep as undefined if not provided
+      const itemPrice = priceEntry.price; // IMPORTANT: This is already the TOTAL price paid, not unit price
       const quantity = priceEntry.quantity || 1;
-      const totalPrice = itemPrice ? (itemPrice * quantity) : 0;
+      
+      // Price is the TOTAL paid, so we add it directly (not multiply by quantity)
+      const totalPrice = itemPrice || 0;
 
       daily.items.push({
         name: item.name,
@@ -110,13 +112,14 @@ export function getMonthlySummary(
   });
   
   // Get top categories
+  // IMPORTANT: price is the TOTAL paid, not unit price
   const categoryMap = new Map<string, { count: number; spent: number }>();
   monthlyPurchases.forEach(daily => {
     daily.items.forEach(item => {
       const existing = categoryMap.get(item.category) || { count: 0, spent: 0 };
       categoryMap.set(item.category, {
         count: existing.count + 1,
-        spent: existing.spent + (item.price || 0) * (item.quantity || 1)
+        spent: existing.spent + (item.price || 0) // Price is already total, don't multiply
       });
     });
   });
@@ -143,7 +146,8 @@ export function exportDailyPurchasesToCSV(dailyPurchases: DailyPurchase[]): stri
   
   dailyPurchases.forEach(daily => {
     daily.items.forEach(item => {
-      const total = (item.price || 0) * (item.quantity || 1);
+      // Price is already the TOTAL paid, so use it directly (not multiply by quantity)
+      const total = item.price || 0;
       rows.push([
         daily.date,
         `"${item.name}"`,

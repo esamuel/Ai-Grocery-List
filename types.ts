@@ -36,11 +36,15 @@ export interface PurchaseHistoryItem {
 
 // Price history entry
 export interface PriceHistory {
-  price: number;
+  price: number; // Total price paid
   currency: string;
   purchaseDate: string; // ISO date string
   store?: string; // Optional: which store
-  quantity?: number; // How many bought at this price
+  quantity?: number; // How many bought at this price (e.g., 2kg)
+
+  // NEW: Unit price tracking (for accurate store comparison)
+  unitPrice?: number; // Price per unit (e.g., ₪6/kg)
+  unit?: string; // Unit type: 'kg', 'lb', 'g', 'piece', 'liter', 'ml', etc.
 }
 
 // User settings for price tracking

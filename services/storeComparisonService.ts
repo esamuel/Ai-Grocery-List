@@ -14,7 +14,8 @@ export interface BestStoreResult {
 }
 
 /**
- * Get average price per store for an item
+ * Get average UNIT price per store for an item
+ * This allows accurate comparison between stores even when quantities differ
  */
 export function getPricesByStore(item: PurchaseHistoryItem): StorePrice[] {
   if (!item.prices || item.prices.length === 0) {
@@ -32,13 +33,23 @@ export function getPricesByStore(item: PurchaseHistoryItem): StorePrice[] {
     const storeName = priceEntry.store;
     const existing = storeMap.get(storeName) || { total: 0, count: 0 };
 
-    existing.total += priceEntry.price * (priceEntry.quantity || 1);
-    existing.count += priceEntry.quantity || 1;
+    // Use unitPrice if available (calculated at purchase time), otherwise calculate from price/quantity
+    // unitPrice is per unit, quantity is the amount bought
+    let unitPrice = priceEntry.unitPrice;
+    if (unitPrice === undefined && priceEntry.price !== undefined && priceEntry.quantity) {
+      // Calculate unit price if not stored
+      unitPrice = priceEntry.price / priceEntry.quantity;
+    }
 
-    // Track most recent price
-    if (!existing.lastDate || priceEntry.purchaseDate > existing.lastDate) {
-      existing.lastPrice = priceEntry.price;
-      existing.lastDate = priceEntry.purchaseDate;
+    if (unitPrice !== undefined) {
+      existing.total += unitPrice;
+      existing.count += 1;
+
+      // Track most recent price
+      if (!existing.lastDate || priceEntry.purchaseDate > existing.lastDate) {
+        existing.lastPrice = unitPrice;
+        existing.lastDate = priceEntry.purchaseDate;
+      }
     }
 
     storeMap.set(storeName, existing);
@@ -47,12 +58,14 @@ export function getPricesByStore(item: PurchaseHistoryItem): StorePrice[] {
   // Convert to array and calculate averages
   const storePrices: StorePrice[] = [];
   storeMap.forEach((data, store) => {
-    storePrices.push({
-      store,
-      avgPrice: data.total / data.count,
-      lastPrice: data.lastPrice,
-      purchaseCount: data.count,
-    });
+    if (data.count > 0) {
+      storePrices.push({
+        store,
+        avgPrice: data.total / data.count,
+        lastPrice: data.lastPrice,
+        purchaseCount: data.count,
+      });
+    }
   });
 
   // Sort by average price (cheapest first)
