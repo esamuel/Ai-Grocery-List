@@ -39,10 +39,6 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
     return dailyPurchases.find(daily => daily.date === selectedDate) || null;
   }, [dailyPurchases, selectedDate]);
 
-  const availableDates = useMemo(() => {
-    return dailyPurchases.map(daily => daily.date).slice(0, 30); // Last 30 days
-  }, [dailyPurchases]);
-
   const handleExportCSV = () => {
     const csv = exportDailyPurchasesToCSV(dailyPurchases);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -66,12 +62,20 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       weekday: 'short',
-      month: 'short', 
+      month: 'short',
       day: 'numeric',
       year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
     });
+  };
+
+  const formatCardDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    return { weekday, day, month };
   };
 
   const getCurrencySymbol = () => {
@@ -114,32 +118,51 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
         </div>
       )}
 
-      {/* Date Selection */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">{translations.selectDate}</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {availableDates.map(date => (
-            <button
-              key={date}
-              onClick={() => setSelectedDate(date)}
-              className={`p-2 text-sm rounded-lg border transition-colors ${
-                selectedDate === date
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              <div className="font-medium">{new Date(date).getDate()}</div>
-              <div className="text-xs opacity-75">
-                {new Date(date).toLocaleDateString('en-US', { month: 'short' })}
-              </div>
-            </button>
-          ))}
+      {/* Shopping Days Grid - Card View */}
+      {!selectedDate && dailyPurchases.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">📅 {translations.recentShoppingDays}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {dailyPurchases.slice(0, 30).map(daily => {
+              const { weekday, day, month } = formatCardDate(daily.date);
+              return (
+                <button
+                  key={daily.date}
+                  onClick={() => setSelectedDate(daily.date)}
+                  className="bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 hover:border-blue-400 rounded-xl p-4 transition-all transform hover:scale-105 active:scale-95 text-left"
+                >
+                  <div className="flex flex-col">
+                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">{weekday}</div>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <div className="text-3xl font-bold text-gray-800">{day}</div>
+                      <div className="text-sm font-medium text-gray-600">{month}</div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-blue-200">
+                      <div className="text-xs text-gray-500">{daily.items.length} {translations.items}</div>
+                      <div className="text-lg font-bold text-green-600 mt-1">
+                        {getCurrencySymbol()}{daily.totalSpent.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Selected Day Details */}
       {selectedDayPurchases ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          {/* Back Button */}
+          <button
+            onClick={() => setSelectedDate('')}
+            className="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
+          >
+            <span className="text-xl">←</span>
+            <span>Back to calendar</span>
+          </button>
+
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
               📅 {formatDate(selectedDayPurchases.date)}
@@ -184,35 +207,16 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
         </div>
       ) : selectedDate ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <button
+            onClick={() => setSelectedDate('')}
+            className="mb-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
+          >
+            <span className="text-xl">←</span>
+            <span>Back to calendar</span>
+          </button>
           <p className="text-gray-500">{translations.noPurchases}</p>
         </div>
       ) : null}
-
-      {/* Recent Days Summary */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">📅 {translations.recentShoppingDays}</h3>
-        <div className="space-y-2">
-          {dailyPurchases.slice(0, 7).map(daily => (
-            <div 
-              key={daily.date}
-              className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-              onClick={() => setSelectedDate(daily.date)}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-600">
-                  {formatDate(daily.date)}
-                </span>
-                <span className="text-sm text-gray-500">
-                  {daily.items.length} {translations.items}
-                </span>
-              </div>
-              <div className="font-semibold text-green-600">
-                {getCurrencySymbol()}{daily.totalSpent.toFixed(2)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
