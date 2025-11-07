@@ -128,7 +128,9 @@ function countItemsInRange(
       if (isNaN(purchaseDate.getTime())) return;
 
       if (purchaseDate >= start && purchaseDate <= end) {
-        count += priceEntry.quantity || 1;
+        // Count each purchase as 1 item (not by quantity)
+        // This gives "average per purchase" rather than "average per unit"
+        count += 1;
       }
     });
   });

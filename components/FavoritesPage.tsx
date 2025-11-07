@@ -99,15 +99,21 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
 
     // Then filter/limit based on mode
     if (sortMode === 'recent') {
-      // Show only TODAY's purchases
+      // Show only items with purchases made TODAY
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1); // Start of tomorrow
 
       items = items.filter(item => {
-        const lastPurchased = new Date(item.lastPurchased);
-        return lastPurchased >= today && lastPurchased < tomorrow;
+        // Check if item has any purchase in the prices array that was made today
+        if (!item.prices || item.prices.length === 0) return false;
+
+        return item.prices.some(priceEntry => {
+          if (!priceEntry.purchaseDate) return false;
+          const purchaseDate = new Date(priceEntry.purchaseDate);
+          return purchaseDate >= today && purchaseDate < tomorrow;
+        });
       });
     } else {
       // For other modes, filter to only show items from the current language starter list
