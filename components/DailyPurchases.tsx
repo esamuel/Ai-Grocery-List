@@ -118,105 +118,60 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
         </div>
       )}
 
-      {/* Shopping Days Grid - Card View */}
-      {!selectedDate && dailyPurchases.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">📅 {translations.recentShoppingDays}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {dailyPurchases.slice(0, 30).map(daily => {
-              const { weekday, day, month } = formatCardDate(daily.date);
-              return (
-                <button
-                  key={daily.date}
-                  onClick={() => setSelectedDate(daily.date)}
-                  className="bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 hover:border-blue-400 rounded-xl p-4 transition-all transform hover:scale-105 active:scale-95 text-left"
-                >
-                  <div className="flex flex-col">
-                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">{weekday}</div>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <div className="text-3xl font-bold text-gray-800">{day}</div>
-                      <div className="text-sm font-medium text-gray-600">{month}</div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-blue-200">
-                      <div className="text-xs text-gray-500">{daily.items.length} {translations.items}</div>
-                      <div className="text-lg font-bold text-green-600 mt-1">
-                        {getCurrencySymbol()}{daily.totalSpent.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Selected Day Details */}
-      {selectedDayPurchases ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          {/* Back Button */}
-          <button
-            onClick={() => setSelectedDate('')}
-            className="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
-          >
-            <span className="text-xl">←</span>
-            <span>Back to calendar</span>
-          </button>
-
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              📅 {formatDate(selectedDayPurchases.date)}
-            </h3>
-            <div className="text-lg font-bold text-green-600">
-              {getCurrencySymbol()}{selectedDayPurchases.totalSpent.toFixed(2)}
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            {selectedDayPurchases.items.map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium text-gray-800">{item.name}</div>
-                  <div className="text-sm text-gray-500">
-                    {item.category}
-                    {item.store && ` • 🏪 ${item.store}`}
-                    {item.quantity && item.unit && ` • ${item.quantity}${item.unit}`}
-                  </div>
+      {/* Daily Purchases List - All Days */}
+      {dailyPurchases.length > 0 ? (
+        <div className="space-y-4">
+          {dailyPurchases.slice(0, 30).map(daily => (
+            <div key={daily.date} className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-lg font-semibold text-gray-800">
+                  {formatDate(daily.date)}
                 </div>
-                <div className="text-right">
-                  {item.price ? (
-                    <>
-                      <div className="font-semibold text-gray-800">
-                        {getCurrencySymbol()}{item.price.toFixed(2)}
-                      </div>
-                      {item.unitPrice && item.unit && (
-                        <div className="text-xs text-gray-500">
-                          {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-xs text-gray-400 italic">
-                      No price
-                    </div>
-                  )}
+                <div className="text-xl font-bold text-blue-600">
+                  {getCurrencySymbol()}{daily.totalSpent.toFixed(2)}
                 </div>
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-2">
+                {daily.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-start text-sm border-t border-gray-100 pt-2">
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-700">{item.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {item.store && <span>🏪 {item.store}</span>}
+                        {item.quantity && item.unit && (
+                          <span className="ml-2">{item.quantity}{item.unit}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {item.price !== undefined ? (
+                        <>
+                          <div className="text-gray-600 font-medium">
+                            {getCurrencySymbol()}{item.price.toFixed(2)}
+                          </div>
+                          {item.unitPrice && item.unit && (
+                            <div className="text-xs text-gray-500">
+                              {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      ) : selectedDate ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-          <button
-            onClick={() => setSelectedDate('')}
-            className="mb-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition-colors"
-          >
-            <span className="text-xl">←</span>
-            <span>Back to calendar</span>
-          </button>
+      ) : (
+        <div className="text-center py-20 bg-white rounded-lg shadow-sm">
+          <div className="text-6xl mb-4">📅</div>
           <p className="text-gray-500">{translations.noPurchases}</p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 };
