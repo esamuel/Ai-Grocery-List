@@ -74,8 +74,7 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     }
 
     // For all other modes, use user's purchase history
-    // Filter to only show items from the current language
-    let items = historyItems.filter(item => currentLanguageItemNames.has(item.name));
+    let items = [...historyItems];
 
     // Sort first
     items.sort((a, b) => {
@@ -102,17 +101,22 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     if (sortMode === 'recent') {
       // Show only TODAY's purchases
       const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1); // Start of tomorrow
+
       items = items.filter(item => {
         const lastPurchased = new Date(item.lastPurchased);
-        return (
-          today.getFullYear() === lastPurchased.getFullYear() &&
-          today.getMonth() === lastPurchased.getMonth() &&
-          today.getDate() === lastPurchased.getDate()
-        );
+        return lastPurchased >= today && lastPurchased < tomorrow;
       });
-    } else if (sortMode === 'frequency') {
-      // Limit to top 40 most frequent items
-      items = items.slice(0, 40);
+    } else {
+      // For other modes, filter to only show items from the current language starter list
+      items = items.filter(item => currentLanguageItemNames.has(item.name));
+
+      if (sortMode === 'frequency') {
+        // Limit to top 40 most frequent items
+        items = items.slice(0, 40);
+      }
     }
 
     return items;
