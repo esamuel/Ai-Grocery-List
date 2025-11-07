@@ -1,7 +1,8 @@
 
 import React from 'react';
-import type { Category } from '../types';
+import type { Category, PurchaseHistoryItem, GroceryItem } from '../types';
 import { CategorySection } from './CategorySection';
+import { InlinePriceEntry } from './InlinePriceEntry';
 
 interface GroceryListProps {
   categories: Category[];
@@ -14,9 +15,49 @@ interface GroceryListProps {
     subtitle: string;
   };
   addAllText?: string;
+  // Inline price entry props
+  showInlinePriceEntry?: boolean;
+  completedItems?: GroceryItem[];
+  purchaseHistory?: PurchaseHistoryItem[];
+  currency?: string;
+  onInlinePriceSave?: (itemsWithPrices: {
+    name: string;
+    category: string;
+    price?: number;
+    store?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+  }[]) => void;
+  onInlinePriceCancel?: () => void;
+  inlinePriceTranslations?: {
+    storeName: string;
+    storePlaceholder: string;
+    price: string;
+    lastPrice: string;
+    saveAll: string;
+    cancel: string;
+    optional: string;
+    at: string;
+  };
 }
 
-export const GroceryList: React.FC<GroceryListProps> = ({ categories, onToggleItem, onDeleteItem, onAddAllInCategory, onMoveToFavorites, emptyState, addAllText }) => {
+export const GroceryList: React.FC<GroceryListProps> = ({
+  categories,
+  onToggleItem,
+  onDeleteItem,
+  onAddAllInCategory,
+  onMoveToFavorites,
+  emptyState,
+  addAllText,
+  showInlinePriceEntry,
+  completedItems,
+  purchaseHistory,
+  currency,
+  onInlinePriceSave,
+  onInlinePriceCancel,
+  inlinePriceTranslations
+}) => {
   if (categories.length === 0) {
     return (
       <div className="text-center py-20">
@@ -29,6 +70,18 @@ export const GroceryList: React.FC<GroceryListProps> = ({ categories, onToggleIt
 
   return (
     <div className="space-y-6">
+      {/* Inline Price Entry */}
+      {showInlinePriceEntry && completedItems && completedItems.length > 0 && inlinePriceTranslations && (
+        <InlinePriceEntry
+          completedItems={completedItems}
+          purchaseHistory={purchaseHistory || []}
+          currency={currency || 'USD'}
+          onSave={onInlinePriceSave!}
+          onCancel={onInlinePriceCancel!}
+          translations={inlinePriceTranslations}
+        />
+      )}
+
       {categories.map(category => (
         <CategorySection
           key={category.name}

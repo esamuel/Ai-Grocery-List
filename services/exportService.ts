@@ -9,6 +9,8 @@ export interface DailyPurchase {
     currency?: string;
     store?: string;
     quantity?: number;
+    unit?: string;
+    unitPrice?: number;
   }>;
   totalSpent: number;
   currency: string;
@@ -72,7 +74,9 @@ export function getDailyPurchases(
         price: itemPrice, // Can be undefined
         currency: priceEntry.currency || currency,
         store: priceEntry.store,
-        quantity
+        quantity,
+        unit: priceEntry.unit,
+        unitPrice: priceEntry.unitPrice
       });
 
       daily.totalSpent += totalPrice;

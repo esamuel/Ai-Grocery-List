@@ -157,6 +157,7 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
                   <div className="text-sm text-gray-500">
                     {item.category}
                     {item.store && ` • 🏪 ${item.store}`}
+                    {item.quantity && item.unit && ` • ${item.quantity}${item.unit}`}
                   </div>
                 </div>
                 <div className="text-right">
@@ -165,15 +166,15 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
                       <div className="font-semibold text-gray-800">
                         {getCurrencySymbol()}{item.price.toFixed(2)}
                       </div>
-                      {item.quantity && item.quantity > 1 && (
+                      {item.unitPrice && item.unit && (
                         <div className="text-xs text-gray-500">
-                          ×{item.quantity}
+                          {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="text-xs text-gray-400 italic">
-                      {item.quantity && item.quantity > 1 ? `×${item.quantity}` : 'No price'}
+                      No price
                     </div>
                   )}
                 </div>

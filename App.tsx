@@ -194,6 +194,14 @@ const translations = {
     priceModalUnitPrice: "Unit Price",
     priceModalTotalPrice: "Total Price",
     priceModalOptional: "optional",
+    // Inline Price Entry
+    inlinePriceStoreName: "Store Name",
+    inlinePriceStorePlaceholder: "e.g., Walmart, Target, Kroger...",
+    inlinePriceLabel: "Price",
+    inlinePriceLastPrice: "Last price",
+    inlinePriceSaveAll: "Save All",
+    inlinePriceCancel: "Skip",
+    inlinePriceAt: "at",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -527,6 +535,14 @@ const translations = {
     priceModalUnitPrice: "מחיר ליחידה",
     priceModalTotalPrice: "מחיר כולל",
     priceModalOptional: "אופציונלי",
+    // Inline Price Entry
+    inlinePriceStoreName: "שם החנות",
+    inlinePriceStorePlaceholder: "למשל, רמי לוי, שופרסל, מגה...",
+    inlinePriceLabel: "מחיר",
+    inlinePriceLastPrice: "מחיר אחרון",
+    inlinePriceSaveAll: "שמור הכל",
+    inlinePriceCancel: "דלג",
+    inlinePriceAt: "ב",
     priceModalUnits: [
       { value: "kg", label: "ק״ג" },
       { value: "g", label: "גרם" },
@@ -859,6 +875,14 @@ const translations = {
     priceModalUnitPrice: "Precio por Unidad",
     priceModalTotalPrice: "Precio Total",
     priceModalOptional: "opcional",
+    // Inline Price Entry
+    inlinePriceStoreName: "Nombre de la Tienda",
+    inlinePriceStorePlaceholder: "ej., Walmart, Soriana, Chedraui...",
+    inlinePriceLabel: "Precio",
+    inlinePriceLastPrice: "Último precio",
+    inlinePriceSaveAll: "Guardar Todo",
+    inlinePriceCancel: "Saltar",
+    inlinePriceAt: "en",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -1199,7 +1223,8 @@ function App() {
   });
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [pendingCompletedItems, setPendingCompletedItems] = useState<GroceryItem[]>([]);
-  
+  const [showInlinePriceEntry, setShowInlinePriceEntry] = useState(false);
+
   // Get list ID and other states from auth
   const [listId, setListId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -1763,24 +1788,54 @@ function App() {
     if (completedItems.length === 0) return;
 
     console.log('🧹 Clearing completed items:', completedItems.length);
+    console.log('💰 Price tracking enabled:', enablePriceTracking);
 
-    // If price tracking is enabled, show the price modal
+    // If price tracking is enabled, show the inline price entry
+    // DON'T remove items yet - they'll be removed when user saves/cancels
     if (enablePriceTracking) {
+      console.log('✅ Showing inline price entry for', completedItems.length, 'items');
       setPendingCompletedItems(completedItems);
-      setShowPriceModal(true);
+      setShowInlinePriceEntry(true);
+      // Scroll to top so user sees the inline entry
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // Otherwise, add items without prices
+    console.log('⚠️ Price tracking disabled, clearing items without prices');
+    // Otherwise, add items without prices and remove them
     await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
   }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
 
+  const handleInlinePriceSave = useCallback(async (itemsWithPrices: {
+    name: string;
+    category: string;
+    price?: number;
+    store?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+  }[]) => {
+    console.log('💾 Inline price entry save:', itemsWithPrices);
+    setShowInlinePriceEntry(false);
+    setPendingCompletedItems([]);
+    await handleCompletedItemsWithPrices(itemsWithPrices);
+  }, [handleCompletedItemsWithPrices]);
+
+  const handleInlinePriceCancel = useCallback(async () => {
+    console.log('❌ Inline price entry cancelled, saving without prices');
+    setShowInlinePriceEntry(false);
+    const itemsToSave = pendingCompletedItems.map(i => ({ name: i.name, category: i.category }));
+    setPendingCompletedItems([]);
+    // Save without prices
+    await handleCompletedItemsWithPrices(itemsToSave);
+  }, [handleCompletedItemsWithPrices, pendingCompletedItems]);
+
   const handleAddAllInCategory = useCallback((categoryName: string) => {
     // Find all items in the specified category from favorites/history
-    const categoryItems = historyItems.filter(historyItem => 
+    const categoryItems = historyItems.filter(historyItem =>
       historyItem.category === categoryName
     );
-    
+
     // Add each item from the category that's not already in the current list
     categoryItems.forEach(historyItem => {
       const itemExists = isSemanticDuplicate(historyItem.name, items.map(i => i.name));
@@ -1793,7 +1848,7 @@ function App() {
           quantity: 1,
           originalText: historyItem.name
         };
-        
+
         setItems(prevItems => [newItem, ...prevItems]);
       }
     });
@@ -2276,6 +2331,27 @@ function App() {
                 onMoveToFavorites={handleMoveItemToFavorites}
                 emptyState={{ title: currentText.emptyTitle, subtitle: currentText.emptySubtitle }}
                 addAllText={currentText.addAll}
+                showInlinePriceEntry={showInlinePriceEntry}
+                completedItems={pendingCompletedItems}
+                purchaseHistory={historyItems}
+                currency={currency}
+                onInlinePriceSave={handleInlinePriceSave}
+                onInlinePriceCancel={handleInlinePriceCancel}
+                inlinePriceTranslations={{
+                  storeName: currentText.inlinePriceStoreName,
+                  storePlaceholder: currentText.inlinePriceStorePlaceholder,
+                  price: currentText.inlinePriceLabel,
+                  lastPrice: currentText.inlinePriceLastPrice,
+                  saveAll: currentText.inlinePriceSaveAll,
+                  cancel: currentText.inlinePriceCancel,
+                  optional: currentText.priceModalOptional,
+                  at: currentText.inlinePriceAt,
+                  quantity: currentText.priceModalQuantity,
+                  unit: currentText.priceModalUnit,
+                  unitPrice: currentText.priceModalUnitPrice,
+                  totalPrice: currentText.priceModalTotalPrice,
+                  units: currentText.priceModalUnits,
+                }}
               />
 
               {/* Ad Banner for Free Users */}

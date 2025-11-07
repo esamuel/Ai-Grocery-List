@@ -319,16 +319,25 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
                       <div className="flex-1">
                         <div className="font-medium text-gray-700">{item.name}</div>
                         <div className="text-xs text-gray-500">
-                          {item.store && <span>{item.store}</span>}
-                          {item.quantity && item.quantity > 1 && (
-                            <span className="ml-2">× {item.quantity}</span>
+                          {item.store && <span>🏪 {item.store}</span>}
+                          {item.quantity && item.unit && (
+                            <span className="ml-2">{item.quantity}{item.unit}</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="text-gray-600 font-medium">
+                        <div className="text-right">
                           {item.price !== undefined ? (
-                            <span>{getCurrencySymbol()}{(item.price * (item.quantity || 1)).toFixed(2)}</span>
+                            <>
+                              <div className="text-gray-600 font-medium">
+                                {getCurrencySymbol()}{item.price.toFixed(2)}
+                              </div>
+                              {item.unitPrice && item.unit && (
+                                <div className="text-xs text-gray-500">
+                                  {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
