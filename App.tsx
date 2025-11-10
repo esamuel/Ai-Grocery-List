@@ -213,6 +213,19 @@ const translations = {
     ],
     enablePriceTracking: "Enable Price Tracking",
     priceTrackingDesc: "Track what you spend on groceries",
+    // Family Member Modal
+    addFamilyMemberTitle: "Add Family Member",
+    addFamilyStep1: "Step 1:",
+    addFamilyStep1Text: "Ask your family member to sign up at aigrocerylists.com first",
+    addFamilyStep2: "Step 2:",
+    addFamilyStep2Text: "Enter their email address below to add them to your shared list",
+    addFamilyEmailPlaceholder: "family@example.com",
+    addFamilyCancel: "Cancel",
+    addFamilyAddButton: "Add Member",
+    addFamilySuccess: "Family member added successfully! They should sign out and back in to see the shared list.",
+    addFamilyNotFound: "User not found. Please ask them to sign up at aigrocerylists.com first, then try again.",
+    addFamilyPermissionError: "Only the list owner can add family members.",
+    addFamilyError: "Error adding family member. Please try again.",
     // Spending Insights
     spendingInsights: "Spending Insights",
     monthlySpending: "Monthly Spending",
@@ -265,6 +278,7 @@ const translations = {
     noMonths: "No purchase history yet",
     shoppingDays: "shopping days",
     backToMonths: "Back to months",
+    backTo: "Back to",
     deletePurchase: "Delete purchase",
     confirmDelete: "Are you sure you want to delete this purchase?",
     deleteDay: "Delete entire day",
@@ -554,6 +568,19 @@ const translations = {
     ],
     enablePriceTracking: "הפעל מעקב מחירים",
     priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
+    // Family Member Modal
+    addFamilyMemberTitle: "הוסף בן משפחה",
+    addFamilyStep1: "שלב 1:",
+    addFamilyStep1Text: "בקש מבן המשפחה שלך להירשם ב-aigrocerylists.com תחילה",
+    addFamilyStep2: "שלב 2:",
+    addFamilyStep2Text: "הזן את כתובת האימייל שלהם למטה כדי להוסיף אותם לרשימה המשותפת שלך",
+    addFamilyEmailPlaceholder: "mishpacha@duga.com",
+    addFamilyCancel: "ביטול",
+    addFamilyAddButton: "הוסף חבר",
+    addFamilySuccess: "בן משפחה נוסף בהצלחה! עליהם להתנתק ולהתחבר מחדש כדי לראות את הרשימה המשותפת.",
+    addFamilyNotFound: "משתמש לא נמצא. אנא בקש מהם להירשם ב-aigrocerylists.com תחילה, ואז נסה שוב.",
+    addFamilyPermissionError: "רק בעל הרשימה יכול להוסיף בני משפחה.",
+    addFamilyError: "שגיאה בהוספת בן משפחה. אנא נסה שוב.",
     // Spending Insights
     spendingInsights: "תובנות הוצאות",
     monthlySpending: "הוצאות חודשיות",
@@ -606,6 +633,7 @@ const translations = {
     noMonths: "אין עדיין היסטוריית קניות",
     shoppingDays: "ימי קניות",
     backToMonths: "חזור לחודשים",
+    backTo: "חזור ל",
     deletePurchase: "מחק רכישה",
     confirmDelete: "האם אתה בטוח שברצונך למחוק רכישה זו?",
     deleteDay: "מחק יום שלם",
@@ -894,6 +922,19 @@ const translations = {
     ],
     enablePriceTracking: "Habilitar Seguimiento de Precios",
     priceTrackingDesc: "Rastrea lo que gastas en comestibles",
+    // Family Member Modal
+    addFamilyMemberTitle: "Agregar Miembro de la Familia",
+    addFamilyStep1: "Paso 1:",
+    addFamilyStep1Text: "Pide a tu familiar que se registre en aigrocerylists.com primero",
+    addFamilyStep2: "Paso 2:",
+    addFamilyStep2Text: "Ingresa su dirección de correo electrónico a continuación para agregarlos a tu lista compartida",
+    addFamilyEmailPlaceholder: "familia@ejemplo.com",
+    addFamilyCancel: "Cancelar",
+    addFamilyAddButton: "Agregar Miembro",
+    addFamilySuccess: "¡Miembro de la familia agregado exitosamente! Deben cerrar sesión y volver a iniciarla para ver la lista compartida.",
+    addFamilyNotFound: "Usuario no encontrado. Por favor, pídeles que se registren en aigrocerylists.com primero, luego intenta nuevamente.",
+    addFamilyPermissionError: "Solo el propietario de la lista puede agregar miembros de la familia.",
+    addFamilyError: "Error al agregar miembro de la familia. Por favor, intenta nuevamente.",
     // Spending Insights
     spendingInsights: "Información de Gastos",
     monthlySpending: "Gasto Mensual",
@@ -946,6 +987,7 @@ const translations = {
     noMonths: "Aún no hay historial de compras",
     shoppingDays: "días de compras",
     backToMonths: "Volver a meses",
+    backTo: "Volver a",
     deletePurchase: "Eliminar compra",
     confirmDelete: "¿Estás seguro de que quieres eliminar esta compra?",
     deleteDay: "Eliminar día completo",
@@ -1439,21 +1481,21 @@ function App() {
     try {
       const success = await addFamilyMember(memberEmail.trim());
       if (success) {
-        setAddMemberStatus('Family member added successfully! They should sign out and back in to see the shared list.');
+        setAddMemberStatus(currentText.addFamilySuccess);
         setMemberEmail('');
         setTimeout(() => {
           setAddMemberStatus(null);
           setShowAddMember(false);
         }, 3000);
       } else {
-        setAddMemberStatus('User not found. Please ask them to sign up at aigrocerylists.com first, then try again.');
+        setAddMemberStatus(currentText.addFamilyNotFound);
       }
     } catch (error: any) {
       console.error('Error adding family member:', error);
       if (error?.message?.includes('PERMISSION_DENIED')) {
-        setAddMemberStatus('Only the list owner can add family members.');
+        setAddMemberStatus(currentText.addFamilyPermissionError);
       } else {
-        setAddMemberStatus('Error adding family member. Please try again.');
+        setAddMemberStatus(currentText.addFamilyError);
       }
     }
   };
@@ -2455,6 +2497,7 @@ function App() {
               listId={listId}
               onDataChange={handleLoadHistoryItems}
               language={language}
+              isOwner={isOwner}
               translations={{
                 selectMonth: currentText.selectMonth || 'Select a Month',
                 noMonths: currentText.noMonths || 'No purchase history yet',
@@ -2462,6 +2505,7 @@ function App() {
                 totalSpent: currentText.totalSpent,
                 shoppingDays: currentText.shoppingDays || 'shopping days',
                 backToMonths: currentText.backToMonths || 'Back to months',
+                backTo: currentText.backTo || 'Back to',
                 deletePurchase: currentText.deletePurchase || 'Delete purchase',
                 confirmDelete: currentText.confirmDelete || 'Are you sure you want to delete this purchase?',
                 deleteDay: currentText.deleteDay || 'Delete entire day',
@@ -2701,37 +2745,37 @@ function App() {
       {showAddMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md transition-colors">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Add Family Member</h2>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">{currentText.addFamilyMemberTitle}</h2>
             <div className="mb-4 space-y-2">
               <p className="text-gray-600 dark:text-gray-300">
-                <span className="font-semibold">Step 1:</span> Ask your family member to sign up at aigrocerylists.com first
+                <span className="font-semibold">{currentText.addFamilyStep1}</span> {currentText.addFamilyStep1Text}
               </p>
               <p className="text-gray-600 dark:text-gray-300">
-                <span className="font-semibold">Step 2:</span> Enter their email address below to add them to your shared list
+                <span className="font-semibold">{currentText.addFamilyStep2}</span> {currentText.addFamilyStep2Text}
               </p>
             </div>
-            
+
             {addMemberStatus && (
               <div className={`p-3 rounded-lg mb-4 ${
-                addMemberStatus.includes('successfully') 
-                  ? 'bg-green-100 text-green-700' 
-                  : addMemberStatus.includes('not found') 
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-red-100 text-red-700'
+                addMemberStatus === currentText.addFamilySuccess
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
+                  : addMemberStatus === currentText.addFamilyNotFound
+                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100'
               }`}>
                 {addMemberStatus}
               </div>
             )}
-            
+
             <input
               type="email"
               value={memberEmail}
               onChange={(e) => setMemberEmail(e.target.value)}
-              placeholder="family@example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              placeholder={currentText.addFamilyEmailPlaceholder}
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 dark:bg-gray-700 dark:text-white"
               disabled={!!addMemberStatus}
             />
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
@@ -2741,14 +2785,14 @@ function App() {
                 }}
                 className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
-                Cancel
+                {currentText.addFamilyCancel}
               </button>
               <button
                 onClick={handleAddFamilyMember}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400"
                 disabled={!memberEmail.trim() || !!addMemberStatus}
               >
-                Add Member
+                {currentText.addFamilyAddButton}
               </button>
             </div>
           </div>

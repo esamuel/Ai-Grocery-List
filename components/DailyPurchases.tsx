@@ -39,6 +39,12 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
     return dailyPurchases.find(daily => daily.date === selectedDate) || null;
   }, [dailyPurchases, selectedDate]);
 
+  const getCurrentMonth = () => {
+    if (dailyPurchases.length === 0) return '';
+    const latestDate = new Date(dailyPurchases[0].date);
+    return latestDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   const handleExportCSV = () => {
     const csv = exportDailyPurchasesToCSV(dailyPurchases);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -88,6 +94,69 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
     }
   };
 
+  // If a date is selected, show detail view
+  if (selectedDate && selectedDayPurchases) {
+    return (
+      <div className="space-y-6">
+        {/* Back button */}
+        <button
+          onClick={() => setSelectedDate('')}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <span>←</span>
+          Back to {getCurrentMonth()}
+        </button>
+
+        {/* Day header */}
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
+          <h2 className="text-2xl font-bold mb-2">{formatDate(selectedDate)}</h2>
+          <div className="text-3xl font-bold mb-3">
+            {getCurrencySymbol()}{selectedDayPurchases.totalSpent.toFixed(2)}
+          </div>
+          <div className="text-sm opacity-90">
+            {selectedDayPurchases.items.length} {translations.items}
+          </div>
+        </div>
+
+        {/* Items list */}
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+          <div className="space-y-2">
+            {selectedDayPurchases.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-start text-sm border-t border-gray-100 pt-2 first:border-t-0 first:pt-0">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-700">{item.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {item.store && <span>🏪 {item.store}</span>}
+                    {item.quantity && item.unit && (
+                      <span className="ml-2">{item.quantity}{item.unit}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {item.price !== undefined ? (
+                    <>
+                      <div className="text-gray-600 font-medium">
+                        {getCurrencySymbol()}{item.price.toFixed(2)}
+                      </div>
+                      {item.unitPrice && item.unit && (
+                        <div className="text-xs text-gray-500">
+                          {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Dashboard view - show card grid
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -118,53 +187,29 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
         </div>
       )}
 
-      {/* Daily Purchases List - All Days */}
+      {/* Day Cards Grid */}
       {dailyPurchases.length > 0 ? (
-        <div className="space-y-4">
-          {dailyPurchases.slice(0, 30).map(daily => (
-            <div key={daily.date} className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-lg font-semibold text-gray-800">
-                  {formatDate(daily.date)}
-                </div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {dailyPurchases.slice(0, 30).map(daily => {
+            const { weekday, day, month } = formatCardDate(daily.date);
+            return (
+              <button
+                key={daily.date}
+                onClick={() => setSelectedDate(daily.date)}
+                className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all text-left"
+              >
+                <div className="text-sm text-gray-500 mb-1">{weekday}</div>
+                <div className="text-3xl font-bold text-gray-800 mb-1">{day}</div>
+                <div className="text-sm text-gray-600 mb-3">{month}</div>
                 <div className="text-xl font-bold text-blue-600">
                   {getCurrencySymbol()}{daily.totalSpent.toFixed(2)}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                {daily.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-start text-sm border-t border-gray-100 pt-2">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-700">{item.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {item.store && <span>🏪 {item.store}</span>}
-                        {item.quantity && item.unit && (
-                          <span className="ml-2">{item.quantity}{item.unit}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {item.price !== undefined ? (
-                        <>
-                          <div className="text-gray-600 font-medium">
-                            {getCurrencySymbol()}{item.price.toFixed(2)}
-                          </div>
-                          {item.unitPrice && item.unit && (
-                            <div className="text-xs text-gray-500">
-                              {getCurrencySymbol()}{item.unitPrice.toFixed(2)}/{item.unit}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+                <div className="text-xs text-gray-500 mt-2">
+                  {daily.items.length} {translations.items}
+                </div>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-20 bg-white rounded-lg shadow-sm">

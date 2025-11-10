@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /privacy.html
+Allow: /terms.html
+Allow: /about.html
+
+Disallow: /admin/
+Disallow: /*.json$
+Disallow: /*.map$
+
+# Google AdSense
+Allow: /
+
+# Crawl delay to avoid overloading server
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://aigrocerylists.com/sitemap.xml
+

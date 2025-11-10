@@ -122,9 +122,25 @@ export const signUpUser = async (email: string, password: string): Promise<User>
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     currentUser = userCredential.user;
 
-    // Create user document with empty favorites and empty displayName
+    // Create a new main list for the user
+    const listId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newListData: GroceryListData = {
+        items: [],
+        history: [],
+    };
+
+    // Create the list with ownership fields
+    await setDoc(doc(db, listsCollection, listId), {
+        ...newListData,
+        ownerId: userCredential.user.uid,
+        members: [userCredential.user.uid],
+        createdAt: new Date().toISOString()
+    } as any);
+
+    // Create user document with mainListId, empty favorites and empty displayName
     await setDoc(doc(db, usersCollection, userCredential.user.uid), {
         email: userCredential.user.email,
+        mainListId: listId,
         favorites: [],
         displayName: '', // Initialize empty displayName field
         createdAt: new Date().toISOString(),
