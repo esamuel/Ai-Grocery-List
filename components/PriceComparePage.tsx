@@ -73,13 +73,83 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
   // Helpers to normalize unit prices to a standard unit per item
   // Normalize a unit price to a standard unit label
 
-  const normalizePriceToStandard = (unitPrice: number, unit?: string, standardUnit?: string) => {
+  const normalizePriceToStandard = (unitPrice: number, unit?: string, standardUnit?: string, quantity?: number, totalPrice?: number) => {
     if (!unit || !standardUnit) return { price: unitPrice, unit: unit };
     const u = unit.toLowerCase();
     const s = standardUnit.toLowerCase();
+    
+    // Helper to convert quantity to base unit
+    const convertToBaseUnit = (qty: number, unit: string): number => {
+      switch (unit.toLowerCase()) {
+        case 'g': return qty / 1000; // grams to kg
+        case 'kg': return qty;
+        case 'lb': return qty * 0.453592; // pounds to kg
+        case 'oz': return qty * 0.0283495; // ounces to kg
+        case 'ml': return qty / 1000; // ml to liter
+        case 'l':
+        case 'liter': return qty;
+        default: return qty;
+      }
+    };
+    
+    // Helper to get base unit for a given unit
+    const getBaseUnit = (unit: string): string => {
+      switch (unit.toLowerCase()) {
+        case 'g':
+        case 'kg':
+        case 'lb':
+        case 'oz':
+          return 'kg';
+        case 'ml':
+        case 'l':
+        case 'liter':
+          return 'l';
+        default:
+          return unit;
+      }
+    };
+    
+    // If we have quantity and totalPrice, verify if unitPrice is already normalized
+    if (quantity !== undefined && totalPrice !== undefined && quantity > 0) {
+      const baseQuantity = convertToBaseUnit(quantity, u);
+      const baseUnit = getBaseUnit(u);
+      
+      // Check if unitPrice matches totalPrice / baseQuantity (meaning it's per base unit)
+      const expectedPricePerBaseUnit = totalPrice / baseQuantity;
+      const tolerance = 0.01; // Allow small floating point differences
+      
+      if (Math.abs(unitPrice - expectedPricePerBaseUnit) < tolerance) {
+        // unitPrice is already per base unit, just return with standard unit label
+        if (baseUnit === s) {
+          return { price: unitPrice, unit: s };
+        }
+        // Need to convert between base units (kg <-> lb)
+        if (baseUnit === 'kg' && s === 'lb') {
+          return { price: unitPrice * 2.2046226218, unit: 'lb' };
+        }
+        if (baseUnit === 'lb' && s === 'kg') {
+          return { price: unitPrice / 2.2046226218, unit: 'kg' };
+        }
+      }
+      
+      // Check if unitPrice matches totalPrice / quantity (meaning it's per original unit)
+      const expectedPricePerOriginalUnit = totalPrice / quantity;
+      if (Math.abs(unitPrice - expectedPricePerOriginalUnit) < tolerance) {
+        // unitPrice is per original unit, need to convert
+        // This is the normal case - continue with conversion below
+      }
+    }
+    
     // Weight conversions to kg or lb
     if (s === 'kg') {
-      if (u === 'g') return { price: unitPrice * 1000, unit: 'kg' };
+      if (u === 'g') {
+        // If unitPrice > 1, it's likely already per kg (calculated from baseQuantity)
+        // Otherwise, convert from per-gram to per-kg
+        if (unitPrice > 1) {
+          return { price: unitPrice, unit: 'kg' };
+        }
+        return { price: unitPrice * 1000, unit: 'kg' };
+      }
       if (u === 'kg') return { price: unitPrice, unit: 'kg' };
       if (u === 'lb') return { price: unitPrice / 2.2046226218, unit: 'kg' }; // per lb -> per kg
       if (u === 'oz') return { price: unitPrice / 0.03527396195, unit: 'kg' }; // per oz -> per kg
@@ -88,11 +158,21 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
       if (u === 'oz') return { price: unitPrice * 16, unit: 'lb' };
       if (u === 'lb') return { price: unitPrice, unit: 'lb' };
       if (u === 'kg') return { price: unitPrice / 2.2046226218, unit: 'lb' };
-      if (u === 'g') return { price: unitPrice / 453.59237, unit: 'lb' };
+      if (u === 'g') {
+        if (unitPrice > 1) {
+          return { price: unitPrice, unit: 'lb' };
+        }
+        return { price: unitPrice / 453.59237, unit: 'lb' };
+      }
     }
     // Volume conversions to liter
     if (s === 'l') {
-      if (u === 'ml') return { price: unitPrice * 1000, unit: 'l' };
+      if (u === 'ml') {
+        if (unitPrice > 1) {
+          return { price: unitPrice, unit: 'l' };
+        }
+        return { price: unitPrice * 1000, unit: 'l' };
+      }
       if (u === 'l' || u === 'liter') return { price: unitPrice, unit: 'l' };
     }
     // Pieces unchanged
@@ -148,7 +228,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
     const itemsWithUnitPrice = itemHistory
       .filter(h => h.unitPrice !== undefined && h.unit)
       .map(h => {
-        const normalized = normalizePriceToStandard(h.unitPrice!, h.unit, standardUnit);
+        const normalized = normalizePriceToStandard(h.unitPrice!, h.unit, standardUnit, h.quantity, h.price);
         return { ...h, unitPrice: normalized.price, unit: normalized.unit };
       });
 
@@ -176,7 +256,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
 
     // Calculate trend based on comparison mode
     const lastValue = compareMode === 'unit' && lastPurchase.unitPrice
-      ? normalizePriceToStandard(lastPurchase.unitPrice, lastPurchase.unit, standardUnit).price
+      ? normalizePriceToStandard(lastPurchase.unitPrice, lastPurchase.unit, standardUnit, lastPurchase.quantity, lastPurchase.price).price
       : lastPurchase.price;
     const trend = lastValue < average ? 'down' : lastValue > average ? 'up' : 'stable';
 
@@ -205,7 +285,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
       const stats = getItemStats(itemName);
       if (!stats) return null;
       const lastValue = stats.compareMode === 'unit' && stats.lastPurchase.unitPrice
-        ? normalizePriceToStandard(stats.lastPurchase.unitPrice, stats.lastPurchase.unit, stats.standardUnit).price
+        ? normalizePriceToStandard(stats.lastPurchase.unitPrice, stats.lastPurchase.unit, stats.standardUnit, stats.lastPurchase.quantity, stats.lastPurchase.price).price
         : stats.lastPurchase.price;
       const isLowest = lastValue === stats.lowest;
       return isLowest ? ({ itemName, ...stats }) : null;
