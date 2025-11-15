@@ -1,4 +1,5 @@
 import { getPurchaseHistory, setPurchaseHistory } from './purchaseHistoryService';
+import { getCanonicalName } from './semanticDupService';
 import type { PurchaseHistoryItem } from '../types';
 
 /**
@@ -25,12 +26,15 @@ export async function mergeHistoricalLists(
     const currentHistory = await getPurchaseHistory(currentListId);
     console.log(`📊 Current list has ${currentHistory.length} items`);
 
-    // Create a map for merging (keyed by item name, lowercase)
+    const getCanonicalForItem = (item: PurchaseHistoryItem) => item.canonicalName || getCanonicalName(item.name);
+
+    // Create a map for merging keyed by canonical names
     const mergedMap = new Map<string, PurchaseHistoryItem>();
 
     // Add current items to map
     currentHistory.forEach(item => {
-      mergedMap.set(item.name.toLowerCase(), item);
+      const key = getCanonicalForItem(item);
+      mergedMap.set(key, { ...item, canonicalName: key });
     });
 
     // Load and merge each old list
@@ -48,7 +52,7 @@ export async function mergeHistoricalLists(
 
         // Merge each item
         oldHistory.forEach(oldItem => {
-          const key = oldItem.name.toLowerCase();
+          const key = getCanonicalForItem(oldItem);
           const existing = mergedMap.get(key);
 
           if (existing) {
@@ -57,6 +61,7 @@ export async function mergeHistoricalLists(
 
             const merged: PurchaseHistoryItem = {
               ...existing,
+              canonicalName: key,
               frequency: existing.frequency + oldItem.frequency,
               // Keep the oldest firstPurchased
               firstPurchased: (existing.firstPurchased && oldItem.firstPurchased)
@@ -90,7 +95,7 @@ export async function mergeHistoricalLists(
           } else {
             // New item - just add it
             console.log(`  ➕ Adding new item "${oldItem.name}" (freq: ${oldItem.frequency})`);
-            mergedMap.set(key, oldItem);
+            mergedMap.set(key, { ...oldItem, canonicalName: key });
           }
         });
 

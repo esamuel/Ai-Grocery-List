@@ -52,7 +52,7 @@ const getFriendlyUserNameFallback = (user: User | null): string => {
   return 'User';
 };
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
-import { isSemanticDuplicate, normalize } from './services/semanticDupService';
+import { getCanonicalName, getDisplayNameForCanonical, isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
@@ -2233,14 +2233,17 @@ function App() {
                 console.log('Items with price data:', itemsWithPrice.length);
                 
                 // Flatten all price entries from all items
-                const allPriceEntries: Array<{itemName: string; price: number; store: string; date: string; unitPrice?: number; unit?: string; quantity?: number}> = [];
+                const allPriceEntries: Array<{itemName: string; displayName: string; price: number; store: string; date: string; unitPrice?: number; unit?: string; quantity?: number}> = [];
                 itemsWithPrice.forEach(item => {
+                  const canonicalName = item.canonicalName || getCanonicalName(item.name);
+                  const displayName = getDisplayNameForCanonical(canonicalName, language);
                   if (item.prices && item.prices.length > 0) {
                     // Add all price entries for this item
                     item.prices.forEach(priceEntry => {
                       if (priceEntry.price !== undefined) {
                         allPriceEntries.push({
-                          itemName: item.name,
+                          itemName: canonicalName,
+                          displayName,
                           price: priceEntry.price,
                           store: priceEntry.store || 'Unknown Store',
                           date: priceEntry.purchaseDate || item.lastPurchased,
@@ -2253,7 +2256,8 @@ function App() {
                   } else if (item.lastPrice !== undefined) {
                     // Fallback to lastPrice if prices array doesn't exist
                     allPriceEntries.push({
-                      itemName: item.name,
+                      itemName: canonicalName,
+                      displayName,
                       price: item.lastPrice,
                       store: 'Unknown Store',
                       date: item.lastPurchased

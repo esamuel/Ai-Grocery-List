@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface PriceRecord {
   itemName: string;
+  displayName?: string;
   price: number;
   store: string;
   date: string;
@@ -55,20 +56,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
   console.log('Price history length:', priceHistory.length);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredItems, setFilteredItems] = useState<PriceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredItems(priceHistory);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = priceHistory.filter(item =>
-        item.itemName.toLowerCase().includes(query)
-      );
-      setFilteredItems(filtered);
-    }
-  }, [searchQuery, priceHistory]);
 
   // Helpers to normalize unit prices to a standard unit per item
   // Normalize a unit price to a standard unit label
@@ -214,6 +202,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
     compareMode: CompareMode;
     hasUnitPrices: boolean;
     standardUnit?: 'kg' | 'l' | 'piece';
+    displayName: string;
   }
 
   const getItemStats = (itemName: string): Stats | null => {
@@ -259,6 +248,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
       ? normalizePriceToStandard(lastPurchase.unitPrice, lastPurchase.unit, standardUnit, lastPurchase.quantity, lastPurchase.price).price
       : lastPurchase.price;
     const trend = lastValue < average ? 'down' : lastValue > average ? 'up' : 'stable';
+    const displayName = itemHistory[0].displayName || itemName;
 
     return {
       lowest,
@@ -271,7 +261,8 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
       trend,
       compareMode,
       hasUnitPrices,
-      standardUnit
+      standardUnit,
+      displayName
     };
   };
 
@@ -292,6 +283,18 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
     })
     .filter((x): x is NonNullable<ItemStats> => x !== null)
     .slice(0, 5);
+
+  type ItemWithStats = { itemName: string; stats: Stats };
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredItemStats = uniqueItems
+    .map(itemName => {
+      const stats = getItemStats(itemName);
+      if (!stats) return null;
+      const searchTarget = `${itemName} ${stats.displayName}`.toLowerCase();
+      if (normalizedSearch && !searchTarget.includes(normalizedSearch)) return null;
+      return { itemName, stats };
+    })
+    .filter((entry): entry is ItemWithStats => entry !== null);
 
   return (
     <div className={`max-w-4xl mx-auto p-4 ${rtl ? 'rtl' : ''}`}>
@@ -388,7 +391,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                 onClick={() => setSelectedItem(deal.itemName)}
               >
                 <div className="font-bold text-gray-800 dark:text-white mb-2">
-                  {normalizeItemLabel(deal.itemName, deal.standardUnit)}
+                  {normalizeItemLabel(deal.displayName, deal.standardUnit)}
                 </div>
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   ₪{deal.lowest.toFixed(2)}
@@ -454,14 +457,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {uniqueItems
-            .filter(itemName =>
-              searchQuery === '' || itemName.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-            .map(itemName => {
-              const stats = getItemStats(itemName);
-              if (!stats) return null;
-
+          {filteredItemStats.map(({ itemName, stats }) => {
               const isExpanded = selectedItem === itemName;
 
               return (
@@ -480,7 +476,7 @@ export const PriceComparePage: React.FC<PriceComparePageProps> = ({
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-gray-800 dark:text-white">
-                        {normalizeItemLabel(itemName, stats.standardUnit)}
+                        {normalizeItemLabel(stats.displayName, stats.standardUnit)}
                       </h3>
                       <span className="text-2xl">
                         {stats.trend === 'down' ? '📉' : stats.trend === 'up' ? '📈' : '➡️'}

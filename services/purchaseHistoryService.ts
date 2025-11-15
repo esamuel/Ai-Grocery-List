@@ -1,6 +1,7 @@
 import { doc as docLite, getDoc as getDocLite, updateDoc as updateDocLite } from 'firebase/firestore/lite';
 import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
 import type { PurchaseHistoryItem, GroceryHistoryItem } from '../types';
+import { getCanonicalName } from './semanticDupService';
 import type { SuggestedItem } from './suggestionsFirestoreService';
 
 type Language = 'en' | 'he' | 'es';
@@ -121,15 +122,18 @@ export async function addOrIncrementPurchase(
   const current = await getPurchaseHistory(listId);
   const map = new Map<string, PurchaseHistoryItem>();
   
-  // Load existing items
-  current.forEach(item => map.set(item.name.toLowerCase(), item));
+  // Load existing items with canonical keys
+  current.forEach(item => {
+    const canonicalName = item.canonicalName || getCanonicalName(item.name);
+    map.set(canonicalName, { ...item, canonicalName });
+  });
   
   const now = new Date().toISOString();
   
   // Process new purchases
   items.forEach(purchase => {
-    const key = purchase.name.toLowerCase();
-    const existing = map.get(key);
+    const canonicalName = getCanonicalName(purchase.name);
+    const existing = map.get(canonicalName);
     
     console.log(`📝 Processing purchase: "${purchase.name}", exists: ${!!existing}`);
     
@@ -138,6 +142,7 @@ export async function addOrIncrementPurchase(
       console.log(`  ➡️ Updating existing item. Old frequency: ${existing.frequency}`);
       const updated: PurchaseHistoryItem = {
         ...existing,
+        canonicalName,
         frequency: existing.frequency + 1,
         lastPurchased: now,
         category: purchase.category || existing.category,
@@ -212,12 +217,13 @@ export async function addOrIncrementPurchase(
       }
       
       console.log(`  ✅ New frequency: ${updated.frequency}, lastPurchased: ${updated.lastPurchased}`);
-      map.set(key, updated);
+      map.set(canonicalName, updated);
     } else {
       // Create new item
       console.log(`  ➕ Creating new history item`);
       const newItem: PurchaseHistoryItem = {
         name: purchase.name,
+        canonicalName,
         category: purchase.category || 'Uncategorized',
         frequency: 1,
         lastPurchased: now,
@@ -253,7 +259,7 @@ export async function addOrIncrementPurchase(
         newItem.highestPrice = purchase.price;
       }
       
-      map.set(key, newItem);
+      map.set(canonicalName, newItem);
     }
   });
   

@@ -25,6 +25,7 @@ export interface PurchaseHistoryItem {
   avgDaysBetween?: number; // Average days between purchases (for predictions)
   starred?: boolean; // User can manually star favorite items
   tags?: string[]; // e.g., ['staple', 'seasonal', 'weekly']
+  canonicalName?: string;
   
   // 💰 Price tracking
   prices?: PriceHistory[]; // Historical prices
