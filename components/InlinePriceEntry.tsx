@@ -262,8 +262,8 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
     <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="font-semibold text-blue-900">💰 Quick Price Entry</h3>
-          <p className="text-xs text-blue-700">Add prices for checked items (optional)</p>
+          <h3 className="font-semibold text-blue-900">{translations.title}</h3>
+          <p className="text-xs text-blue-700">{translations.subtitle}</p>
         </div>
         <button
           onClick={onCancel}

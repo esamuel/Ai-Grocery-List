@@ -202,6 +202,8 @@ const translations = {
     inlinePriceSaveAll: "Save All",
     inlinePriceCancel: "Skip",
     inlinePriceAt: "at",
+    inlinePriceTitle: "Quick Price Entry",
+    inlinePriceSubtitle: "Add prices for checked items (optional)",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -557,6 +559,8 @@ const translations = {
     inlinePriceSaveAll: "שמור הכל",
     inlinePriceCancel: "דלג",
     inlinePriceAt: "ב",
+    inlinePriceTitle: "✏️ הזן מחירים",
+    inlinePriceSubtitle: "הוסף מחירים לפריטים שנבחרו (אופציונלי)",
     priceModalUnits: [
       { value: "kg", label: "ק״ג" },
       { value: "g", label: "גרם" },
@@ -911,6 +915,8 @@ const translations = {
     inlinePriceSaveAll: "Guardar Todo",
     inlinePriceCancel: "Saltar",
     inlinePriceAt: "en",
+    inlinePriceTitle: "💰 Entrada Rápida de Precios",
+    inlinePriceSubtitle: "Agregar precios para artículos seleccionados (opcional)",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -2384,6 +2390,8 @@ function App() {
                 onInlinePriceSave={handleInlinePriceSave}
                 onInlinePriceCancel={handleInlinePriceCancel}
                 inlinePriceTranslations={{
+                  title: currentText.inlinePriceTitle,
+                  subtitle: currentText.inlinePriceSubtitle,
                   storeName: currentText.inlinePriceStoreName,
                   storePlaceholder: currentText.inlinePriceStorePlaceholder,
                   price: currentText.inlinePriceLabel,
