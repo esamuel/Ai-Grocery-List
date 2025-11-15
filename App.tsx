@@ -564,7 +564,7 @@ const translations = {
       { value: "oz", label: "אונקייה" },
       { value: "l", label: "ליטר" },
       { value: "ml", label: "מ״ל" },
-      { value: "piece", label: "חתיכה" }
+      { value: "piece", label: "יחידה" }
     ],
     enablePriceTracking: "הפעל מעקב מחירים",
     priceTrackingDesc: "עקוב אחר מה שאתה מוציא על מצרכים",
