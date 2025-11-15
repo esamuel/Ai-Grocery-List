@@ -50,14 +50,8 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
   console.log('🎨 InlinePriceEntry rendered with', completedItems.length, 'items');
   console.log('📦 Completed items:', completedItems.map(i => i.name));
 
-  // Load last used store from localStorage
+  // Focus store input on mount (don't remember last store - user enters fresh each time)
   useEffect(() => {
-    const lastStore = localStorage.getItem('lastUsedStore');
-    if (lastStore) {
-      console.log('🏪 Loading last store:', lastStore);
-      setStoreName(lastStore);
-    }
-    // Focus store input on mount
     setTimeout(() => storeInputRef.current?.focus(), 100);
   }, []);
 
@@ -229,11 +223,6 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
   };
 
   const handleSave = () => {
-    // Save store to localStorage for next time
-    if (storeName) {
-      localStorage.setItem('lastUsedStore', storeName);
-    }
-
     const itemsWithPrices = completedItems.map(item => ({
       name: item.name,
       category: item.category,
