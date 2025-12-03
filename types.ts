@@ -8,6 +8,7 @@ export interface GroceryItem {
   unit?: string;
   originalText?: string; // Original input like "2× milk 1L"
   addedAt?: string; // When added to current list
+  monthAdded?: string; // Month when item was added (YYYY-MM format)
 }
 
 export interface Category {

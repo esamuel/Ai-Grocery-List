@@ -51,14 +51,41 @@ const getFriendlyUserNameFallback = (user: User | null): string => {
   }
   return 'User';
 };
+
+// Helper to get current month in YYYY-MM format
+const getCurrentMonthString = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+// Helper to get month from date string (ISO or other format)
+const getMonthFromDate = (dateString?: string): string => {
+  try {
+    if (!dateString) return getCurrentMonthString();
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  } catch {
+    return getCurrentMonthString();
+  }
+};
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { getCanonicalName, getDisplayNameForCanonical, isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
+import { ensureHistoricalDates } from './services/ensureHistoricalDates';
+import { repairHistoricalDataForMonths, verifyMonthsVisible } from './services/repairHistoricalData';
+import { fixMonthsVisibility, verifyMonthsAreExtracted } from './services/fixMonthsVisibility';
+import { forceCorrectPricesFormat, verifyExtractableMonths } from './services/forcePricesFormat';
+import { getDailyPurchases } from './services/exportService';
+import { ensureAllMonthsVisible, verifyMonthsVisible as verifyMonthsVisibleNew } from './services/ensureAllMonthsVisible';
 type Language = 'en' | 'he' | 'es';
-  type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
+type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
 
 const translations = {
   en: {
@@ -261,7 +288,7 @@ const translations = {
     starred: "Starred",
     category: "Category",
     alphabetical: "A-Z",
-    
+
     // Daily Purchases
     dailyPurchases: "Daily Purchases",
     dailyPurchasesSubtitle: "View your shopping history by date",
@@ -618,7 +645,7 @@ const translations = {
     starred: "מועדפים",
     category: "קטגוריה",
     alphabetical: "א-ת",
-    
+
     // Daily Purchases
     dailyPurchases: "קניות יומיות",
     dailyPurchasesSubtitle: "צפה בהיסטוריית הקניות שלך לפי תאריך",
@@ -974,7 +1001,7 @@ const translations = {
     starred: "Favoritos",
     category: "Categoría",
     alphabetical: "A-Z",
-    
+
     // Daily Purchases
     dailyPurchases: "Compras Diarias",
     dailyPurchasesSubtitle: "Ve tu historial de compras por fecha",
@@ -1138,51 +1165,51 @@ const getInitialLanguage = (): Language => {
   try {
     // Get all available browser languages
     const browserLanguages = navigator.languages || [navigator.language] || ['en'];
-    
+
     // Check saved preference first
     const savedLanguage = localStorage.getItem('groceryListLanguage') as Language;
     if (savedLanguage && ['en', 'he', 'es'].includes(savedLanguage)) {
       return savedLanguage;
     }
-    
+
     // Enhanced language detection
     for (const lang of browserLanguages) {
       const normalizedLang = lang.toLowerCase();
-      
+
       // Hebrew detection (comprehensive)
-      if (normalizedLang.includes('he') || 
-          normalizedLang.includes('iw') || 
-          normalizedLang.includes('hebrew') ||
-          normalizedLang.includes('il')) {
+      if (normalizedLang.includes('he') ||
+        normalizedLang.includes('iw') ||
+        normalizedLang.includes('hebrew') ||
+        normalizedLang.includes('il')) {
         return 'he';
       }
-      
+
       // Spanish detection (comprehensive)
-      if (normalizedLang.includes('es') || 
-          normalizedLang.includes('spanish') || 
-          normalizedLang.includes('español') ||
-          normalizedLang.includes('ar') ||  // Argentina
-          normalizedLang.includes('mx') ||  // Mexico
-          normalizedLang.includes('co') ||  // Colombia
-          normalizedLang.includes('cl') ||  // Chile
-          normalizedLang.includes('pe') ||  // Peru
-          normalizedLang.includes('ve') ||  // Venezuela
-          normalizedLang.includes('ec') ||  // Ecuador
-          normalizedLang.includes('gt') ||  // Guatemala
-          normalizedLang.includes('cu') ||  // Cuba
-          normalizedLang.includes('bo') ||  // Bolivia
-          normalizedLang.includes('do') ||  // Dominican Republic
-          normalizedLang.includes('hn') ||  // Honduras
-          normalizedLang.includes('py') ||  // Paraguay
-          normalizedLang.includes('sv') ||  // El Salvador
-          normalizedLang.includes('ni') ||  // Nicaragua
-          normalizedLang.includes('cr') ||  // Costa Rica
-          normalizedLang.includes('pa') ||  // Panama
-          normalizedLang.includes('uy')) {  // Uruguay
+      if (normalizedLang.includes('es') ||
+        normalizedLang.includes('spanish') ||
+        normalizedLang.includes('español') ||
+        normalizedLang.includes('ar') ||  // Argentina
+        normalizedLang.includes('mx') ||  // Mexico
+        normalizedLang.includes('co') ||  // Colombia
+        normalizedLang.includes('cl') ||  // Chile
+        normalizedLang.includes('pe') ||  // Peru
+        normalizedLang.includes('ve') ||  // Venezuela
+        normalizedLang.includes('ec') ||  // Ecuador
+        normalizedLang.includes('gt') ||  // Guatemala
+        normalizedLang.includes('cu') ||  // Cuba
+        normalizedLang.includes('bo') ||  // Bolivia
+        normalizedLang.includes('do') ||  // Dominican Republic
+        normalizedLang.includes('hn') ||  // Honduras
+        normalizedLang.includes('py') ||  // Paraguay
+        normalizedLang.includes('sv') ||  // El Salvador
+        normalizedLang.includes('ni') ||  // Nicaragua
+        normalizedLang.includes('cr') ||  // Costa Rica
+        normalizedLang.includes('pa') ||  // Panama
+        normalizedLang.includes('uy')) {  // Uruguay
         return 'es';
       }
     }
-    
+
     // Default to English
     return 'en';
   } catch (error) {
@@ -1204,7 +1231,7 @@ function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
-  
+
   // Subscription & Paywall
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -1220,7 +1247,7 @@ function App() {
       console.error('Failed to refresh subscription:', err);
     }
   }, [user?.uid]);
-  
+
   // Dark Mode
   const [darkMode, setDarkMode] = useState(() => {
     try {
@@ -1233,19 +1260,19 @@ function App() {
     }
   });
 
-        // Apply dark mode class to document
-        useEffect(() => {
-          console.log('🌙 Dark mode changed to:', darkMode);
-          if (darkMode) {
-            document.documentElement.classList.add('dark');
-            console.log('✅ Added dark class to document');
-          } else {
-            document.documentElement.classList.remove('dark');
-            console.log('✅ Removed dark class from document');
-          }
-          localStorage.setItem('darkMode', String(darkMode));
-        }, [darkMode]);
-  
+  // Apply dark mode class to document
+  useEffect(() => {
+    console.log('🌙 Dark mode changed to:', darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      console.log('✅ Added dark class to document');
+    } else {
+      document.documentElement.classList.remove('dark');
+      console.log('✅ Removed dark class from document');
+    }
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
   // Price tracking
   const [enablePriceTracking, setEnablePriceTracking] = useState(() => {
     try {
@@ -1289,16 +1316,86 @@ function App() {
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
   const [toast, setToast] = useState<{ message: string; variant?: ToastVariant } | null>(null);
-  
+
+  // Owner code for testing pro features
+  const [ownerCodeInput, setOwnerCodeInput] = useState('');
+  const [isProBypass, setIsProBypass] = useState(() => {
+    try {
+      return localStorage.getItem('proBypass') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Firestore sync hook
   const { items, historyItems, setItems, setHistoryItems, isSyncing } = useFirestoreSync(listId);
-  
+
   // PWA Install hook
   const { isInstallable, installApp } = usePWAInstall();
 
   // Category migration effect
   useEffect(() => {
     if (listId && user && historyItems && historyItems.length > 0) {
+      // DIAGNOSTIC: Call getDailyPurchases directly to see data structure
+      console.log('\n🔍🔍🔍 RUNNING DIAGNOSTIC: Checking data structure...\n');
+      const dailyPurchases = getDailyPurchases(historyItems, currency);
+      console.log(`\n✅ getDailyPurchases returned ${dailyPurchases.length} days`);
+      if (dailyPurchases.length === 0) {
+        console.error('❌ NO DAYS RETURNED - This is why months are not showing!');
+      }
+      console.log('\n');
+
+      // ===================================================================
+      // PRIORITY #1: COMPREHENSIVE MONTHS VISIBILITY FIX
+      // This MUST run first to ensure all historical dates are properly set
+      // ===================================================================
+      console.log('🚀 PRIORITY #1: Running comprehensive months visibility fix...');
+      ensureAllMonthsVisible(listId)
+        .then(async (result) => {
+          if (result.success) {
+            console.log('✅ Comprehensive fix completed successfully!');
+            console.log(`   Items checked: ${result.itemsChecked}`);
+            console.log(`   Items fixed: ${result.itemsFixed}`);
+            console.log(`   Prices fixed: ${result.pricesFixed}`);
+            console.log(`   Months found: ${result.monthsFound.join(', ')}`);
+
+            if (result.itemsFixed > 0) {
+              showToast(`✅ Fixed ${result.itemsFixed} items - All ${result.monthsFound.length} months now visible!`, 'success');
+            } else if (result.monthsFound.length > 0) {
+              console.log(`✅ All dates already valid - ${result.monthsFound.length} months visible`);
+            }
+
+            // Verify the fix worked
+            const verifiedMonths = await verifyMonthsVisibleNew(listId);
+            console.log(`🔍 VERIFICATION: ${verifiedMonths.length} months should be visible`);
+          } else {
+            console.error('❌ Comprehensive fix had issues:', result.errors);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Comprehensive months fix failed:', error);
+        });
+
+      // CRITICAL FIRST: Ensure all history items have proper prices format
+      console.log('🔴🔴🔴 CRITICAL: Forcing correct prices format...');
+      forceCorrectPricesFormat(listId)
+        .then(async (wasFixed) => {
+          console.log(`\n✅ Force fix complete - Was fixed: ${wasFixed}`);
+
+          // THEN: Verify what months can be extracted
+          const verification = await verifyExtractableMonths(listId);
+          console.log(`\n✅ VERIFICATION COMPLETE:`);
+          console.log(`   Total extractable months: ${verification.months.length}`);
+          console.log(`   Months: ${verification.months.join(', ')}`);
+
+          if (verification.months.length > 0) {
+            showToast(`✅ Fixed! ${verification.months.length} months visible for price comparison!`, 'success');
+          } else {
+            console.warn('⚠️ WARNING: No months extractable - checking data structure...');
+          }
+        })
+        .catch(error => console.error('Critical fix failed:', error));
+
       if (checkMigrationNeeded(historyItems)) {
         console.log('🔄 Running category migration...');
         migrateOtherCategoryToPantry(listId, historyItems)
@@ -1353,9 +1450,71 @@ function App() {
         .catch(error => {
           console.error('❌ Date year fix failed:', error);
         });
+
+      // CRITICAL: Repair historical data to ensure ALL months visible for price comparison
+      console.log('🔧 CRITICAL: Repairing historical data for month comparison...');
+      repairHistoricalDataForMonths(listId)
+        .then(async (result) => {
+          if (result.success) {
+            console.log(`✅ ${result.message}`);
+            if (result.monthsFound.length > 1) {
+              showToast(`✅ All ${result.monthsFound.length} months visible for price comparison!`, 'success');
+            }
+
+            // Verify the repair worked
+            const verified = await verifyMonthsVisible(listId);
+            if (verified.monthsVisible.length > 1) {
+              console.log(`✅ VERIFIED: ${verified.monthsVisible.length} months found!`);
+              console.log(`   Months: ${verified.monthsVisible.join(', ')}`);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('❌ Critical repair failed:', error);
+        });
     }
   }, [listId, user, historyItems]);
-  
+
+  // Archive items from previous months (only on mount or when month changes)
+  useEffect(() => {
+    if (!listId || !items || items.length === 0) return;
+
+    const currentMonth = getCurrentMonthString();
+    const previousMonthItems = items.filter(item => {
+      const itemMonth = item.monthAdded;
+      // Only archive items that have a monthAdded field set to a previous month
+      // Items without monthAdded are preserved (legacy items from before this feature)
+      return itemMonth && itemMonth !== currentMonth;
+    });
+
+    // If there are items from previous months, archive them to history
+    if (previousMonthItems.length > 0) {
+      console.log(`🗂️ Found ${previousMonthItems.length} items from previous months, archiving...`);
+
+      // Add previous month items to history (one by one to maintain data integrity)
+      let archivedCount = 0;
+      previousMonthItems.forEach(item => {
+        addOrIncrementPurchase(listId, [{
+          name: item.name,
+          category: item.category
+        }]).then(() => {
+          archivedCount++;
+          console.log(`✅ Archived: ${item.name} (${archivedCount}/${previousMonthItems.length})`);
+        }).catch(err => console.error('Failed to archive item:', item.name, err));
+      });
+
+      // Remove previous month items from current list
+      setItems(prevItems =>
+        prevItems.filter(item => {
+          const itemMonth = item.monthAdded;
+          return !itemMonth || itemMonth === currentMonth;
+        })
+      );
+
+      showToast(`Archived ${previousMonthItems.length} items from previous month to history`, 'success');
+    }
+  }, [listId]);
+
   // Local loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1367,7 +1526,7 @@ function App() {
     localStorage.setItem('groceryListLanguage', newLanguage);
   };
   const [showLanguageDetected, setShowLanguageDetected] = useState(false);
-  
+
   const currentText = translations[language];
 
   // Show language detection notification
@@ -1401,7 +1560,7 @@ function App() {
   // Handle authentication state changes
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
-    
+
     try {
       unsubscribe = onAuthStateChange(async (authUser) => {
         setUser(authUser);
@@ -1409,14 +1568,14 @@ function App() {
           try {
             const accessibleListId = await getAccessibleListId();
             setListId(accessibleListId);
-            
+
             // Migrate list if needed (add ownerId and members fields)
             const needsMigration = await checkListNeedsMigration(accessibleListId);
             if (needsMigration) {
               console.log('🔄 List needs migration - adding ownership fields');
               await migrateListOwnershipFields(accessibleListId, authUser.uid);
             }
-            
+
             // Check if user is the list owner
             const ownerStatus = await isListOwner();
             setIsOwner(ownerStatus);
@@ -1441,7 +1600,7 @@ function App() {
           } catch (error) {
             console.error('Error getting accessible list:', error);
             const msg = error instanceof Error ? error.message : String(error);
-            
+
             // If quota exceeded, offer offline mode
             if (msg.includes('quota exceeded') || msg.includes('resource-exhausted')) {
               setError(`Firestore quota exceeded. Working in offline mode - your data will sync when quota resets.`);
@@ -1527,16 +1686,38 @@ function App() {
     }
   };
 
+  // Owner code handler for testing pro features
+  const handleOwnerCodeSubmit = () => {
+    // Owner code: OWNER-PRO-2024 (you can change this to any code you want)
+    const validCode = 'OWNER-PRO-2024';
+
+    if (ownerCodeInput.trim().toUpperCase() === validCode) {
+      setIsProBypass(true);
+      localStorage.setItem('proBypass', 'true');
+      showToast('✅ Pro features unlocked for testing!', 'success');
+      setOwnerCodeInput('');
+    } else {
+      showToast('❌ Invalid owner code', 'error');
+    }
+  };
+
+  const handleDisableProBypass = () => {
+    setIsProBypass(false);
+    localStorage.removeItem('proBypass');
+    showToast('Pro bypass disabled', 'info');
+  };
+
   const handleAddItem = useCallback(async (itemText: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
     try {
       const existingItemNames = items.map(item => item.name);
       const categorizedResult = await categorizeGroceries(itemText, existingItemNames, language);
-      
+
       const newItems: GroceryItem[] = [];
       // Track existing names, prevent duplicates including semantic matches
       const existingLower = items.map(i => normalize(i.name));
+      const currentMonth = getCurrentMonthString();
       categorizedResult.forEach(cat => {
         cat.items.forEach(parsedItem => {
           if (isSemanticDuplicate(parsedItem.name, existingLower)) return;
@@ -1548,7 +1729,8 @@ function App() {
             category: cat.category || currentText.uncategorized,
             quantity: parsedItem.quantity,
             unit: parsedItem.unit,
-            originalText: parsedItem.originalText
+            originalText: parsedItem.originalText,
+            monthAdded: currentMonth
           });
         });
       });
@@ -1596,8 +1778,9 @@ function App() {
       name: historyItem.name,
       completed: false,
       category: historyItem.category || currentText.uncategorized,
+      monthAdded: getCurrentMonthString()
     };
-    
+
     console.log('Adding new item to list:', newItem);
     setItems(prevItems => {
       const updatedItems = [newItem, ...prevItems];
@@ -1668,7 +1851,7 @@ function App() {
 
   const handleMoveSelectedToFavorites = () => {
     const selectedItemsArray = items.filter(item => selectedItems.has(item.id));
-    
+
     if (selectedItemsArray.length === 0) return;
 
     console.log('Moving selected items to favorites:', selectedItemsArray);
@@ -1695,21 +1878,21 @@ function App() {
 
     // Remove selected items from current list
     setItems(prevItems => prevItems.filter(item => !selectedItems.has(item.id)));
-    
+
     // Clear selection
     setSelectedItems(new Set());
   };
 
   const handleDeleteSelected = () => {
     const selectedItemsArray = items.filter(item => selectedItems.has(item.id));
-    
+
     if (selectedItemsArray.length === 0) return;
 
     console.log('Deleting selected items:', selectedItemsArray);
 
     // Remove selected items from current list (no history)
     setItems(prevItems => prevItems.filter(item => !selectedItems.has(item.id)));
-    
+
     // Clear selection
     setSelectedItems(new Set());
   };
@@ -1737,11 +1920,11 @@ function App() {
     try {
       // FIRST: Update history in Firestore
       await addOrIncrementPurchase(listId, [{ name: target.name, category: target.category }]);
-      
+
       // SECOND: Remove from current list
       // The Firestore listener will automatically update historyItems
-    setItems(prev => prev.filter(i => i.id !== id));
-      
+      setItems(prev => prev.filter(i => i.id !== id));
+
       console.log('✅ Item moved to favorites');
     } catch (e) {
       console.error('❌ Failed to move item to favorites:', e);
@@ -1806,25 +1989,25 @@ function App() {
     try {
       // FIRST: Update history in Firestore (with prices and store)
       await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({
-      name: i.name,
-      category: i.category,
-      price: i.price,
-      store: i.store,
-      currency: currency,
-      quantity: i.quantity,
-      unit: i.unit,
-      unitPrice: i.unitPrice
+        name: i.name,
+        category: i.category,
+        price: i.price,
+        store: i.store,
+        currency: currency,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPrice: i.unitPrice
       })));
-      
+
       console.log('✅ Purchase history updated in Firestore');
 
       // SECOND: Remove completed items from current list
       // The Firestore listener will automatically update historyItems
-    setItems(prevItems => {
+      setItems(prevItems => {
         const remainingItems = prevItems.filter(item => !item.completed);
         console.log('✅ Removed completed items. Remaining:', remainingItems.length);
         return remainingItems;
-    });
+      });
 
     } catch (e) {
       console.error('❌ Failed to process completed items:', e);
@@ -1885,6 +2068,7 @@ function App() {
     );
 
     // Add each item from the category that's not already in the current list
+    const currentMonth = getCurrentMonthString();
     categoryItems.forEach(historyItem => {
       const itemExists = isSemanticDuplicate(historyItem.name, items.map(i => i.name));
       if (!itemExists) {
@@ -1894,7 +2078,8 @@ function App() {
           completed: false,
           category: historyItem.category,
           quantity: 1,
-          originalText: historyItem.name
+          originalText: historyItem.name,
+          monthAdded: currentMonth
         };
 
         setItems(prevItems => [newItem, ...prevItems]);
@@ -1903,10 +2088,10 @@ function App() {
   }, [historyItems, items, setItems]);
 
   const handleAddSuggestion = useCallback((suggestion: ShoppingSuggestion) => {
-    const itemExists = items.some(item => 
+    const itemExists = items.some(item =>
       item.name.toLowerCase() === suggestion.item.name.toLowerCase()
     );
-    
+
     if (!itemExists) {
       const newItem: GroceryItem = {
         id: `${Date.now()}-${suggestion.item.name}-${Math.random()}`,
@@ -1914,32 +2099,39 @@ function App() {
         completed: false,
         category: suggestion.item.category,
         quantity: 1,
-        originalText: suggestion.item.name
+        originalText: suggestion.item.name,
+        monthAdded: getCurrentMonthString()
       };
-      
+
       setItems(prevItems => [newItem, ...prevItems]);
     }
   }, [items, setItems]);
 
   const handleImportSuccess = useCallback(async (importedItems: GroceryItem[]) => {
+    const currentMonth = getCurrentMonthString();
+    const itemsWithMonth = importedItems.map(item => ({
+      ...item,
+      monthAdded: item.monthAdded || currentMonth
+    }));
+
     if (!listId) {
       // No list yet; fallback to adding into current list to avoid data loss
-      setItems(prevItems => [...importedItems, ...prevItems]);
+      setItems(prevItems => [...itemsWithMonth, ...prevItems]);
       setShowImportExport(false);
       return;
     }
 
     try {
       // Add imported items directly to purchase history
-      await addOrIncrementPurchase(listId, importedItems.map(i => ({
-      name: i.name,
-      category: i.category,
+      await addOrIncrementPurchase(listId, itemsWithMonth.map(i => ({
+        name: i.name,
+        category: i.category,
       })));
       setCurrentView('favorites'); // View purchase history after import
       setShowImportExport(false);
     } catch (e) {
       console.warn('Failed to add items to purchase history, falling back to add to list', e);
-      setItems(prevItems => [...importedItems, ...prevItems]);
+      setItems(prevItems => [...itemsWithMonth, ...prevItems]);
       setShowImportExport(false);
     }
   }, [listId, setItems]);
@@ -1956,7 +2148,7 @@ function App() {
       .map(([name, items]) => ({ name, items }))
       .sort((a, b) => a.name.localeCompare(b.name, language));
   }, [items, language, currentText.uncategorized]);
-  
+
   const sortedHistory = useMemo(() => {
     return [...historyItems].sort((a, b) => b.frequency - a.frequency);
   }, [historyItems]);
@@ -1985,7 +2177,7 @@ function App() {
     setListId('demo-list');
     setIsOwner(true); // Demo user is always owner
     setIsLoadingAuth(false);
-    
+
     // Show onboarding for demo users
     const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
     if (!hasSeenOnboarding) {
@@ -2087,7 +2279,7 @@ function App() {
     }
     */
 
-    return <LoginPage onLogin={() => {}} onDemoMode={handleDemoMode} translations={currentText} />;
+    return <LoginPage onLogin={() => { }} onDemoMode={handleDemoMode} translations={currentText} />;
   }
 
   const LanguageButton: React.FC<{ lang: Language, children: React.ReactNode }> = ({ lang, children }) => (
@@ -2098,7 +2290,7 @@ function App() {
 
   const NavButton: React.FC<{ currentView: View, buttonView: View, children: React.ReactNode, onClick: () => void }> = ({ currentView, buttonView, children, onClick }) => (
     <button onClick={onClick} className={`flex-1 flex flex-col items-center justify-center p-2 text-sm font-medium transition-colors ${currentView === buttonView ? 'text-green-600' : 'text-gray-500 hover:text-green-500'}`}>
-        {children}
+      {children}
     </button>
   );
 
@@ -2112,35 +2304,35 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors" dir={language === 'he' ? 'rtl' : 'ltr'}>
       <header className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-sm sticky top-0 z-50 transition-colors">
         <div className="max-w-3xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-                <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                    <span className="text-3xl">🛒</span>
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{currentText.title}</h1>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            <span>{currentText.welcomeUser}: {displayName || getFriendlyUserNameFallback(user)}</span>
-                            {isDemoMode && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">Demo Mode</span>}
-                        </div>
-                    </div>
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <span className="text-3xl">🛒</span>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{currentText.title}</h1>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  <span>{currentText.welcomeUser}: {displayName || getFriendlyUserNameFallback(user)}</span>
+                  {isDemoMode && <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">Demo Mode</span>}
                 </div>
-                <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleShowHelp} 
-                      className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition-colors"
-                      title="Show tutorial"
-                    >
-                      <InfoIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setShowSettings(true)}
-                      className="text-gray-600 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100 transition-colors"
-                      title="Settings"
-                    >
-                      <GearIcon className="w-5 h-5" />
-                    </button>
-                </div>
+              </div>
             </div>
-            {isSyncing && <div className="text-center text-sm text-green-600 p-1 animate-pulse">{currentText.syncing}</div>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShowHelp}
+                className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition-colors"
+                title="Show tutorial"
+              >
+                <InfoIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="text-gray-600 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Settings"
+              >
+                <GearIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          {isSyncing && <div className="text-center text-sm text-green-600 p-1 animate-pulse">{currentText.syncing}</div>}
         </div>
         {/* Back to Dashboard Button - Only show when not on dashboard */}
         {currentView !== 'dashboard' && (
@@ -2168,397 +2360,397 @@ function App() {
 
       <main className="max-w-3xl mx-auto p-4 sm:px-6 lg:px-8 pb-32">
         {currentView === 'dashboard' ? (
-            <DashboardPage
-              onNavigate={(view) => setCurrentView(view as View)}
-              translations={{
-                dashboard: currentText.dashboard,
-                list: currentText.list,
-                listDesc: currentText.listDesc,
-                history: currentText.favorites,
-                historyDesc: currentText.historyDesc,
-                family: currentText.family,
-                familyDesc: currentText.familyDesc,
-                priceCompare: currentText.priceCompare,
-                priceCompareDesc: currentText.priceCompareDesc,
-                insights: currentText.spendingInsights,
-                insightsDesc: currentText.insightsDesc,
-                daily: currentText.dailyPurchases,
-                dailyDesc: currentText.dailyDesc,
-                voice: currentText.inputPlaceholder,
-                voiceDesc: currentText.voiceDesc,
-                importExport: currentText.importExport,
-                importExportDesc: currentText.importExportDesc,
-                suggestions: currentText.suggestionsTitle,
-                suggestionsDesc: currentText.suggestionsDesc,
-                quickSearch: currentText.quickSearch,
-                viewAll: currentText.viewAll,
-                addItem: currentText.addItem,
-                bestDeals: currentText.bestDeals,
-                dashboardHelpText: currentText.dashboardHelpText,
-              }}
-              itemsCount={items.length}
-              historyCount={historyItems.length}
-              familyMembersCount={0}
-              trackedPricesCount={historyItems.filter(item =>
-                item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
-              ).length}
-              rtl={language === 'he'}
-            />
+          <DashboardPage
+            onNavigate={(view) => setCurrentView(view as View)}
+            translations={{
+              dashboard: currentText.dashboard,
+              list: currentText.list,
+              listDesc: currentText.listDesc,
+              history: currentText.favorites,
+              historyDesc: currentText.historyDesc,
+              family: currentText.family,
+              familyDesc: currentText.familyDesc,
+              priceCompare: currentText.priceCompare,
+              priceCompareDesc: currentText.priceCompareDesc,
+              insights: currentText.spendingInsights,
+              insightsDesc: currentText.insightsDesc,
+              daily: currentText.dailyPurchases,
+              dailyDesc: currentText.dailyDesc,
+              voice: currentText.inputPlaceholder,
+              voiceDesc: currentText.voiceDesc,
+              importExport: currentText.importExport,
+              importExportDesc: currentText.importExportDesc,
+              suggestions: currentText.suggestionsTitle,
+              suggestionsDesc: currentText.suggestionsDesc,
+              quickSearch: currentText.quickSearch,
+              viewAll: currentText.viewAll,
+              addItem: currentText.addItem,
+              bestDeals: currentText.bestDeals,
+              dashboardHelpText: currentText.dashboardHelpText,
+            }}
+            itemsCount={items.length}
+            historyCount={historyItems.length}
+            familyMembersCount={0}
+            trackedPricesCount={historyItems.filter(item =>
+              item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
+            ).length}
+            rtl={language === 'he'}
+          />
         ) : currentView === 'priceCompare' ? (
-            <PriceComparePage
-              onBack={() => setCurrentView('dashboard')}
-              translations={{
-                priceCompare: currentText.priceCompare,
-                back: currentText.back,
-                searchPlaceholder: currentText.searchPlaceholder,
-                lowestPrice: currentText.lowestPrice,
-                highestPrice: currentText.highestPrice,
-                avgPrice: currentText.avgPrice,
-                lastPurchased: currentText.lastPurchased,
-                priceHistory: currentText.priceHistory,
-                noPriceData: currentText.noPriceData,
-                trackNewItem: currentText.trackNewItem,
-                bestDeals: currentText.bestDeals,
-                itemName: currentText.itemName,
-                store: currentText.store,
-                price: currentText.priceModalTotal,
-                date: currentText.date,
-                trend: currentText.trend,
-                enablePriceTracking: currentText.enablePriceTracking,
-                priceTrackingDesc: currentText.priceTrackingDesc,
-              }}
-              priceHistory={(() => {
-                console.log('📊 Price Compare Data Debug:');
-                console.log('Total history items:', historyItems.length);
-                console.log('Price tracking enabled:', enablePriceTracking);
-                
-                // Items with lastPrice OR prices array
-                const itemsWithPrice = historyItems.filter(item => 
-                  item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
-                );
-                console.log('Items with price data:', itemsWithPrice.length);
-                
-                // Flatten all price entries from all items
-                const allPriceEntries: Array<{itemName: string; displayName: string; price: number; store: string; date: string; unitPrice?: number; unit?: string; quantity?: number}> = [];
-                itemsWithPrice.forEach(item => {
-                  const canonicalName = item.canonicalName || getCanonicalName(item.name);
-                  const displayName = getDisplayNameForCanonical(canonicalName, language);
-                  if (item.prices && item.prices.length > 0) {
-                    // Add all price entries for this item
-                    item.prices.forEach(priceEntry => {
-                      if (priceEntry.price !== undefined) {
-                        allPriceEntries.push({
-                          itemName: canonicalName,
-                          displayName,
-                          price: priceEntry.price,
-                          store: priceEntry.store || 'Unknown Store',
-                          date: priceEntry.purchaseDate || item.lastPurchased,
-                          unitPrice: priceEntry.unitPrice,
-                          unit: priceEntry.unit,
-                          quantity: priceEntry.quantity
-                        });
-                      }
-                    });
-                  } else if (item.lastPrice !== undefined) {
-                    // Fallback to lastPrice if prices array doesn't exist
-                    allPriceEntries.push({
-                      itemName: canonicalName,
-                      displayName,
-                      price: item.lastPrice,
-                      store: 'Unknown Store',
-                      date: item.lastPurchased
-                    });
-                  }
-                });
-                
-                console.log('Total price entries:', allPriceEntries.length);
-                console.log('Price history data:', allPriceEntries);
-                return allPriceEntries;
-              })()}
-              rtl={language === 'he'}
-              priceTrackingEnabled={enablePriceTracking}
-              onTogglePriceTracking={(enabled) => {
-                setEnablePriceTracking(enabled);
-                localStorage.setItem('enablePriceTracking', String(enabled));
-              }}
-              historyItemsCount={historyItems.length}
-            />
+          <PriceComparePage
+            onBack={() => setCurrentView('dashboard')}
+            translations={{
+              priceCompare: currentText.priceCompare,
+              back: currentText.back,
+              searchPlaceholder: currentText.searchPlaceholder,
+              lowestPrice: currentText.lowestPrice,
+              highestPrice: currentText.highestPrice,
+              avgPrice: currentText.avgPrice,
+              lastPurchased: currentText.lastPurchased,
+              priceHistory: currentText.priceHistory,
+              noPriceData: currentText.noPriceData,
+              trackNewItem: currentText.trackNewItem,
+              bestDeals: currentText.bestDeals,
+              itemName: currentText.itemName,
+              store: currentText.store,
+              price: currentText.priceModalTotal,
+              date: currentText.date,
+              trend: currentText.trend,
+              enablePriceTracking: currentText.enablePriceTracking,
+              priceTrackingDesc: currentText.priceTrackingDesc,
+            }}
+            priceHistory={(() => {
+              console.log('📊 Price Compare Data Debug:');
+              console.log('Total history items:', historyItems.length);
+              console.log('Price tracking enabled:', enablePriceTracking);
+
+              // Items with lastPrice OR prices array
+              const itemsWithPrice = historyItems.filter(item =>
+                item.lastPrice !== undefined || (item.prices && item.prices.length > 0)
+              );
+              console.log('Items with price data:', itemsWithPrice.length);
+
+              // Flatten all price entries from all items
+              const allPriceEntries: Array<{ itemName: string; displayName: string; price: number; store: string; date: string; unitPrice?: number; unit?: string; quantity?: number }> = [];
+              itemsWithPrice.forEach(item => {
+                const canonicalName = item.canonicalName || getCanonicalName(item.name);
+                const displayName = getDisplayNameForCanonical(canonicalName, language);
+                if (item.prices && item.prices.length > 0) {
+                  // Add all price entries for this item
+                  item.prices.forEach(priceEntry => {
+                    if (priceEntry.price !== undefined) {
+                      allPriceEntries.push({
+                        itemName: canonicalName,
+                        displayName,
+                        price: priceEntry.price,
+                        store: priceEntry.store || 'Unknown Store',
+                        date: priceEntry.purchaseDate || item.lastPurchased,
+                        unitPrice: priceEntry.unitPrice,
+                        unit: priceEntry.unit,
+                        quantity: priceEntry.quantity
+                      });
+                    }
+                  });
+                } else if (item.lastPrice !== undefined) {
+                  // Fallback to lastPrice if prices array doesn't exist
+                  allPriceEntries.push({
+                    itemName: canonicalName,
+                    displayName,
+                    price: item.lastPrice,
+                    store: 'Unknown Store',
+                    date: item.lastPurchased
+                  });
+                }
+              });
+
+              console.log('Total price entries:', allPriceEntries.length);
+              console.log('Price history data:', allPriceEntries);
+              return allPriceEntries;
+            })()}
+            rtl={language === 'he'}
+            priceTrackingEnabled={enablePriceTracking}
+            onTogglePriceTracking={(enabled) => {
+              setEnablePriceTracking(enabled);
+              localStorage.setItem('enablePriceTracking', String(enabled));
+            }}
+            historyItemsCount={historyItems.length}
+          />
         ) : currentView === 'suggestions' ? (
-            <div className="mb-6">
-              <button
-                onClick={() => setCurrentView('list')}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to List
-              </button>
-              <SmartSuggestions
-                currentItems={items.map(item => item.name)}
-                historyItems={historyItems}
-                language={language}
-                onAddSuggestion={handleAddSuggestion}
-                translations={{
-                  title: currentText.suggestionsTitle,
-                  subtitle: currentText.suggestionsSubtitle,
-                  addButton: currentText.addSuggestion,
-                  noSuggestions: currentText.noSuggestions,
-                  predictive: currentText.predictive,
-                  timeBased: currentText.timeBased,
-                  frequencyBased: currentText.frequencyBased,
-                  seasonal: currentText.seasonal,
-                  complementary: currentText.complementary,
-                  bestPriceEver: currentText.bestPriceEver,
-                  greatDeal: currentText.greatDeal,
-                  priceIncreased: currentText.priceIncreased,
-                  higherThanUsual: currentText.higherThanUsual,
-                  bestAtStore: currentText.bestAtStore,
-                  cheaper: currentText.cheaper,
-                }}
-              />
-            </div>
+          <div className="mb-6">
+            <button
+              onClick={() => setCurrentView('list')}
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to List
+            </button>
+            <SmartSuggestions
+              currentItems={items.map(item => item.name)}
+              historyItems={historyItems}
+              language={language}
+              onAddSuggestion={handleAddSuggestion}
+              translations={{
+                title: currentText.suggestionsTitle,
+                subtitle: currentText.suggestionsSubtitle,
+                addButton: currentText.addSuggestion,
+                noSuggestions: currentText.noSuggestions,
+                predictive: currentText.predictive,
+                timeBased: currentText.timeBased,
+                frequencyBased: currentText.frequencyBased,
+                seasonal: currentText.seasonal,
+                complementary: currentText.complementary,
+                bestPriceEver: currentText.bestPriceEver,
+                greatDeal: currentText.greatDeal,
+                priceIncreased: currentText.priceIncreased,
+                higherThanUsual: currentText.higherThanUsual,
+                bestAtStore: currentText.bestAtStore,
+                cheaper: currentText.cheaper,
+              }}
+            />
+          </div>
         ) : currentView === 'list' ? (
-            <>
-              {/* Action Buttons */}
-              <div className="flex justify-between items-center mb-2 rtl:flex-row-reverse gap-2">
+          <>
+            {/* Action Buttons */}
+            <div className="flex justify-between items-center mb-2 rtl:flex-row-reverse gap-2">
+              <button
+                onClick={() => setCurrentView('suggestions')}
+                className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-purple-500 text-white hover:bg-purple-600 shadow-sm flex items-center gap-2"
+              >
+                <span>✨</span>
+                <span>Smart Suggestions</span>
+              </button>
+            </div>
+
+            {/* Swipe hint (shown once) */}
+            {showSwipeHint && items.length > 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 flex items-center justify-between gap-3 rtl:flex-row-reverse">
+                <div className="flex items-center gap-2 rtl:flex-row-reverse">
+                  <span>👉</span>
+                  <span className="text-sm">
+                    {currentText.swipeHint}
+                  </span>
+                </div>
                 <button
-                  onClick={() => setCurrentView('suggestions')}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors bg-purple-500 text-white hover:bg-purple-600 shadow-sm flex items-center gap-2"
+                  onClick={() => { try { localStorage.setItem('swipeHintDismissed', '1'); } catch { } setShowSwipeHint(false); }}
+                  className="text-sm px-3 py-1 rounded-md bg-yellow-100 hover:bg-yellow-200 text-yellow-900"
                 >
-                  <span>✨</span>
-                  <span>Smart Suggestions</span>
+                  {currentText.gotIt}
                 </button>
               </div>
+            )}
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <div className="mb-2">{error}</div>
+                <button
+                  onClick={async () => {
+                    try {
+                      setError(null);
+                      setIsLoadingAuth(true);
+                      const accessibleListId = await getAccessibleListId();
+                      setListId(accessibleListId);
+                      const ownerStatus = await isListOwner();
+                      setIsOwner(ownerStatus);
+                    } catch (e) {
+                      console.error('Retry failed:', e);
+                      const msg = e instanceof Error ? e.message : String(e);
+                      setError(`Retry failed: ${msg}`);
+                    } finally {
+                      setIsLoadingAuth(false);
+                    }
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+                >
+                  Retry loading list
+                </button>
+              </div>
+            )}
 
-              {/* Swipe hint (shown once) */}
-              {showSwipeHint && items.length > 0 && (
-                <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 flex items-center justify-between gap-3 rtl:flex-row-reverse">
-                  <div className="flex items-center gap-2 rtl:flex-row-reverse">
-                    <span>👉</span>
-                    <span className="text-sm">
-                      {currentText.swipeHint}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => { try { localStorage.setItem('swipeHintDismissed', '1'); } catch {} setShowSwipeHint(false); }}
-                    className="text-sm px-3 py-1 rounded-md bg-yellow-100 hover:bg-yellow-200 text-yellow-900"
-                  >
-                    {currentText.gotIt}
-                  </button>
-                </div>
-              )}
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                  <div className="mb-2">{error}</div>
-                  <button
-                    onClick={async () => {
-                      try {
-                        setError(null);
-                        setIsLoadingAuth(true);
-                        const accessibleListId = await getAccessibleListId();
-                        setListId(accessibleListId);
-                        const ownerStatus = await isListOwner();
-                        setIsOwner(ownerStatus);
-                      } catch (e) {
-                        console.error('Retry failed:', e);
-                        const msg = e instanceof Error ? e.message : String(e);
-                        setError(`Retry failed: ${msg}`);
-                      } finally {
-                        setIsLoadingAuth(false);
-                      }
-                    }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-                  >
-                    Retry loading list
-                  </button>
-                </div>
-              )}
-              
-              <GroceryList
-                categories={categorizedList}
-                onToggleItem={handleToggleItem}
-                onDeleteItem={handleDeleteItem}
-                onAddAllInCategory={handleAddAllInCategory}
-                onMoveToFavorites={handleMoveItemToFavorites}
-                emptyState={{ title: currentText.emptyTitle, subtitle: currentText.emptySubtitle }}
-                addAllText={currentText.addAll}
-                showInlinePriceEntry={showInlinePriceEntry}
-                completedItems={pendingCompletedItems}
-                purchaseHistory={historyItems}
-                currency={currency}
-                onInlinePriceSave={handleInlinePriceSave}
-                onInlinePriceCancel={handleInlinePriceCancel}
-                inlinePriceTranslations={{
-                  title: currentText.inlinePriceTitle,
-                  subtitle: currentText.inlinePriceSubtitle,
-                  storeName: currentText.inlinePriceStoreName,
-                  storePlaceholder: currentText.inlinePriceStorePlaceholder,
-                  price: currentText.inlinePriceLabel,
-                  lastPrice: currentText.inlinePriceLastPrice,
-                  saveAll: currentText.inlinePriceSaveAll,
-                  cancel: currentText.inlinePriceCancel,
-                  optional: currentText.priceModalOptional,
-                  at: currentText.inlinePriceAt,
-                  quantity: currentText.priceModalQuantity,
-                  unit: currentText.priceModalUnit,
-                  unitPrice: currentText.priceModalUnitPrice,
-                  totalPrice: currentText.priceModalTotalPrice,
-                  units: currentText.priceModalUnits,
-                }}
-              />
+            <GroceryList
+              categories={categorizedList}
+              onToggleItem={handleToggleItem}
+              onDeleteItem={handleDeleteItem}
+              onAddAllInCategory={handleAddAllInCategory}
+              onMoveToFavorites={handleMoveItemToFavorites}
+              emptyState={{ title: currentText.emptyTitle, subtitle: currentText.emptySubtitle }}
+              addAllText={currentText.addAll}
+              showInlinePriceEntry={showInlinePriceEntry}
+              completedItems={pendingCompletedItems}
+              purchaseHistory={historyItems}
+              currency={currency}
+              onInlinePriceSave={handleInlinePriceSave}
+              onInlinePriceCancel={handleInlinePriceCancel}
+              inlinePriceTranslations={{
+                title: currentText.inlinePriceTitle,
+                subtitle: currentText.inlinePriceSubtitle,
+                storeName: currentText.inlinePriceStoreName,
+                storePlaceholder: currentText.inlinePriceStorePlaceholder,
+                price: currentText.inlinePriceLabel,
+                lastPrice: currentText.inlinePriceLastPrice,
+                saveAll: currentText.inlinePriceSaveAll,
+                cancel: currentText.inlinePriceCancel,
+                optional: currentText.priceModalOptional,
+                at: currentText.inlinePriceAt,
+                quantity: currentText.priceModalQuantity,
+                unit: currentText.priceModalUnit,
+                unitPrice: currentText.priceModalUnitPrice,
+                totalPrice: currentText.priceModalTotalPrice,
+                units: currentText.priceModalUnits,
+              }}
+            />
 
-              {/* Ad Banner for Free Users */}
-              {(!subscription || subscription.plan === 'free') && (
-                <>
-                  <AdBanner
-                    adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
-                    format="auto"
-                    responsive={true}
-                    className="my-6"
-                  />
-                  {/* Remove Ads Banner */}
-                  <div className="my-4 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700">
-                    <div className="flex items-center justify-between gap-4 rtl:flex-row-reverse">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                          {currentText.removeAdsTitle || 'Remove Ads'}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {currentText.removeAdsDescription || 'Upgrade to Pro or Family plan for an ad-free experience'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowPaywall(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-md whitespace-nowrap"
-                      >
-                        {currentText.upgrade || 'Upgrade'}
-                      </button>
+            {/* Ad Banner for Free Users */}
+            {(!subscription || subscription.plan === 'free') && !isProBypass && (
+              <>
+                <AdBanner
+                  adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
+                  format="auto"
+                  responsive={true}
+                  className="my-6"
+                />
+                {/* Remove Ads Banner */}
+                <div className="my-4 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700">
+                  <div className="flex items-center justify-between gap-4 rtl:flex-row-reverse">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                        {currentText.removeAdsTitle || 'Remove Ads'}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {currentText.removeAdsDescription || 'Upgrade to Pro or Family plan for an ad-free experience'}
+                      </p>
                     </div>
+                    <button
+                      onClick={() => setShowPaywall(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-md whitespace-nowrap"
+                    >
+                      {currentText.upgrade || 'Upgrade'}
+                    </button>
                   </div>
-                </>
-              )}
-
-              {/* Clear Completed Button at Bottom */}
-              {hasCompletedItems && (
-                <div className="mt-6 flex justify-center">
-                  <button
-                    onClick={handleClearCompleted}
-                    className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
-                  >
-                    {currentText.clearCompleted}
-                  </button>
                 </div>
-              )}
-            </>
+              </>
+            )}
+
+            {/* Clear Completed Button at Bottom */}
+            {hasCompletedItems && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={handleClearCompleted}
+                  className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
+                >
+                  {currentText.clearCompleted}
+                </button>
+              </div>
+            )}
+          </>
         ) : currentView === 'favorites' ? (
-            <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
+          <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
         ) : currentView === 'family' ? (
-            <FamilyActivities
-              userId={user?.uid || ''}
-              listId={listId || ''}
-              translations={{
-                title: currentText.familyTitle,
-                subtitle: currentText.familySubtitle,
-                membersTitle: currentText.familyMembersTitle,
-                owner: currentText.familyOwner,
-                member: currentText.familyMember,
-                activeNow: currentText.familyActiveNow,
-                recentActivityTitle: currentText.familyRecentActivity,
-                noActivity: currentText.familyNoActivity,
-                checkedOff: currentText.familyCheckedOff,
-                added: currentText.familyAdded,
-                removed: currentText.familyRemoved,
-                you: currentText.familyYou,
-                minutesAgo: currentText.familyMinutesAgo,
-                hoursAgo: currentText.familyHoursAgo,
-                daysAgo: currentText.familyDaysAgo,
-                justNow: currentText.familyJustNow,
-              }}
-              rtl={language === 'he'}
-            />
+          <FamilyActivities
+            userId={user?.uid || ''}
+            listId={listId || ''}
+            translations={{
+              title: currentText.familyTitle,
+              subtitle: currentText.familySubtitle,
+              membersTitle: currentText.familyMembersTitle,
+              owner: currentText.familyOwner,
+              member: currentText.familyMember,
+              activeNow: currentText.familyActiveNow,
+              recentActivityTitle: currentText.familyRecentActivity,
+              noActivity: currentText.familyNoActivity,
+              checkedOff: currentText.familyCheckedOff,
+              added: currentText.familyAdded,
+              removed: currentText.familyRemoved,
+              you: currentText.familyYou,
+              minutesAgo: currentText.familyMinutesAgo,
+              hoursAgo: currentText.familyHoursAgo,
+              daysAgo: currentText.familyDaysAgo,
+              justNow: currentText.familyJustNow,
+            }}
+            rtl={language === 'he'}
+          />
         ) : currentView === 'insights' ? (
-            <SpendingInsights 
-              historyItems={historyItems} 
-              currency={currency}
-              budget={monthlyBudget > 0 ? monthlyBudget : undefined}
-              language={language}
-              translations={{
-                title: currentText.spendingInsights,
-                monthlySpending: currentText.monthlySpending,
-                itemsPurchased: currentText.itemsPurchased,
-                avgPerItem: currentText.avgPerItem,
-                weeklyTrend: currentText.weeklyTrend,
-                thisWeek: currentText.thisWeek,
-                lastWeek: currentText.lastWeek,
-                monthlyTrend: currentText.monthlyTrend,
-                thisMonth: currentText.thisMonth,
-                lastMonth: currentText.lastMonth,
-                categoryBreakdown: currentText.categoryBreakdown,
-                visualBreakdown: currentText.visualBreakdown,
-                budget: currentText.budget,
-                remaining: currentText.remaining,
-                overBudget: currentText.overBudget,
-                noPriceData: currentText.noPriceData,
-              }}
-            />
+          <SpendingInsights
+            historyItems={historyItems}
+            currency={currency}
+            budget={monthlyBudget > 0 ? monthlyBudget : undefined}
+            language={language}
+            translations={{
+              title: currentText.spendingInsights,
+              monthlySpending: currentText.monthlySpending,
+              itemsPurchased: currentText.itemsPurchased,
+              avgPerItem: currentText.avgPerItem,
+              weeklyTrend: currentText.weeklyTrend,
+              thisWeek: currentText.thisWeek,
+              lastWeek: currentText.lastWeek,
+              monthlyTrend: currentText.monthlyTrend,
+              thisMonth: currentText.thisMonth,
+              lastMonth: currentText.lastMonth,
+              categoryBreakdown: currentText.categoryBreakdown,
+              visualBreakdown: currentText.visualBreakdown,
+              budget: currentText.budget,
+              remaining: currentText.remaining,
+              overBudget: currentText.overBudget,
+              noPriceData: currentText.noPriceData,
+            }}
+          />
         ) : currentView === 'daily' ? (
-            <MonthlyPurchasesView
-              historyItems={historyItems}
-              currency={currency}
-              listId={listId}
-              onDataChange={handleLoadHistoryItems}
-              language={language}
-              isOwner={isOwner}
-              translations={{
-                selectMonth: currentText.selectMonth || 'Select a Month',
-                noMonths: currentText.noMonths || 'No purchase history yet',
-                items: currentText.items,
-                totalSpent: currentText.totalSpent,
-                shoppingDays: currentText.shoppingDays || 'shopping days',
-                backToMonths: currentText.backToMonths || 'Back to months',
-                backTo: currentText.backTo || 'Back to',
-                deletePurchase: currentText.deletePurchase || 'Delete purchase',
-                confirmDelete: currentText.confirmDelete || 'Are you sure you want to delete this purchase?',
-                deleteDay: currentText.deleteDay || 'Delete entire day',
-                confirmDeleteDay: currentText.confirmDeleteDay || 'Are you sure you want to delete all purchases from this day?',
-              }}
-            />
+          <MonthlyPurchasesView
+            historyItems={historyItems}
+            currency={currency}
+            listId={listId}
+            onDataChange={handleLoadHistoryItems}
+            language={language}
+            isOwner={isOwner}
+            translations={{
+              selectMonth: currentText.selectMonth || 'Select a Month',
+              noMonths: currentText.noMonths || 'No purchase history yet',
+              items: currentText.items,
+              totalSpent: currentText.totalSpent,
+              shoppingDays: currentText.shoppingDays || 'shopping days',
+              backToMonths: currentText.backToMonths || 'Back to months',
+              backTo: currentText.backTo || 'Back to',
+              deletePurchase: currentText.deletePurchase || 'Delete purchase',
+              confirmDelete: currentText.confirmDelete || 'Are you sure you want to delete this purchase?',
+              deleteDay: currentText.deleteDay || 'Delete entire day',
+              confirmDeleteDay: currentText.confirmDeleteDay || 'Are you sure you want to delete all purchases from this day?',
+            }}
+          />
         ) : currentView === 'history' ? (
-            <div className="p-4">
-              <button
-                onClick={() => setCurrentView('list')}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to List
-              </button>
-              <PurchaseHistory
-                historyItems={historyItems}
-                onAddItem={handleAddItemFromHistory}
-                translations={{
-                  title: currentText.purchaseHistory || 'Purchase History',
-                  noHistory: currentText.noPurchaseHistory || 'No purchase history found.',
-                  name: currentText.name || 'Name',
-                  category: currentText.category || 'Category',
-                  lastPurchased: currentText.lastPurchased || 'Last Purchased',
-                  timesPurchased: currentText.timesPurchased || 'times',
-                  addToList: currentText.addToList || 'Add to List',
-                  dateFormat: currentText.dateFormat || 'MMMM d, yyyy'
-                }}
-              />
-            </div>
-        ) : currentView === 'legal' ? (
-            <LegalPage
-              initialTab={'privacy'}
+          <div className="p-4">
+            <button
+              onClick={() => setCurrentView('list')}
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to List
+            </button>
+            <PurchaseHistory
+              historyItems={historyItems}
+              onAddItem={handleAddItemFromHistory}
               translations={{
-                legal: currentText.legal,
-                privacyPolicy: currentText.privacyPolicy,
-                termsOfService: currentText.termsOfService,
+                title: currentText.purchaseHistory || 'Purchase History',
+                noHistory: currentText.noPurchaseHistory || 'No purchase history found.',
+                name: currentText.name || 'Name',
+                category: currentText.category || 'Category',
+                lastPurchased: currentText.lastPurchased || 'Last Purchased',
+                timesPurchased: currentText.timesPurchased || 'times',
+                addToList: currentText.addToList || 'Add to List',
+                dateFormat: currentText.dateFormat || 'MMMM d, yyyy'
               }}
             />
+          </div>
+        ) : currentView === 'legal' ? (
+          <LegalPage
+            initialTab={'privacy'}
+            translations={{
+              legal: currentText.legal,
+              privacyPolicy: currentText.privacyPolicy,
+              termsOfService: currentText.termsOfService,
+            }}
+          />
         ) : null}
       </main>
 
@@ -2583,164 +2775,214 @@ function App() {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 pt-4">
 
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Language</h3>
-                <div className="flex gap-2">
-                  <LanguageButton lang="en">EN</LanguageButton>
-                  <LanguageButton lang="he">עב</LanguageButton>
-                  <LanguageButton lang="es">ES</LanguageButton>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Language</h3>
+                  <div className="flex gap-2">
+                    <LanguageButton lang="en">EN</LanguageButton>
+                    <LanguageButton lang="he">עב</LanguageButton>
+                    <LanguageButton lang="es">ES</LanguageButton>
+                  </div>
                 </div>
-              </div>
 
-              {/* Dark Mode Toggle */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🌙 {currentText.darkMode}</h3>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{currentText.darkModeDesc}</span>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      darkMode ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        darkMode ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-
-              {/* Price Tracking Toggle */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">💰 {currentText.enablePriceTracking}</h3>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-gray-600">{currentText.priceTrackingDesc}</span>
-                  <input
-                    type="checkbox"
-                    checked={enablePriceTracking}
-                    onChange={(e) => {
-                      setEnablePriceTracking(e.target.checked);
-                      localStorage.setItem('enablePriceTracking', String(e.target.checked));
-                    }}
-                    className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
-                  />
-                </label>
-                {enablePriceTracking && (
-                  <div className="mt-3">
-                    <label className="text-sm text-gray-700">Currency:</label>
-                    <select
-                      value={currency}
-                      onChange={(e) => {
-                        setCurrency(e.target.value);
-                        localStorage.setItem('currency', e.target.value);
-                      }}
-                      className="ml-2 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                {/* Dark Mode Toggle */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🌙 {currentText.darkMode}</h3>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{currentText.darkModeDesc}</span>
+                    <button
+                      onClick={() => setDarkMode(!darkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
                     >
-                      <option value="USD">$ USD</option>
-                      <option value="ILS">₪ ILS</option>
-                      <option value="EUR">€ EUR</option>
-                      <option value="GBP">£ GBP</option>
-                    </select>
-                  </div>
-                )}
-                
-                {/* Budget Setting */}
-                {enablePriceTracking && (
-                  <div className="mt-4 pt-4 border-t">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">📊 {currentText.setBudget}</h3>
-                    <p className="text-xs text-gray-500 mb-2">{currentText.budgetDesc}</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={monthlyBudget || ''}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value) || 0;
-                          setMonthlyBudget(value);
-                          localStorage.setItem('monthlyBudget', String(value));
-                        }}
-                        placeholder="0"
-                        min="0"
-                        step="50"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
-                      <span className="text-sm text-gray-600">{currency}</span>
-                    </div>
-                  </div>
-                )}
+                    </button>
+                  </label>
+                </div>
 
-                {/* Display Name Setting */}
-                {user && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">👤 {currentText.displayName}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{currentText.displayNameDesc}</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder={user.email || ''}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={handleUpdateDisplayName}
-                        disabled={isUpdatingDisplayName}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                {/* Price Tracking Toggle */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">💰 {currentText.enablePriceTracking}</h3>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-gray-600">{currentText.priceTrackingDesc}</span>
+                    <input
+                      type="checkbox"
+                      checked={enablePriceTracking}
+                      onChange={(e) => {
+                        setEnablePriceTracking(e.target.checked);
+                        localStorage.setItem('enablePriceTracking', String(e.target.checked));
+                      }}
+                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                    />
+                  </label>
+                  {enablePriceTracking && (
+                    <div className="mt-3">
+                      <label className="text-sm text-gray-700">Currency:</label>
+                      <select
+                        value={currency}
+                        onChange={(e) => {
+                          setCurrency(e.target.value);
+                          localStorage.setItem('currency', e.target.value);
+                        }}
+                        className="ml-2 px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
-                        {isUpdatingDisplayName ? currentText.savingDisplayName : currentText.saveDisplayName}
+                        <option value="USD">$ USD</option>
+                        <option value="ILS">₪ ILS</option>
+                        <option value="EUR">€ EUR</option>
+                        <option value="GBP">£ GBP</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Budget Setting */}
+                  {enablePriceTracking && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">📊 {currentText.setBudget}</h3>
+                      <p className="text-xs text-gray-500 mb-2">{currentText.budgetDesc}</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={monthlyBudget || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            setMonthlyBudget(value);
+                            localStorage.setItem('monthlyBudget', String(value));
+                          }}
+                          placeholder="0"
+                          min="0"
+                          step="50"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-600">{currency}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display Name Setting */}
+                  {user && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">👤 {currentText.displayName}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{currentText.displayNameDesc}</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          placeholder={user.email || ''}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={handleUpdateDisplayName}
+                          disabled={isUpdatingDisplayName}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                        >
+                          {isUpdatingDisplayName ? currentText.savingDisplayName : currentText.saveDisplayName}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Owner Code for Testing (Show if logged in) */}
+                  {user && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        🔑 Pro Access Code
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Enter code to unlock pro features for testing: <strong>OWNER-PRO-2024</strong>
+                      </p>
+
+                      {isProBypass ? (
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                              ✅ Pro Features Unlocked
+                            </span>
+                          </div>
+                          <p className="text-xs text-green-600 dark:text-green-400 mb-2">
+                            All pro features are now available for testing
+                          </p>
+                          <button
+                            onClick={handleDisableProBypass}
+                            className="w-full px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                          >
+                            Disable Pro Bypass
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={ownerCodeInput}
+                            onChange={(e) => setOwnerCodeInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleOwnerCodeSubmit();
+                              }
+                            }}
+                            placeholder="Enter owner code..."
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                          <button
+                            onClick={handleOwnerCodeSubmit}
+                            className="px-4 py-2 bg-purple-500 text-white rounded-md text-sm hover:bg-purple-600 transition-colors"
+                          >
+                            Unlock
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Legal Links */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">⚖️ {currentText.legal}</h3>
+                    <div className="flex items-center gap-3 text-sm">
+                      <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
+                        {currentText.privacyPolicy}
+                      </button>
+                      <span className="text-gray-400">•</span>
+                      <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
+                        {currentText.termsOfService}
                       </button>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Legal Links */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">⚖️ {currentText.legal}</h3>
-                <div className="flex items-center gap-3 text-sm">
-                  <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
-                    {currentText.privacyPolicy}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => { setShowSettings(false); setShowPaywall(true); }}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-md"
+                  >
+                    💎 Upgrade to Pro
                   </button>
-                  <span className="text-gray-400">•</span>
-                  <button onClick={() => { setShowSettings(false); setCurrentView('legal'); }} className="text-blue-600 hover:underline">
-                    {currentText.termsOfService}
+                  {isInstallable && (
+                    <button
+                      onClick={handleInstallApp}
+                      className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-lg hover:from-green-600 hover:to-blue-600 transition-all shadow-md"
+                    >
+                      📱 {currentText.installApp}
+                    </button>
+                  )}
+                  {isOwner && (
+                    <button
+                      onClick={() => { setShowSettings(false); setShowAddMember(true); }}
+                      className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    >
+                      Add Family
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setShowSettings(false); handleSignOut(); }}
+                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    {currentText.signOut}
                   </button>
                 </div>
-                </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  onClick={() => { setShowSettings(false); setShowPaywall(true); }}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-md"
-                >
-                  💎 Upgrade to Pro
-                </button>
-                {isInstallable && (
-                  <button
-                    onClick={handleInstallApp}
-                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-lg hover:from-green-600 hover:to-blue-600 transition-all shadow-md"
-                  >
-                    📱 {currentText.installApp}
-                  </button>
-                )}
-                {isOwner && (
-                  <button
-                    onClick={() => { setShowSettings(false); setShowAddMember(true); }}
-                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                  >
-                    Add Family
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowSettings(false); handleSignOut(); }}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                >
-                  {currentText.signOut}
-                </button>
-              </div>
-            </div>
             </div>
           </div>
         </div>
@@ -2752,7 +2994,7 @@ function App() {
       )}
 
       {currentView === 'list' && <ItemInput onAddItem={handleAddItem} isProcessing={isLoading} language={language} placeholders={{ main: currentText.inputPlaceholder, adding: currentText.adding, add: currentText.add }} />}
-      
+
       {/* Family Member Addition Modal */}
       {showAddMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -2768,13 +3010,12 @@ function App() {
             </div>
 
             {addMemberStatus && (
-              <div className={`p-3 rounded-lg mb-4 ${
-                addMemberStatus === currentText.addFamilySuccess
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
-                  : addMemberStatus === currentText.addFamilyNotFound
-                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100'
-              }`}>
+              <div className={`p-3 rounded-lg mb-4 ${addMemberStatus === currentText.addFamilySuccess
+                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
+                : addMemberStatus === currentText.addFamilyNotFound
+                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100'
+                }`}>
                 {addMemberStatus}
               </div>
             )}
@@ -2916,7 +3157,7 @@ function App() {
         <PaywallModal
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
-          currentPlan={subscription?.plan || 'free'}
+          currentPlan={isProBypass ? 'pro' : (subscription?.plan || 'free')}
           userId={user?.uid}
           onSubscriptionUpdated={refreshSubscription}
           translations={{
