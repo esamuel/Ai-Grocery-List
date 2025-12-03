@@ -83,6 +83,8 @@ import { repairHistoricalDataForMonths, verifyMonthsVisible } from './services/r
 import { fixMonthsVisibility, verifyMonthsAreExtracted } from './services/fixMonthsVisibility';
 import { forceCorrectPricesFormat, verifyExtractableMonths } from './services/forcePricesFormat';
 import { getDailyPurchases } from './services/exportService';
+import { findMissingNovemberData } from './services/findMissingNovemberData';
+import { loadAllHistoryData, verifyHistoryDataLoad } from './services/loadAllHistoryData';
 import { ensureAllMonthsVisible, verifyMonthsVisible as verifyMonthsVisibleNew } from './services/ensureAllMonthsVisible';
 type Language = 'en' | 'he' | 'es';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
@@ -1344,6 +1346,23 @@ function App() {
         console.error('❌ NO DAYS RETURNED - This is why months are not showing!');
       }
       console.log('\n');
+      
+      // VERIFY: Check if all history data was loaded
+      console.log('\n🔍 VERIFYING ALL HISTORY DATA WAS LOADED...\n');
+      verifyHistoryDataLoad(listId, historyItems).then(verifiedHistory => {
+        if (verifiedHistory.length > historyItems.length) {
+          console.log(`\n🚨 FOUND MISSING DATA! Loading ${verifiedHistory.length - historyItems.length} more items\n`);
+          setHistoryItems(verifiedHistory);
+        }
+      }).catch(err => {
+        console.error('Error verifying history data:', err);
+      });
+      
+      // SEARCH: Look for missing November data
+      console.log('\n🔍 SEARCHING FOR MISSING DATA...\n');
+      findMissingNovemberData(historyItems).catch(err => {
+        console.error('Error searching for November data:', err);
+      });
 
       // ===================================================================
       // PRIORITY #1: COMPREHENSIVE MONTHS VISIBILITY FIX

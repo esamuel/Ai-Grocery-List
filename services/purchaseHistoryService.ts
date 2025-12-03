@@ -26,6 +26,11 @@ function groceryListDocPath(listId: string) {
   return docLite(getDb(), 'groceryLists', listId);
 }
 
+function listsDocPath(listId: string) {
+  // Path: lists/{listId} (alternative collection for older data)
+  return docLite(getDb(), 'lists', listId);
+}
+
 // Calculate average days between purchases
 function calculateAvgDaysBetween(frequency: number, firstPurchased: string, lastPurchased: string): number {
   if (frequency <= 1) return 0;
@@ -54,11 +59,36 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
   }
 
   try {
-    const docRef = groceryListDocPath(listId);
-    const snap = await getDocLite(docRef);
-    if (!snap.exists()) return [];
-    const data = snap.data();
-    return (data.history || []) as PurchaseHistoryItem[];
+    // PRIORITY: Try 'lists' collection first (where older data is stored)
+    console.log(`🔍 Checking 'lists' collection for purchase history...`);
+    const listsDocRef = listsDocPath(listId);
+    const listsSnap = await getDocLite(listsDocRef);
+    
+    if (listsSnap.exists()) {
+      const data = listsSnap.data();
+      const history = (data.history || []) as PurchaseHistoryItem[];
+      if (history.length > 0) {
+        console.log(`✅ getPurchaseHistory: Found ${history.length} items in 'lists' collection (October + November data!)🎉`);
+        return history;
+      }
+    }
+
+    // Fallback: Try groceryLists collection (main/newer location)
+    console.log(`📍 Checking 'groceryLists' collection for purchase history...`);
+    const groceryListsDocRef = groceryListDocPath(listId);
+    const grocerySnap = await getDocLite(groceryListsDocRef);
+    
+    if (grocerySnap.exists()) {
+      const data = grocerySnap.data();
+      const history = (data.history || []) as PurchaseHistoryItem[];
+      if (history.length > 0) {
+        console.log(`✅ getPurchaseHistory: Found ${history.length} items in 'groceryLists' collection`);
+        return history;
+      }
+    }
+
+    console.log(`⚠️ No purchase history found in either collection`);
+    return [];
   } catch (e) {
     console.warn('getPurchaseHistory failed', e);
     return [];
@@ -99,15 +129,30 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
   }
 
   try {
-    const docRef = groceryListDocPath(listId);
     // Clean undefined values before sending to Firestore
     const cleanedItems = removeUndefined(items);
+    const timestamp = { updatedAt: new Date().toISOString() };
+    
     console.log(`🔄 Writing ${cleanedItems.length} items to Firestore...`);
-    await updateDocLite(docRef, { 
+    
+    // Write to BOTH collections to keep them in sync
+    // Primary: 'lists' collection (where October/November data lives)
+    const listsDocRef = listsDocPath(listId);
+    await updateDocLite(listsDocRef, { 
       history: cleanedItems,
-      updatedAt: new Date().toISOString()
+      ...timestamp
     });
-    console.log(`✅ Purchase history updated in Firestore (${cleanedItems.length} items) - UI will update in ~3s`);
+    console.log(`✅ Updated 'lists' collection`);
+    
+    // Secondary: 'groceryLists' collection (backup/fallback)
+    const groceryListsDocRef = groceryListDocPath(listId);
+    await updateDocLite(groceryListsDocRef, { 
+      history: cleanedItems,
+      ...timestamp
+    });
+    console.log(`✅ Updated 'groceryLists' collection`);
+    
+    console.log(`✅ Purchase history synced to both collections (${cleanedItems.length} items)`);
   } catch (e) {
     console.error('❌ Failed to update purchase history:', e);
     throw e;
