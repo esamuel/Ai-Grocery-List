@@ -22,13 +22,8 @@ function getDb() {
 }
 
 function groceryListDocPath(listId: string) {
-  // Path: groceryLists/{listId} (main document)
+  // Path: groceryLists/{listId}
   return docLite(getDb(), 'groceryLists', listId);
-}
-
-function listsDocPath(listId: string) {
-  // Path: lists/{listId} (alternative collection for older data)
-  return docLite(getDb(), 'lists', listId);
 }
 
 // Calculate average days between purchases
@@ -59,7 +54,7 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
   }
 
   try {
-    const docRef = listsDocPath(listId);
+    const docRef = groceryListDocPath(listId);
     const snap = await getDocLite(docRef);
     if (!snap.exists()) return [];
     const data = snap.data();
@@ -104,7 +99,7 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
   }
 
   try {
-    const docRef = listsDocPath(listId);
+    const docRef = groceryListDocPath(listId);
     // Clean undefined values before sending to Firestore
     const cleanedItems = removeUndefined(items);
     console.log(`🔄 Writing ${cleanedItems.length} items to Firestore...`);
