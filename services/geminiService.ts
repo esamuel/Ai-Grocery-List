@@ -20,7 +20,7 @@ const getAiClient = (): GoogleGenAI => {
 };
 
 
-const model = "gemini-2.5-flash";
+const model = "gemini-1.5-flash";
 
 const schema = {
   type: Type.ARRAY,
@@ -400,26 +400,44 @@ export const analyzeReceiptImage = async (
   const languageName = languageNames[uiLanguage];
   const categoryList = getCategoryPromptList(uiLanguage);
 
-  const prompt = `
-    Analyze this receipt image and extract all grocery items, their prices, quantities, and categories.
-    
-    1. **storeName**: Extract the store name.
-    2. **purchaseDate**: Extract the date of purchase (YYYY-MM-DD). If not clear, use today's date ${new Date().toISOString().split('T')[0]}.
-    3. **currency**: Detect the currency (ILS, USD, etc.).
-    4. **items**: List each product with:
-       - **name**: Keep it in the language found on the receipt, but clean it up (remove internal codes).
-       - **category**: Map to one of these EXACT categories (in ${languageName}): ${categoryList}.
-       - **price**: The price for that item/quantity.
-       - **quantity**: The number of items or weight.
-       - **unit**: The unit if applicable.
-    5. **totalAmount**: The total amount shown on the receipt.
+  // Extract MIME type from base64 if available, otherwise default to image/jpeg
+  let mimeType = "image/jpeg";
+  const mimeMatch = base64Image.match(/^data:([^;]+);base64,/);
+  if (mimeMatch) {
+    mimeType = mimeMatch[1];
+  }
 
-    CRITICAL: You MUST use the EXACT category names provided. Do not invent new categories.
-    Return the result as a JSON object adhering to the provided schema.
+  const prompt = `
+    You are an expert OCR and grocery receipt analysis engine specialized in Hebrew and multilingual receipts. 
+    Your task is to analyze this receipt image and extract structured data accurately.
+
+    INSTRUCTIONS:
+    1. **OCR Extraction**: Carefully read all text on the receipt. Handle potential low-quality, blurry, or rotated images.
+    2. **Language Awareness**: This receipt is likely from an Israeli supermarket (e.g., Rami Levy, Shufersal, Victory, Yohananof). It contains Hebrew text and currency (₪ / ILS). Preserve Hebrew characters exactly.
+    3. **Ambiguity**: If an item name is truncated or contains internal store codes, clean it up to a human-readable name in Hebrew.
+    4. **Layout**: Identify columns for item name, quantity, unit price, and total line price.
+    5. **Fields**:
+       - **storeName**: The supermarket name at the top (e.g., "רמי לוי", "שופרסל").
+       - **purchaseDate**: The date of shopping (Format: YYYY-MM-DD). If not clear, use today: ${new Date().toISOString().split('T')[0]}.
+       - **currency**: Default to "ILS" for Hebrew receipts unless stated otherwise.
+       - **items**: List each product:
+         - **name**: Product name in Hebrew (e.g., "חלב 3%", "עגבניות").
+         - **category**: Map to exactly ONE from: ${categoryList}.
+         - **price**: The final price for that item line.
+         - **quantity**: The quantity or weight.
+         - **unit**: e.g., "ק״ג", "יחידה", "L".
+       - **totalAmount**: The cumulative total at the bottom.
+
+    CRITICAL RULES:
+    - Use ONLY the categories provided: ${categoryList}.
+    - If you are unsure about an item's category, use the most logical one or 'Other' (translated to ${languageName}).
+    - Return ONLY valid JSON adhering to the schema. 
+    - No markdown formatting or extra text.
   `;
 
   try {
     const geminiClient = getAiClient();
+
     const result = await geminiClient.models.generateContent({
       model: "gemini-1.5-flash",
       contents: [
@@ -430,7 +448,7 @@ export const analyzeReceiptImage = async (
             {
               inlineData: {
                 data: base64Image.split(',')[1] || base64Image,
-                mimeType: "image/jpeg"
+                mimeType: mimeType
               }
             }
           ]
@@ -447,7 +465,7 @@ export const analyzeReceiptImage = async (
 
     const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;
 
-    // Normalize categories
+    // Normalize categories to ensure they match our internal list exactly
     parsed.items = parsed.items.map(item => ({
       ...item,
       category: normalizeCategory(item.category, uiLanguage)
@@ -456,6 +474,9 @@ export const analyzeReceiptImage = async (
     return parsed;
   } catch (error) {
     console.error("Error analyzing receipt with Gemini:", error);
-    throw new Error("Failed to analyze receipt. Please try again or enter items manually.");
+    if (error instanceof Error && error.message.includes("SAFETY")) {
+      throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
+    }
+    throw new Error(uiLanguage === 'he' ? "שגיאה בניתוח הקבלה. המערכת לא הצליחה לקרוא את הטקסט באופן תקין. נסה לצלם תמונה ברורה יותר." : "Failed to analyze receipt. The AI couldn't parse the text clearly. Please try a clearer photo.");
   }
 };

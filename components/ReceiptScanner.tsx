@@ -46,9 +46,9 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         try {
             const analysis = await analyzeReceiptImage(image, language);
             setResult(analysis);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError(language === 'he' ? 'שגיאה בניתוח הקבלה. נסה שוב.' : language === 'es' ? 'Error al analizar el recibo. Inténtalo de nuevo.' : 'Error analyzing receipt. Try again.');
+            setError(err.message || (language === 'he' ? 'שגיאה בניתוח הקבלה. נסה שוב.' : language === 'es' ? 'Error al analizar el recibo. Inténtalo de nuevo.' : 'Error analyzing receipt. Try again.'));
         } finally {
             setIsAnalyzing(false);
         }
