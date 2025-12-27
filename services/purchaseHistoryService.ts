@@ -22,7 +22,7 @@ function getDb() {
 }
 
 function groceryListDocPath(listId: string) {
-  // Path: groceryLists/{listId}
+  // Path: groceryLists/{listId} (main document)
   return docLite(getDb(), 'groceryLists', listId);
 }
 
@@ -117,7 +117,7 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
 // Add or increment item in purchase history
 export async function addOrIncrementPurchase(
   listId: string,
-  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number; unit?: string; unitPrice?: number }[]
+  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number; unit?: string; unitPrice?: number; purchaseDate?: string }[]
 ): Promise<void> {
   const current = await getPurchaseHistory(listId);
   const map = new Map<string, PurchaseHistoryItem>();
@@ -135,7 +135,11 @@ export async function addOrIncrementPurchase(
     const canonicalName = getCanonicalName(purchase.name);
     const existing = map.get(canonicalName);
     
-    console.log(`📝 Processing purchase: "${purchase.name}", exists: ${!!existing}`);
+    // CRITICAL FIX: Use provided purchaseDate if available, otherwise use current time
+    // This prevents overwriting historical dates when retroactively adding purchases
+    const purchaseTimestamp = purchase.purchaseDate || now;
+    
+    console.log(`📝 Processing purchase: "${purchase.name}", exists: ${!!existing}, date: ${purchaseTimestamp}`);
     
     if (existing) {
       // Update existing item
@@ -144,7 +148,7 @@ export async function addOrIncrementPurchase(
         ...existing,
         canonicalName,
         frequency: existing.frequency + 1,
-        lastPurchased: now,
+        lastPurchased: purchaseTimestamp,
         category: purchase.category || existing.category,
       };
       
@@ -159,8 +163,9 @@ export async function addOrIncrementPurchase(
       
       // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
       // Even if no price/store is provided, we need the purchaseDate for the calendar
+      // CRITICAL: Use provided purchaseDate to preserve historical accuracy
       const priceEntry: any = {
-        purchaseDate: now,
+        purchaseDate: purchaseTimestamp,
         quantity: purchase.quantity || 1,
       };
 
@@ -169,6 +174,22 @@ export async function addOrIncrementPurchase(
       if (hasPriceData) {
         priceEntry.price = purchase.price;
         priceEntry.currency = purchase.currency || 'USD';
+      } else {
+        // CRITICAL FIX: When no price provided, use last known price for this item
+        // This prevents ₪0.00 totals that make month comparisons useless
+        if (existing.lastPrice && existing.lastPrice > 0) {
+          priceEntry.price = existing.lastPrice;
+          priceEntry.currency = purchase.currency || 'ILS';
+          priceEntry.estimatedPrice = true; // Mark as estimated for transparency
+          console.log(`  💡 No price provided, using last known: ₪${existing.lastPrice}`);
+        } else if (existing.avgPrice && existing.avgPrice > 0) {
+          priceEntry.price = existing.avgPrice;
+          priceEntry.currency = purchase.currency || 'ILS';
+          priceEntry.estimatedPrice = true;
+          console.log(`  💡 No price provided, using average: ₪${existing.avgPrice}`);
+        }
+        // If no price history exists at all, leave price undefined
+        // This is intentional - better to have no data than wrong data for new items
       }
 
       // Add unit information if provided
@@ -226,14 +247,15 @@ export async function addOrIncrementPurchase(
         canonicalName,
         category: purchase.category || 'Uncategorized',
         frequency: 1,
-        lastPurchased: now,
-        firstPurchased: now,
+        lastPurchased: purchaseTimestamp,
+        firstPurchased: purchaseTimestamp,
         avgDaysBetween: 0,
       };
       
       // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
+      // CRITICAL: Use provided purchaseDate to preserve historical accuracy
       const priceEntry: any = {
-        purchaseDate: now,
+        purchaseDate: purchaseTimestamp,
         quantity: purchase.quantity || 1,
       };
 
@@ -242,6 +264,25 @@ export async function addOrIncrementPurchase(
       if (hasPriceData) {
         priceEntry.price = purchase.price;
         priceEntry.currency = purchase.currency || 'USD';
+      } else {
+        // CRITICAL FIX: For NEW items without price, use category-based estimation
+        // This ensures month totals are never ₪0.00 which breaks comparisons
+        const categoryDefaults: Record<string, number> = {
+          'פירות וירקות': 10.0,
+          'מוצרי חלב וביצים': 12.0,
+          'בשר ועוף': 45.0,
+          'מאפים': 8.0,
+          'משקאות': 7.0,
+          'מוצרי מזווה': 15.0,
+          'קפואים': 18.0,
+          'חטיפים וממתקים': 10.0,
+        };
+        
+        const estimatedPrice = categoryDefaults[purchase.category || ''] || 12.0;
+        priceEntry.price = estimatedPrice;
+        priceEntry.currency = purchase.currency || 'ILS';
+        priceEntry.estimatedPrice = true; // Mark as estimated for transparency
+        console.log(`  💡 New item without price, using category estimate: ₪${estimatedPrice}`);
       }
 
       // Add store if provided

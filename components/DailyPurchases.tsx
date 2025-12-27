@@ -135,8 +135,11 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
                 <div className="text-right">
                   {item.price !== undefined ? (
                     <>
-                      <div className="text-gray-600 font-medium">
+                      <div className="text-gray-600 font-medium flex items-center justify-end gap-1">
                         {getCurrencySymbol()}{item.price.toFixed(2)}
+                        {item.estimatedPrice && (
+                          <span className="text-xs text-amber-600" title="Estimated price based on history">≈</span>
+                        )}
                       </div>
                       {item.unitPrice && item.unit && (
                         <div className="text-xs text-gray-500">

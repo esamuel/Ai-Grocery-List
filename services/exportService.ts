@@ -11,6 +11,7 @@ export interface DailyPurchase {
     quantity?: number;
     unit?: string;
     unitPrice?: number;
+    estimatedPrice?: boolean; // NEW: Flag for auto-estimated prices
   }>;
   totalSpent: number;
   currency: string;
@@ -32,31 +33,13 @@ export function getDailyPurchases(
 ): DailyPurchase[] {
   const dailyMap = new Map<string, DailyPurchase>();
   
-  console.log('📋 getDailyPurchases called with', historyItems.length, 'items');
-  let itemsProcessed = 0;
-  let itemsSkipped = 0;
-  let pricesProcessed = 0;
-  let pricesSkipped = 0;
-  
-  historyItems.forEach((item, idx) => {
-    console.log(`\n[${idx + 1}/${historyItems.length}] Item: "${item.name}"`);
-    console.log(`    prices array: ${item.prices ? `YES (${item.prices.length} entries)` : 'NO'}`);
-    
-    if (!item.prices) {
-      console.log(`    ❌ NO PRICES ARRAY - SKIPPING`);
-      itemsSkipped++;
-      return;
-    }
-    
-    itemsProcessed++;
+  historyItems.forEach(item => {
+    if (!item.prices) return;
 
-    item.prices.forEach((priceEntry, priceIdx) => {
-      console.log(`    Price entry ${priceIdx + 1}: purchaseDate = ${priceEntry.purchaseDate || 'MISSING'}`);
-      
+    item.prices.forEach(priceEntry => {
       // Validate date before processing
       if (!priceEntry.purchaseDate) {
-        console.log(`    ❌ NO PURCHASEDATE - SKIPPING`);
-        pricesSkipped++;
+        console.warn(`Skipping price entry with no purchaseDate for item: ${item.name}`);
         return;
       }
 
@@ -64,15 +47,11 @@ export function getDailyPurchases(
 
       // Check if date is valid
       if (isNaN(purchaseDate.getTime())) {
-        console.log(`    ❌ INVALID DATE - SKIPPING`);
-        pricesSkipped++;
+        console.warn(`Invalid purchaseDate "${priceEntry.purchaseDate}" for item: ${item.name}`);
         return;
       }
-      
-      pricesProcessed++;
+
       const date = purchaseDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      const month = purchaseDate.toISOString().substring(0, 7); // YYYY-MM
-      console.log(`    ✅ VALID: ${date} (Month: ${month})`);
 
       if (!dailyMap.has(date)) {
         dailyMap.set(date, {
@@ -98,7 +77,8 @@ export function getDailyPurchases(
         store: priceEntry.store,
         quantity,
         unit: priceEntry.unit,
-        unitPrice: priceEntry.unitPrice
+        unitPrice: priceEntry.unitPrice,
+        estimatedPrice: priceEntry.estimatedPrice // Pass through the estimation flag
       });
 
       daily.totalSpent += totalPrice;
@@ -106,23 +86,8 @@ export function getDailyPurchases(
   });
   
   // Sort by date (newest first)
-  const result = Array.from(dailyMap.values())
+  return Array.from(dailyMap.values())
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  
-  console.log(`\n📊 getDailyPurchases SUMMARY:`);
-  console.log(`   Total items checked: ${historyItems.length}`);
-  console.log(`   Items processed: ${itemsProcessed}`);
-  console.log(`   Items skipped: ${itemsSkipped}`);
-  console.log(`   Prices processed: ${pricesProcessed}`);
-  console.log(`   Prices skipped: ${pricesSkipped}`);
-  console.log(`   Days found: ${result.length}`);
-  console.log(`   Months found: ${new Set(result.map(d => d.date.substring(0, 7))).size}`);
-  result.forEach(day => {
-    const month = day.date.substring(0, 7);
-    console.log(`   - ${day.date} (${month}): ${day.items.length} items`);
-  });
-  
-  return result;
 }
 
 // Get monthly summary

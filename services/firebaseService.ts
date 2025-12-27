@@ -76,7 +76,7 @@ const getFirebaseServices = () => {
 };
 
 
-const listsCollection = 'lists';
+const listsCollection = 'groceryLists';
 const usersCollection = 'users';
 
 // Authentication functions

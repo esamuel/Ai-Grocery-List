@@ -8,7 +8,6 @@ export interface GroceryItem {
   unit?: string;
   originalText?: string; // Original input like "2× milk 1L"
   addedAt?: string; // When added to current list
-  monthAdded?: string; // Month when item was added (YYYY-MM format)
 }
 
 export interface Category {
@@ -47,6 +46,9 @@ export interface PriceHistory {
   // NEW: Unit price tracking (for accurate store comparison)
   unitPrice?: number; // Price per unit (e.g., ₪6/kg)
   unit?: string; // Unit type: 'kg', 'lb', 'g', 'piece', 'liter', 'ml', etc.
+  
+  // IMPORTANT: Price estimation flag
+  estimatedPrice?: boolean; // True if price was auto-estimated (not user-entered)
 }
 
 // User settings for price tracking

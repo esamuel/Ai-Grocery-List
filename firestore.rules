@@ -21,47 +21,6 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Legacy Lists Collection - for backward compatibility with older data
-    match /lists/{listId} {
-      // Helper to check if user is owner or member of this list
-      function hasListAccess() {
-        let listData = resource.data;
-        return isAuthenticated() && (
-          // Check if user is the owner
-          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
-          // Or check if user is in members array
-          request.auth.uid in listData.get('members', []) ||
-          // MIGRATION: Allow access if ownerId is missing (for migration)
-          !exists(/databases/$(database)/documents/lists/$(listId)) ||
-          (listData.ownerId == null && listData.owner == null)
-        );
-      }
-
-      // Helper to check if user is the list owner (for adding members)
-      function isListOwner() {
-        let listData = resource.data;
-        return isAuthenticated() && (
-          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
-          // MIGRATION: Allow if ownerId is missing (for migration)
-          (listData.ownerId == null && listData.owner == null)
-        );
-      }
-
-      // Allow read if user is owner or member OR if list needs migration
-      allow read: if isAuthenticated();
-
-      // Allow create if user is authenticated and sets themselves as owner
-      allow create: if isAuthenticated() &&
-        request.resource.data.ownerId == request.auth.uid;
-
-      // Allow update if user is owner or member
-      // TEMPORARY: Allow all authenticated while debugging ID mismatch
-      allow update: if isAuthenticated();
-
-      // Allow delete only if user is owner
-      allow delete: if isListOwner();
-    }
-
     // Grocery Lists - owner and members can access
     match /groceryLists/{listId} {
       // Helper to check if user is owner or member of this list

@@ -18,6 +18,7 @@ interface FeatureCard {
 
 interface DashboardPageProps {
   onNavigate: (view: string) => void;
+  onScanReceipt?: () => void;
   translations: {
     list: string;
     listDesc: string;
@@ -42,6 +43,8 @@ interface DashboardPageProps {
     addItem: string;
     bestDeals: string;
     dashboardHelpText: string;
+    scanReceipt?: string;
+    scanReceiptDesc?: string;
   };
   itemsCount?: number;
   historyCount?: number;
@@ -52,6 +55,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   onNavigate,
+  onScanReceipt,
   translations,
   itemsCount = 0,
   historyCount = 0,
@@ -84,14 +88,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       onClick: () => onNavigate('favorites')
     },
     {
-      id: 'family',
-      icon: '👥',
-      title: translations.family,
-      description: translations.familyDesc,
-      color: 'from-purple-400 to-purple-600',
-      iconBg: 'bg-gradient-to-br from-purple-400 to-purple-600',
-      badge: familyMembersCount > 0 ? `${familyMembersCount}` : undefined,
-      onClick: () => onNavigate('family')
+      id: 'scanReceipt',
+      icon: '📸',
+      title: translations.scanReceipt || 'Scan Receipt',
+      description: translations.scanReceiptDesc || 'Add items from a photo',
+      color: 'from-cyan-400 to-cyan-600',
+      iconBg: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
+      onClick: () => onScanReceipt?.()
     },
     {
       id: 'priceCompare',
@@ -120,6 +123,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       color: 'from-orange-400 to-orange-600',
       iconBg: 'bg-gradient-to-br from-orange-400 to-orange-600',
       onClick: () => onNavigate('daily')
+    },
+    {
+      id: 'family',
+      icon: '👥',
+      title: translations.family,
+      description: translations.familyDesc,
+      color: 'from-purple-400 to-purple-600',
+      iconBg: 'bg-gradient-to-br from-purple-400 to-purple-600',
+      badge: familyMembersCount > 0 ? `${familyMembersCount}` : undefined,
+      onClick: () => onNavigate('family')
     }
   ];
 
@@ -202,16 +215,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     </span>
                   </div>
 
-                  {/* Title */}
-                  <h3 className={`text-sm font-semibold text-center ${
-                    feature.id === 'list' ? 'text-blue-600 dark:text-blue-300' :
-                    feature.id === 'history' ? 'text-yellow-600 dark:text-yellow-300' :
-                    feature.id === 'family' ? 'text-purple-600 dark:text-purple-300' :
-                    feature.id === 'priceCompare' ? 'text-green-600 dark:text-green-300' :
-                    feature.id === 'insights' ? 'text-pink-600 dark:text-pink-300' :
-                    feature.id === 'daily' ? 'text-orange-600 dark:text-orange-300' :
-                    'text-gray-600 dark:text-gray-300'
-                  }`}>
+                  <h3 className={`text-sm font-semibold text-center ${feature.id === 'list' ? 'text-blue-600 dark:text-blue-300' :
+                      feature.id === 'history' ? 'text-yellow-600 dark:text-yellow-300' :
+                        feature.id === 'scanReceipt' ? 'text-cyan-600 dark:text-cyan-300' :
+                          feature.id === 'family' ? 'text-purple-600 dark:text-purple-300' :
+                            feature.id === 'priceCompare' ? 'text-green-600 dark:text-green-300' :
+                              feature.id === 'insights' ? 'text-pink-600 dark:text-pink-300' :
+                                feature.id === 'daily' ? 'text-orange-600 dark:text-orange-300' :
+                                  'text-gray-600 dark:text-gray-300'
+                    }`}>
                     {feature.title}
                   </h3>
                 </div>

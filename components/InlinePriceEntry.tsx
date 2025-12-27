@@ -13,6 +13,7 @@ interface InlinePriceEntryProps {
     quantity?: number;
     unit?: string;
     unitPrice?: number;
+    purchaseDate?: string; // NEW: Optional custom purchase date for retroactive entries
   }[]) => void;
   onCancel: () => void;
   translations: {
@@ -29,6 +30,7 @@ interface InlinePriceEntryProps {
     unitPrice?: string;
     totalPrice?: string;
     units?: { value: string; label: string }[];
+    purchaseDate?: string;
   };
 }
 
@@ -45,6 +47,7 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
   const [units, setUnits] = useState<Record<string, string>>({});
   const [unitPrices, setUnitPrices] = useState<Record<string, string>>({});
   const [storeName, setStoreName] = useState<string>('');
+  const [purchaseDate, setPurchaseDate] = useState<string>(''); // NEW: Optional custom purchase date
   const storeInputRef = useRef<HTMLInputElement>(null);
 
   console.log('🎨 InlinePriceEntry rendered with', completedItems.length, 'items');
@@ -231,6 +234,7 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
       quantity: quantities[item.name] ? parseFloat(quantities[item.name]) : undefined,
       unit: units[item.name] || undefined,
       unitPrice: unitPrices[item.name] ? parseFloat(unitPrices[item.name]) : undefined,
+      purchaseDate: purchaseDate || undefined, // NEW: Include custom purchase date if set
     }));
 
     onSave(itemsWithPrices);
@@ -272,21 +276,55 @@ export const InlinePriceEntry: React.FC<InlinePriceEntryProps> = ({
           ✕
         </button>
       </div>
+      
+      {/* Important message about price estimation */}
+      <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-3">
+        <div className="flex items-start gap-2">
+          <span className="text-yellow-600 text-lg">💡</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-yellow-900">Price Tracking Important!</p>
+            <p className="text-xs text-yellow-700 mt-1">
+              {currency === 'ILS' 
+                ? 'כדי לקבל השוואות מחירים מדויקות, אנא הזן את המחירים בפועל. אם תדלג, נשתמש במחירים משוערים.'
+                : 'For accurate price comparisons, please enter actual prices. If skipped, we\'ll use estimated prices based on your history.'}
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {/* Store Input */}
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-blue-900 mb-1">
-          🏪 {translations.storeName}
-          <span className="text-blue-600 font-normal ml-1">({translations.optional})</span>
-        </label>
-        <input
-          ref={storeInputRef}
-          type="text"
-          value={storeName}
-          onChange={(e) => setStoreName(e.target.value)}
-          placeholder={translations.storePlaceholder}
-          className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-        />
+      {/* Store and Date Inputs Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        {/* Store Input */}
+        <div>
+          <label className="block text-sm font-medium text-blue-900 mb-1">
+            🏪 {translations.storeName}
+            <span className="text-blue-600 font-normal ml-1">({translations.optional})</span>
+          </label>
+          <input
+            ref={storeInputRef}
+            type="text"
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder={translations.storePlaceholder}
+            className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Purchase Date Input - NEW! */}
+        <div>
+          <label className="block text-sm font-medium text-blue-900 mb-1">
+            📅 {translations.purchaseDate || (currency === 'ILS' ? 'תאריך רכישה' : 'Purchase Date')}
+            <span className="text-blue-600 font-normal ml-1">({translations.optional})</span>
+          </label>
+          <input
+            type="date"
+            value={purchaseDate ? new Date(purchaseDate).toISOString().split('T')[0] : ''}
+            onChange={(e) => setPurchaseDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
+            max={new Date().toISOString().split('T')[0]}
+            className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            title={currency === 'ILS' ? 'השאר ריק לתאריך נוכחי' : 'Leave empty for current date'}
+          />
+        </div>
       </div>
 
       {/* Price Inputs */}

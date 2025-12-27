@@ -30,6 +30,8 @@ import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
 import { PurchaseHistory } from './components/PurchaseHistory';
+import { ReceiptScanner } from './components/ReceiptScanner';
+import { analyzeReceiptImage, ReceiptAnalysisResult } from './services/geminiService';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -51,41 +53,12 @@ const getFriendlyUserNameFallback = (user: User | null): string => {
   }
   return 'User';
 };
-
-// Helper to get current month in YYYY-MM format
-const getCurrentMonthString = (): string => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-};
-
-// Helper to get month from date string (ISO or other format)
-const getMonthFromDate = (dateString?: string): string => {
-  try {
-    if (!dateString) return getCurrentMonthString();
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  } catch {
-    return getCurrentMonthString();
-  }
-};
 import { addOrIncrementPurchase } from './services/purchaseHistoryService';
 import { getCanonicalName, getDisplayNameForCanonical, isSemanticDuplicate, normalize } from './services/semanticDupService';
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
-import { ensureHistoricalDates } from './services/ensureHistoricalDates';
-import { repairHistoricalDataForMonths, verifyMonthsVisible } from './services/repairHistoricalData';
-import { fixMonthsVisibility, verifyMonthsAreExtracted } from './services/fixMonthsVisibility';
-import { forceCorrectPricesFormat, verifyExtractableMonths } from './services/forcePricesFormat';
-import { getDailyPurchases } from './services/exportService';
-import { findMissingNovemberData } from './services/findMissingNovemberData';
-import { loadAllHistoryData, verifyHistoryDataLoad } from './services/loadAllHistoryData';
-import { ensureAllMonthsVisible, verifyMonthsVisible as verifyMonthsVisibleNew } from './services/ensureAllMonthsVisible';
 type Language = 'en' | 'he' | 'es';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
 
@@ -233,6 +206,7 @@ const translations = {
     inlinePriceAt: "at",
     inlinePriceTitle: "Quick Price Entry",
     inlinePriceSubtitle: "Add prices for checked items (optional)",
+    inlinePricePurchaseDate: "Purchase Date",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -590,6 +564,7 @@ const translations = {
     inlinePriceAt: "ב",
     inlinePriceTitle: "✏️ הזן מחירים",
     inlinePriceSubtitle: "הוסף מחירים לפריטים שנבחרו (אופציונלי)",
+    inlinePricePurchaseDate: "תאריך רכישה",
     priceModalUnits: [
       { value: "kg", label: "ק״ג" },
       { value: "g", label: "גרם" },
@@ -946,6 +921,7 @@ const translations = {
     inlinePriceAt: "en",
     inlinePriceTitle: "💰 Entrada Rápida de Precios",
     inlinePriceSubtitle: "Agregar precios para artículos seleccionados (opcional)",
+    inlinePricePurchaseDate: "Fecha de Compra",
     priceModalUnits: [
       { value: "kg", label: "kg" },
       { value: "g", label: "g" },
@@ -1233,6 +1209,7 @@ function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
 
   // Subscription & Paywall
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
@@ -1319,16 +1296,6 @@ function App() {
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
   const [toast, setToast] = useState<{ message: string; variant?: ToastVariant } | null>(null);
 
-  // Owner code for testing pro features
-  const [ownerCodeInput, setOwnerCodeInput] = useState('');
-  const [isProBypass, setIsProBypass] = useState(() => {
-    try {
-      return localStorage.getItem('proBypass') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
   // Firestore sync hook
   const { items, historyItems, setItems, setHistoryItems, isSyncing } = useFirestoreSync(listId);
 
@@ -1338,83 +1305,6 @@ function App() {
   // Category migration effect
   useEffect(() => {
     if (listId && user && historyItems && historyItems.length > 0) {
-      // DIAGNOSTIC: Call getDailyPurchases directly to see data structure
-      console.log('\n🔍🔍🔍 RUNNING DIAGNOSTIC: Checking data structure...\n');
-      const dailyPurchases = getDailyPurchases(historyItems, currency);
-      console.log(`\n✅ getDailyPurchases returned ${dailyPurchases.length} days`);
-      if (dailyPurchases.length === 0) {
-        console.error('❌ NO DAYS RETURNED - This is why months are not showing!');
-      }
-      console.log('\n');
-      
-      // VERIFY: Check if all history data was loaded
-      console.log('\n🔍 VERIFYING ALL HISTORY DATA WAS LOADED...\n');
-      verifyHistoryDataLoad(listId, historyItems).then(verifiedHistory => {
-        if (verifiedHistory.length > historyItems.length) {
-          console.log(`\n🚨 FOUND MISSING DATA! Loading ${verifiedHistory.length - historyItems.length} more items\n`);
-          setHistoryItems(verifiedHistory);
-        }
-      }).catch(err => {
-        console.error('Error verifying history data:', err);
-      });
-      
-      // SEARCH: Look for missing November data
-      console.log('\n🔍 SEARCHING FOR MISSING DATA...\n');
-      findMissingNovemberData(historyItems).catch(err => {
-        console.error('Error searching for November data:', err);
-      });
-
-      // ===================================================================
-      // PRIORITY #1: COMPREHENSIVE MONTHS VISIBILITY FIX
-      // This MUST run first to ensure all historical dates are properly set
-      // ===================================================================
-      console.log('🚀 PRIORITY #1: Running comprehensive months visibility fix...');
-      ensureAllMonthsVisible(listId)
-        .then(async (result) => {
-          if (result.success) {
-            console.log('✅ Comprehensive fix completed successfully!');
-            console.log(`   Items checked: ${result.itemsChecked}`);
-            console.log(`   Items fixed: ${result.itemsFixed}`);
-            console.log(`   Prices fixed: ${result.pricesFixed}`);
-            console.log(`   Months found: ${result.monthsFound.join(', ')}`);
-
-            if (result.itemsFixed > 0) {
-              showToast(`✅ Fixed ${result.itemsFixed} items - All ${result.monthsFound.length} months now visible!`, 'success');
-            } else if (result.monthsFound.length > 0) {
-              console.log(`✅ All dates already valid - ${result.monthsFound.length} months visible`);
-            }
-
-            // Verify the fix worked
-            const verifiedMonths = await verifyMonthsVisibleNew(listId);
-            console.log(`🔍 VERIFICATION: ${verifiedMonths.length} months should be visible`);
-          } else {
-            console.error('❌ Comprehensive fix had issues:', result.errors);
-          }
-        })
-        .catch(error => {
-          console.error('❌ Comprehensive months fix failed:', error);
-        });
-
-      // CRITICAL FIRST: Ensure all history items have proper prices format
-      console.log('🔴🔴🔴 CRITICAL: Forcing correct prices format...');
-      forceCorrectPricesFormat(listId)
-        .then(async (wasFixed) => {
-          console.log(`\n✅ Force fix complete - Was fixed: ${wasFixed}`);
-
-          // THEN: Verify what months can be extracted
-          const verification = await verifyExtractableMonths(listId);
-          console.log(`\n✅ VERIFICATION COMPLETE:`);
-          console.log(`   Total extractable months: ${verification.months.length}`);
-          console.log(`   Months: ${verification.months.join(', ')}`);
-
-          if (verification.months.length > 0) {
-            showToast(`✅ Fixed! ${verification.months.length} months visible for price comparison!`, 'success');
-          } else {
-            console.warn('⚠️ WARNING: No months extractable - checking data structure...');
-          }
-        })
-        .catch(error => console.error('Critical fix failed:', error));
-
       if (checkMigrationNeeded(historyItems)) {
         console.log('🔄 Running category migration...');
         migrateOtherCategoryToPantry(listId, historyItems)
@@ -1469,70 +1359,8 @@ function App() {
         .catch(error => {
           console.error('❌ Date year fix failed:', error);
         });
-
-      // CRITICAL: Repair historical data to ensure ALL months visible for price comparison
-      console.log('🔧 CRITICAL: Repairing historical data for month comparison...');
-      repairHistoricalDataForMonths(listId)
-        .then(async (result) => {
-          if (result.success) {
-            console.log(`✅ ${result.message}`);
-            if (result.monthsFound.length > 1) {
-              showToast(`✅ All ${result.monthsFound.length} months visible for price comparison!`, 'success');
-            }
-
-            // Verify the repair worked
-            const verified = await verifyMonthsVisible(listId);
-            if (verified.monthsVisible.length > 1) {
-              console.log(`✅ VERIFIED: ${verified.monthsVisible.length} months found!`);
-              console.log(`   Months: ${verified.monthsVisible.join(', ')}`);
-            }
-          }
-        })
-        .catch(error => {
-          console.error('❌ Critical repair failed:', error);
-        });
     }
   }, [listId, user, historyItems]);
-
-  // Archive items from previous months (only on mount or when month changes)
-  useEffect(() => {
-    if (!listId || !items || items.length === 0) return;
-
-    const currentMonth = getCurrentMonthString();
-    const previousMonthItems = items.filter(item => {
-      const itemMonth = item.monthAdded;
-      // Only archive items that have a monthAdded field set to a previous month
-      // Items without monthAdded are preserved (legacy items from before this feature)
-      return itemMonth && itemMonth !== currentMonth;
-    });
-
-    // If there are items from previous months, archive them to history
-    if (previousMonthItems.length > 0) {
-      console.log(`🗂️ Found ${previousMonthItems.length} items from previous months, archiving...`);
-
-      // Add previous month items to history (one by one to maintain data integrity)
-      let archivedCount = 0;
-      previousMonthItems.forEach(item => {
-        addOrIncrementPurchase(listId, [{
-          name: item.name,
-          category: item.category
-        }]).then(() => {
-          archivedCount++;
-          console.log(`✅ Archived: ${item.name} (${archivedCount}/${previousMonthItems.length})`);
-        }).catch(err => console.error('Failed to archive item:', item.name, err));
-      });
-
-      // Remove previous month items from current list
-      setItems(prevItems =>
-        prevItems.filter(item => {
-          const itemMonth = item.monthAdded;
-          return !itemMonth || itemMonth === currentMonth;
-        })
-      );
-
-      showToast(`Archived ${previousMonthItems.length} items from previous month to history`, 'success');
-    }
-  }, [listId]);
 
   // Local loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -1573,6 +1401,35 @@ function App() {
     setToast({ message, variant });
     setTimeout(() => setToast(null), 2500);
   }, []);
+
+  const handleReceiptConfirm = async (result: ReceiptAnalysisResult) => {
+    if (!listId) return;
+
+    setIsLoading(true);
+    try {
+      const purchases = result.items.map(item => ({
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        currency: result.currency,
+        store: result.storeName,
+        quantity: item.quantity,
+        unit: item.unit,
+        purchaseDate: result.purchaseDate
+      }));
+
+      await addOrIncrementPurchase(listId, purchases);
+      showToast(language === 'he' ? 'הרכישות נוספו בהצלחה!' : language === 'es' ? '¡Compras añadidas con éxito!' : 'Purchases added successfully!', 'success');
+
+      // Switch view to daily to see the new purchases
+      setCurrentView('daily');
+    } catch (err) {
+      console.error(err);
+      showToast(language === 'he' ? 'שגיאה בהוספת הרכישות' : language === 'es' ? 'Error al añadir compras' : 'Error adding purchases', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Using shared service isSemanticDuplicate()
 
@@ -1705,27 +1562,6 @@ function App() {
     }
   };
 
-  // Owner code handler for testing pro features
-  const handleOwnerCodeSubmit = () => {
-    // Owner code: OWNER-PRO-2024 (you can change this to any code you want)
-    const validCode = 'OWNER-PRO-2024';
-
-    if (ownerCodeInput.trim().toUpperCase() === validCode) {
-      setIsProBypass(true);
-      localStorage.setItem('proBypass', 'true');
-      showToast('✅ Pro features unlocked for testing!', 'success');
-      setOwnerCodeInput('');
-    } else {
-      showToast('❌ Invalid owner code', 'error');
-    }
-  };
-
-  const handleDisableProBypass = () => {
-    setIsProBypass(false);
-    localStorage.removeItem('proBypass');
-    showToast('Pro bypass disabled', 'info');
-  };
-
   const handleAddItem = useCallback(async (itemText: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
@@ -1736,7 +1572,6 @@ function App() {
       const newItems: GroceryItem[] = [];
       // Track existing names, prevent duplicates including semantic matches
       const existingLower = items.map(i => normalize(i.name));
-      const currentMonth = getCurrentMonthString();
       categorizedResult.forEach(cat => {
         cat.items.forEach(parsedItem => {
           if (isSemanticDuplicate(parsedItem.name, existingLower)) return;
@@ -1748,8 +1583,7 @@ function App() {
             category: cat.category || currentText.uncategorized,
             quantity: parsedItem.quantity,
             unit: parsedItem.unit,
-            originalText: parsedItem.originalText,
-            monthAdded: currentMonth
+            originalText: parsedItem.originalText
           });
         });
       });
@@ -1797,7 +1631,6 @@ function App() {
       name: historyItem.name,
       completed: false,
       category: historyItem.category || currentText.uncategorized,
-      monthAdded: getCurrentMonthString()
     };
 
     console.log('Adding new item to list:', newItem);
@@ -2000,13 +1833,14 @@ function App() {
   }, [isInstallable, installApp, currentText, showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
-  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string; quantity?: number; unit?: string; unitPrice?: number }[]) => {
+  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string; quantity?: number; unit?: string; unitPrice?: number; purchaseDate?: string }[]) => {
     if (!listId) return;
 
     console.log('🔄 Processing completed items with prices:', itemsWithPrices);
 
     try {
       // FIRST: Update history in Firestore (with prices and store)
+      // CRITICAL: Pass through purchaseDate to preserve historical accuracy
       await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({
         name: i.name,
         category: i.category,
@@ -2015,7 +1849,8 @@ function App() {
         currency: currency,
         quantity: i.quantity,
         unit: i.unit,
-        unitPrice: i.unitPrice
+        unitPrice: i.unitPrice,
+        purchaseDate: i.purchaseDate  // NEW: Preserve custom purchase dates
       })));
 
       console.log('✅ Purchase history updated in Firestore');
@@ -2087,7 +1922,6 @@ function App() {
     );
 
     // Add each item from the category that's not already in the current list
-    const currentMonth = getCurrentMonthString();
     categoryItems.forEach(historyItem => {
       const itemExists = isSemanticDuplicate(historyItem.name, items.map(i => i.name));
       if (!itemExists) {
@@ -2097,8 +1931,7 @@ function App() {
           completed: false,
           category: historyItem.category,
           quantity: 1,
-          originalText: historyItem.name,
-          monthAdded: currentMonth
+          originalText: historyItem.name
         };
 
         setItems(prevItems => [newItem, ...prevItems]);
@@ -2118,8 +1951,7 @@ function App() {
         completed: false,
         category: suggestion.item.category,
         quantity: 1,
-        originalText: suggestion.item.name,
-        monthAdded: getCurrentMonthString()
+        originalText: suggestion.item.name
       };
 
       setItems(prevItems => [newItem, ...prevItems]);
@@ -2127,22 +1959,16 @@ function App() {
   }, [items, setItems]);
 
   const handleImportSuccess = useCallback(async (importedItems: GroceryItem[]) => {
-    const currentMonth = getCurrentMonthString();
-    const itemsWithMonth = importedItems.map(item => ({
-      ...item,
-      monthAdded: item.monthAdded || currentMonth
-    }));
-
     if (!listId) {
       // No list yet; fallback to adding into current list to avoid data loss
-      setItems(prevItems => [...itemsWithMonth, ...prevItems]);
+      setItems(prevItems => [...importedItems, ...prevItems]);
       setShowImportExport(false);
       return;
     }
 
     try {
       // Add imported items directly to purchase history
-      await addOrIncrementPurchase(listId, itemsWithMonth.map(i => ({
+      await addOrIncrementPurchase(listId, importedItems.map(i => ({
         name: i.name,
         category: i.category,
       })));
@@ -2150,7 +1976,7 @@ function App() {
       setShowImportExport(false);
     } catch (e) {
       console.warn('Failed to add items to purchase history, falling back to add to list', e);
-      setItems(prevItems => [...itemsWithMonth, ...prevItems]);
+      setItems(prevItems => [...importedItems, ...prevItems]);
       setShowImportExport(false);
     }
   }, [listId, setItems]);
@@ -2381,6 +2207,7 @@ function App() {
         {currentView === 'dashboard' ? (
           <DashboardPage
             onNavigate={(view) => setCurrentView(view as View)}
+            onScanReceipt={() => setIsReceiptScannerOpen(true)}
             translations={{
               dashboard: currentText.dashboard,
               list: currentText.list,
@@ -2406,6 +2233,8 @@ function App() {
               addItem: currentText.addItem,
               bestDeals: currentText.bestDeals,
               dashboardHelpText: currentText.dashboardHelpText,
+              scanReceipt: currentText.scanReceipt,
+              scanReceiptDesc: currentText.scanReceiptDesc,
             }}
             itemsCount={items.length}
             historyCount={historyItems.length}
@@ -2616,11 +2445,12 @@ function App() {
                 unitPrice: currentText.priceModalUnitPrice,
                 totalPrice: currentText.priceModalTotalPrice,
                 units: currentText.priceModalUnits,
+                purchaseDate: currentText.inlinePricePurchaseDate,
               }}
             />
 
             {/* Ad Banner for Free Users */}
-            {(!subscription || subscription.plan === 'free') && !isProBypass && (
+            {(!subscription || subscription.plan === 'free') && (
               <>
                 <AdBanner
                   adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
@@ -2721,6 +2551,7 @@ function App() {
             onDataChange={handleLoadHistoryItems}
             language={language}
             isOwner={isOwner}
+            onScanReceipt={() => setIsReceiptScannerOpen(true)}
             translations={{
               selectMonth: currentText.selectMonth || 'Select a Month',
               noMonths: currentText.noMonths || 'No purchase history yet',
@@ -2733,6 +2564,7 @@ function App() {
               confirmDelete: currentText.confirmDelete || 'Are you sure you want to delete this purchase?',
               deleteDay: currentText.deleteDay || 'Delete entire day',
               confirmDeleteDay: currentText.confirmDeleteDay || 'Are you sure you want to delete all purchases from this day?',
+              scanReceipt: currentText.scanReceipt,
             }}
           />
         ) : currentView === 'history' ? (
@@ -2901,58 +2733,6 @@ function App() {
                           {isUpdatingDisplayName ? currentText.savingDisplayName : currentText.saveDisplayName}
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Owner Code for Testing (Show if logged in) */}
-                  {user && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                        🔑 Pro Access Code
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        Enter code to unlock pro features for testing: <strong>OWNER-PRO-2024</strong>
-                      </p>
-
-                      {isProBypass ? (
-                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
-                              ✅ Pro Features Unlocked
-                            </span>
-                          </div>
-                          <p className="text-xs text-green-600 dark:text-green-400 mb-2">
-                            All pro features are now available for testing
-                          </p>
-                          <button
-                            onClick={handleDisableProBypass}
-                            className="w-full px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                          >
-                            Disable Pro Bypass
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={ownerCodeInput}
-                            onChange={(e) => setOwnerCodeInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleOwnerCodeSubmit();
-                              }
-                            }}
-                            placeholder="Enter owner code..."
-                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                          <button
-                            onClick={handleOwnerCodeSubmit}
-                            className="px-4 py-2 bg-purple-500 text-white rounded-md text-sm hover:bg-purple-600 transition-colors"
-                          >
-                            Unlock
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -3176,7 +2956,7 @@ function App() {
         <PaywallModal
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
-          currentPlan={isProBypass ? 'pro' : (subscription?.plan || 'free')}
+          currentPlan={subscription?.plan || 'free'}
           userId={user?.uid}
           onSubscriptionUpdated={refreshSubscription}
           translations={{
@@ -3223,6 +3003,15 @@ function App() {
           }}
         />
       )}
+
+      {/* Receipt Scanner Modal */}
+      <ReceiptScanner
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        onConfirm={handleReceiptConfirm}
+        language={language}
+        currency={currency}
+      />
     </div>
   );
 }

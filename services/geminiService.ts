@@ -8,13 +8,13 @@ const getAiClient = (): GoogleGenAI => {
   if (ai) {
     return ai;
   }
-  
+
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("Gemini API key not found. AI features will be disabled.");
     throw new Error("Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment variables.");
   }
-  
+
   ai = new GoogleGenAI({ apiKey });
   return ai;
 };
@@ -62,52 +62,104 @@ const schema = {
   }
 };
 
+const receiptSchema = {
+  type: Type.OBJECT,
+  properties: {
+    storeName: {
+      type: Type.STRING,
+      description: "The name of the store (e.g., 'Walmart', 'Rami Levy')"
+    },
+    purchaseDate: {
+      type: Type.STRING,
+      description: "The date of purchase in YYYY-MM-DD format if found, otherwise today's date"
+    },
+    currency: {
+      type: Type.STRING,
+      description: "The currency code (e.g., 'ILS', 'USD', 'EUR')"
+    },
+    items: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: {
+            type: Type.STRING,
+            description: "The name of the item"
+          },
+          category: {
+            type: Type.STRING,
+            description: "Grocery category for the item"
+          },
+          price: {
+            type: Type.NUMBER,
+            description: "The price of the item"
+          },
+          quantity: {
+            type: Type.NUMBER,
+            description: "The quantity or weight of the item (default to 1)"
+          },
+          unit: {
+            type: Type.STRING,
+            description: "The unit (e.g., 'kg', 'g', 'L', 'piece')"
+          }
+        },
+        required: ["name", "category", "price", "quantity"]
+      }
+    },
+    totalAmount: {
+      type: Type.NUMBER,
+      description: "The total amount paid on the receipt"
+    }
+  },
+  required: ["storeName", "purchaseDate", "currency", "items", "totalAmount"]
+};
+
 
 export interface ParsedGroceryItem {
-    name: string;
-    quantity: number;
-    unit?: string;
-    originalText: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+  originalText: string;
 }
 
 export interface CategorizedResponse {
-    category: string;
-    items: ParsedGroceryItem[];
+  category: string;
+  items: ParsedGroceryItem[];
 }
 
 // Function to detect the language of input text
 const detectInputLanguage = (text: string): 'en' | 'he' | 'es' => {
-    // Hebrew Unicode range
-    if (/[\u0590-\u05FF]/.test(text)) return 'he';
-    // Spanish specific characters
-    if (/[ñáéíóúüÑÁÉÍÓÚÜ¿¡]/.test(text)) return 'es';
-    // Default to English
-    return 'en';
+  // Hebrew Unicode range
+  if (/[\u0590-\u05FF]/.test(text)) return 'he';
+  // Spanish specific characters
+  if (/[ñáéíóúüÑÁÉÍÓÚÜ¿¡]/.test(text)) return 'es';
+  // Default to English
+  return 'en';
 };
 
 export const categorizeGroceries = async (newItemText: string, existingItems: string[], uiLanguage: 'en' | 'he' | 'es'): Promise<CategorizedResponse[]> => {
-    // Check cache first
-    const cachedResult = getCachedCategorization(newItemText, uiLanguage);
-    if (cachedResult) {
-      return cachedResult;
-    }
+  // Check cache first
+  const cachedResult = getCachedCategorization(newItemText, uiLanguage);
+  if (cachedResult) {
+    return cachedResult;
+  }
 
-    // Detect the actual language of the input text
-    const inputLanguage = detectInputLanguage(newItemText);
-    
-    const languageMap = {
-      en: 'English',
-      he: 'Hebrew',
-      es: 'Spanish'
-    };
-    
-    // Use the detected input language for the response, not the UI language
-    const responseLanguage = inputLanguage;
-    const languageName = languageMap[responseLanguage];
+  // Detect the actual language of the input text
+  const inputLanguage = detectInputLanguage(newItemText);
 
-    const categoryList = getCategoryPromptList(responseLanguage);
-    
-    const prompt = `
+  const languageMap = {
+    en: 'English',
+    he: 'Hebrew',
+    es: 'Spanish'
+  };
+
+  // Use the detected input language for the response, not the UI language
+  const responseLanguage = inputLanguage;
+  const languageName = languageMap[responseLanguage];
+
+  const categoryList = getCategoryPromptList(responseLanguage);
+
+  const prompt = `
       You are an expert grocery list assistant. Your task is to parse and categorize new grocery items with quantity and unit information.
       
       IMPORTANT: The user input is in ${languageName}. You MUST preserve the original language and script of the items exactly as provided. Do NOT translate the item names.
@@ -153,12 +205,12 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
 
     const jsonText = response.text.trim();
     console.log('Gemini categorization response:', jsonText);
-    
+
     let parsedResponse: CategorizedResponse[];
-    
+
     try {
       const parsed = JSON.parse(jsonText);
-      
+
       // Handle both array format and object format
       if (Array.isArray(parsed)) {
         parsedResponse = parsed as CategorizedResponse[];
@@ -167,37 +219,37 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
       } else {
         throw new Error("AI returned unexpected format");
       }
-      
+
       // Normalize category names to ensure consistency
       parsedResponse = parsedResponse.map(item => ({
         ...item,
         category: normalizeCategory(item.category, responseLanguage)
       }));
-      
+
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
       throw new Error("AI returned invalid JSON");
     }
-    
+
     // Cache successful result
     setCachedCategorization(newItemText, uiLanguage, parsedResponse);
-    
+
     return parsedResponse;
   } catch (error) {
     console.error("Error calling Gemini API, falling back to local categorization:", error);
-    
+
     // Use local categorization as fallback
     try {
       const localResult = categorizeGroceriesLocally(newItemText, existingItems, responseLanguage);
       console.log("Successfully used local categorization fallback");
-      
+
       // Cache the local result too
       setCachedCategorization(newItemText, uiLanguage, localResult);
-      
+
       return localResult;
     } catch (localError) {
       console.error("Local categorization also failed:", localError);
-      
+
       // Last resort: return uncategorized items
       const fallbackResult: CategorizedResponse[] = [{
         category: responseLanguage === 'he' ? 'מזווה' : responseLanguage === 'es' ? 'Otros' : 'Other',
@@ -207,7 +259,7 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
           originalText: item.trim()
         }))
       }];
-      
+
       return fallbackResult;
     }
   }
@@ -222,7 +274,7 @@ export const categorizeAndTranslateImportedItems = async (
   const languageNames = { en: 'English', he: 'Hebrew', es: 'Spanish' };
   const languageName = languageNames[targetLanguage];
   const categoryList = getCategoryPromptList(targetLanguage);
-  
+
   const prompt = `
       You are an expert grocery list assistant. Your task is to parse, categorize, and translate imported grocery items.
       
@@ -264,12 +316,12 @@ export const categorizeAndTranslateImportedItems = async (
 
     const result = response.text;
     console.log('Gemini translation response:', result);
-    
+
     let parsedResponse: CategorizedResponse[];
-    
+
     try {
       const parsed = JSON.parse(result);
-      
+
       // Handle both array format and object format
       if (Array.isArray(parsed)) {
         parsedResponse = parsed as CategorizedResponse[];
@@ -278,36 +330,36 @@ export const categorizeAndTranslateImportedItems = async (
       } else {
         throw new Error("AI returned unexpected format");
       }
-      
+
       // Normalize category names to ensure consistency
       parsedResponse = parsedResponse.map(item => ({
         ...item,
         category: normalizeCategory(item.category, targetLanguage)
       }));
-      
+
     } catch (parseError) {
       console.error("Failed to parse AI translation response:", parseError);
       throw new Error("AI returned invalid JSON for translation");
     }
-    
+
     // Cache the result
     setCachedCategorization(newItemText, targetLanguage, parsedResponse);
-    
+
     return parsedResponse;
   } catch (error) {
     console.error("Gemini translation failed:", error);
-    
+
     // Fallback to local categorization (without translation for now)
     try {
       const localResult = await categorizeGroceriesLocally(newItemText, existingItems, targetLanguage);
-      
+
       // Cache the local result too
       setCachedCategorization(newItemText, targetLanguage, localResult);
-      
+
       return localResult;
     } catch (localError) {
       console.error("Local translation also failed:", localError);
-      
+
       // Last resort: return items in original language with translated categories
       const responseLanguage = targetLanguage === 'he' ? 'he' : targetLanguage === 'es' ? 'es' : 'en';
       const fallbackResult: CategorizedResponse[] = [{
@@ -318,8 +370,92 @@ export const categorizeAndTranslateImportedItems = async (
           originalText: item.trim()
         }))
       }];
-      
+
       return fallbackResult;
     }
+  }
+};
+
+export interface ReceiptItem {
+  name: string;
+  category: string;
+  price: number;
+  quantity: number;
+  unit?: string;
+}
+
+export interface ReceiptAnalysisResult {
+  storeName: string;
+  purchaseDate: string;
+  currency: string;
+  items: ReceiptItem[];
+  totalAmount: number;
+}
+
+export const analyzeReceiptImage = async (
+  base64Image: string,
+  uiLanguage: 'en' | 'he' | 'es'
+): Promise<ReceiptAnalysisResult> => {
+  const languageNames = { en: 'English', he: 'Hebrew', es: 'Spanish' };
+  const languageName = languageNames[uiLanguage];
+  const categoryList = getCategoryPromptList(uiLanguage);
+
+  const prompt = `
+    Analyze this receipt image and extract all grocery items, their prices, quantities, and categories.
+    
+    1. **storeName**: Extract the store name.
+    2. **purchaseDate**: Extract the date of purchase (YYYY-MM-DD). If not clear, use today's date ${new Date().toISOString().split('T')[0]}.
+    3. **currency**: Detect the currency (ILS, USD, etc.).
+    4. **items**: List each product with:
+       - **name**: Keep it in the language found on the receipt, but clean it up (remove internal codes).
+       - **category**: Map to one of these EXACT categories (in ${languageName}): ${categoryList}.
+       - **price**: The price for that item/quantity.
+       - **quantity**: The number of items or weight.
+       - **unit**: The unit if applicable.
+    5. **totalAmount**: The total amount shown on the receipt.
+
+    CRITICAL: You MUST use the EXACT category names provided. Do not invent new categories.
+    Return the result as a JSON object adhering to the provided schema.
+  `;
+
+  try {
+    const geminiClient = getAiClient();
+    const result = await geminiClient.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                data: base64Image.split(',')[1] || base64Image,
+                mimeType: "image/jpeg"
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: receiptSchema,
+      },
+    });
+
+    const jsonText = result.text.trim();
+    console.log('Gemini receipt analysis response:', jsonText);
+
+    const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;
+
+    // Normalize categories
+    parsed.items = parsed.items.map(item => ({
+      ...item,
+      category: normalizeCategory(item.category, uiLanguage)
+    }));
+
+    return parsed;
+  } catch (error) {
+    console.error("Error analyzing receipt with Gemini:", error);
+    throw new Error("Failed to analyze receipt. Please try again or enter items manually.");
   }
 };

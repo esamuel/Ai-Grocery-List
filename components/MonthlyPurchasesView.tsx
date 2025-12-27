@@ -24,7 +24,9 @@ interface MonthlyPurchasesViewProps {
     confirmDelete: string;
     deleteDay: string;
     confirmDeleteDay: string;
+    scanReceipt?: string;
   };
+  onScanReceipt?: () => void;
 }
 
 interface MonthData {
@@ -43,7 +45,8 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   onDataChange,
   language = 'en',
   isOwner = false,
-  translations
+  translations,
+  onScanReceipt
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -320,8 +323,11 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
                     <div className="text-right min-w-[80px]">
                       {item.price !== undefined ? (
                         <>
-                          <div className="text-gray-800 font-semibold text-base">
+                          <div className="text-gray-800 font-semibold text-base flex items-center justify-end gap-1">
                             {getCurrencySymbol()}{item.price.toFixed(2)}
+                            {item.estimatedPrice && (
+                              <span className="text-xs text-amber-600" title="Estimated price based on history">≈</span>
+                            )}
                           </div>
                           {item.unitPrice && item.unit && (
                             <div className="text-xs text-gray-500 mt-0.5">
@@ -435,8 +441,15 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="text-center">
+      <div className="flex flex-col items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800">{translations.selectMonth}</h2>
+        <button
+          onClick={onScanReceipt}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <span>📸</span>
+          {translations.scanReceipt || 'Scan Receipt'}
+        </button>
       </div>
 
       {/* Month cards grid */}

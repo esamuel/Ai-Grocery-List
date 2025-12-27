@@ -39,6 +39,7 @@ interface GroceryListProps {
     cancel: string;
     optional: string;
     at: string;
+    purchaseDate?: string;
   };
 }
 
