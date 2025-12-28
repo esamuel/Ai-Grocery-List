@@ -438,8 +438,9 @@ export const analyzeReceiptImage = async (
   try {
     const geminiClient = getAiClient();
 
+    // Switch to gemini-1.5-pro for better OCR performance on dense receipts
     const result = await geminiClient.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-pro",
       contents: [
         {
           role: "user",
@@ -461,7 +462,7 @@ export const analyzeReceiptImage = async (
     });
 
     const jsonText = result.text.trim();
-    console.log('Gemini receipt analysis response:', jsonText);
+    console.log('Gemini receipt analysis response (Pro):', jsonText);
 
     const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;
 
@@ -473,10 +474,45 @@ export const analyzeReceiptImage = async (
 
     return parsed;
   } catch (error) {
-    console.error("Error analyzing receipt with Gemini:", error);
-    if (error instanceof Error && error.message.includes("SAFETY")) {
-      throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
+    console.error("Error analyzing receipt with Gemini Pro:", error);
+
+    // Fallback to Flash if Pro fails (e.g., quota or timeout)
+    try {
+      console.log("Attempting fallback to gemini-1.5-flash...");
+      const geminiClient = getAiClient();
+      const flashResult = await geminiClient.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  data: base64Image.split(',')[1] || base64Image,
+                  mimeType: mimeType
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: receiptSchema,
+        },
+      });
+      const flashJson = flashResult.text.trim();
+      const parsed = JSON.parse(flashJson) as ReceiptAnalysisResult;
+      parsed.items = parsed.items.map(item => ({
+        ...item,
+        category: normalizeCategory(item.category, uiLanguage)
+      }));
+      return parsed;
+    } catch (fallbackError) {
+      if (error instanceof Error && error.message.includes("SAFETY")) {
+        throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
+      }
+      throw new Error(uiLanguage === 'he' ? "שיפור הניתוח נכשל. המערכת לא הצליחה לקרוא את הטקסט. נסה לצלם תמונה ברורה יותר, מקרוב ועם תאורה טובה." : "Analysis failed. The AI couldn't parse the text. Try a clearer photo, close-up and with good lighting.");
     }
-    throw new Error(uiLanguage === 'he' ? "שגיאה בניתוח הקבלה. המערכת לא הצליחה לקרוא את הטקסט באופן תקין. נסה לצלם תמונה ברורה יותר." : "Failed to analyze receipt. The AI couldn't parse the text clearly. Please try a clearer photo.");
   }
 };
