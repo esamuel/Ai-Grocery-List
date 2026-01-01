@@ -149,10 +149,16 @@ export const handler: Handler = async (event) => {
 
     let jsonText: string;
     try {
-      jsonText = await runModel('gemini-1.5-pro-latest');
+      // Try Gemini 2.0 Flash first (faster and newer)
+      jsonText = await runModel('gemini-2.0-flash-exp');
     } catch (err) {
-      console.warn('Pro model failed, retrying with flash', err);
-      jsonText = await runModel('gemini-1.5-flash-latest');
+      console.warn('Gemini 2.0 Flash failed, trying 1.5 Pro', err);
+      try {
+        jsonText = await runModel('gemini-1.5-pro');
+      } catch (err2) {
+        console.warn('Gemini 1.5 Pro failed, trying 1.5 Flash', err2);
+        jsonText = await runModel('gemini-1.5-flash');
+      }
     }
 
     const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;

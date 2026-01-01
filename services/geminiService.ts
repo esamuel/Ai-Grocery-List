@@ -493,9 +493,9 @@ export const analyzeReceiptImage = async (
 
     const geminiClient = getAiClient();
 
-    // Switch to gemini-1.5-pro-latest for better OCR performance on dense receipts
+    // Try Gemini 2.0 Flash first (faster, newer, better OCR)
     const result = await geminiClient.models.generateContent({
-      model: "gemini-1.5-pro-latest",
+      model: "gemini-2.0-flash-exp",
       contents: [
         {
           role: "user",
@@ -531,12 +531,12 @@ export const analyzeReceiptImage = async (
   } catch (error) {
     console.error("Error analyzing receipt with Gemini Pro:", error);
 
-    // Fallback to Flash if Pro fails (e.g., quota or timeout)
+    // Fallback to 1.5 Pro if 2.0 Flash fails
     try {
-      console.log("Attempting fallback to gemini-1.5-flash-latest...");
+      console.log("Attempting fallback to gemini-1.5-pro...");
       const geminiClient = getAiClient();
-      const flashResult = await geminiClient.models.generateContent({
-        model: "gemini-1.5-flash-latest",
+      const proResult = await geminiClient.models.generateContent({
+        model: "gemini-1.5-pro",
         contents: [
           {
             role: "user",
@@ -556,24 +556,58 @@ export const analyzeReceiptImage = async (
           responseSchema: receiptSchema,
         },
       });
-      const flashJson = flashResult.text.trim();
-      const parsed = JSON.parse(flashJson) as ReceiptAnalysisResult;
+      const proJson = proResult.text.trim();
+      const parsed = JSON.parse(proJson) as ReceiptAnalysisResult;
       parsed.items = parsed.items.map(item => ({
         ...item,
         category: normalizeCategory(item.category, uiLanguage)
       }));
       return parsed;
     } catch (fallbackError) {
-      if (error instanceof Error && error.message.includes("SAFETY")) {
-        throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
+      // Last resort: try 1.5 Flash
+      try {
+        console.log("Final fallback to gemini-1.5-flash...");
+        const geminiClient = getAiClient();
+        const flashResult = await geminiClient.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    data: base64Image.split(',')[1] || base64Image,
+                    mimeType: mimeType
+                  }
+                }
+              ]
+            }
+          ],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: receiptSchema,
+          },
+        });
+        const flashJson = flashResult.text.trim();
+        const flashParsed = JSON.parse(flashJson) as ReceiptAnalysisResult;
+        flashParsed.items = flashParsed.items.map(item => ({
+          ...item,
+          category: normalizeCategory(item.category, uiLanguage)
+        }));
+        return flashParsed;
+      } catch (finalError) {
+        if (error instanceof Error && error.message.includes("SAFETY")) {
+          throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
+        }
+        const friendlyMessage =
+          uiLanguage === 'he'
+            ? "ניתוח הקבלה נכשל. ודא שהתמונה חדה, ללא השתקפויות והטקסט כולו נראה. נסה לצלם שוב מקרוב עם תאורה טובה."
+            : uiLanguage === 'es'
+              ? "El análisis del recibo falló. Asegúrate de que la foto sea nítida, sin reflejos y que todo el texto sea visible."
+              : "Receipt analysis failed. Make sure the photo is sharp, without glare, and all text is visible.";
+        throw new Error(friendlyMessage);
       }
-      const friendlyMessage =
-        uiLanguage === 'he'
-          ? "ניתוח הקבלה נכשל. ודא שהתמונה חדה, ללא השתקפויות והטקסט כולו נראה. נסה לצלם שוב מקרוב עם תאורה טובה."
-          : uiLanguage === 'es'
-            ? "El análisis del recibo falló. Asegúrate de que la foto sea nítida, sin reflejos y que todo el texto sea visible."
-            : "Receipt analysis failed. Make sure the photo is sharp, without glare, and all text is visible.";
-      throw new Error(friendlyMessage);
     }
   }
 };
