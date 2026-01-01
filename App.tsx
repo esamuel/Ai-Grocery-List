@@ -30,8 +30,6 @@ import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
 import { PurchaseHistory } from './components/PurchaseHistory';
-import { ReceiptScanner } from './components/ReceiptScanner';
-import { analyzeReceiptImage, ReceiptAnalysisResult } from './services/geminiService';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1209,7 +1207,6 @@ function App() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
-  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
 
   // Subscription & Paywall
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
@@ -1402,34 +1399,6 @@ function App() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
-  const handleReceiptConfirm = async (result: ReceiptAnalysisResult) => {
-    if (!listId) return;
-
-    setIsLoading(true);
-    try {
-      const purchases = result.items.map(item => ({
-        name: item.name,
-        category: item.category,
-        price: item.price,
-        currency: result.currency,
-        store: result.storeName,
-        quantity: item.quantity,
-        unit: item.unit,
-        purchaseDate: result.purchaseDate
-      }));
-
-      await addOrIncrementPurchase(listId, purchases);
-      showToast(language === 'he' ? 'הרכישות נוספו בהצלחה!' : language === 'es' ? '¡Compras añadidas con éxito!' : 'Purchases added successfully!', 'success');
-
-      // Switch view to daily to see the new purchases
-      setCurrentView('daily');
-    } catch (err) {
-      console.error(err);
-      showToast(language === 'he' ? 'שגיאה בהוספת הרכישות' : language === 'es' ? 'Error al añadir compras' : 'Error adding purchases', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Using shared service isSemanticDuplicate()
 
@@ -2207,7 +2176,6 @@ function App() {
         {currentView === 'dashboard' ? (
           <DashboardPage
             onNavigate={(view) => setCurrentView(view as View)}
-            onScanReceipt={() => setIsReceiptScannerOpen(true)}
             translations={{
               dashboard: currentText.dashboard,
               list: currentText.list,
@@ -2551,7 +2519,6 @@ function App() {
             onDataChange={handleLoadHistoryItems}
             language={language}
             isOwner={isOwner}
-            onScanReceipt={() => setIsReceiptScannerOpen(true)}
             translations={{
               selectMonth: currentText.selectMonth || 'Select a Month',
               noMonths: currentText.noMonths || 'No purchase history yet',
@@ -3004,14 +2971,6 @@ function App() {
         />
       )}
 
-      {/* Receipt Scanner Modal */}
-      <ReceiptScanner
-        isOpen={isReceiptScannerOpen}
-        onClose={() => setIsReceiptScannerOpen(false)}
-        onConfirm={handleReceiptConfirm}
-        language={language}
-        currency={currency}
-      />
     </div>
   );
 }
