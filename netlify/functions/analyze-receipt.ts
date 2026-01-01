@@ -149,10 +149,10 @@ export const handler: Handler = async (event) => {
 
     let jsonText: string;
     try {
-      jsonText = await runModel('gemini-1.5-pro');
+      jsonText = await runModel('gemini-1.5-pro-latest');
     } catch (err) {
       console.warn('Pro model failed, retrying with flash', err);
-      jsonText = await runModel('gemini-1.5-flash');
+      jsonText = await runModel('gemini-1.5-flash-latest');
     }
 
     const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;

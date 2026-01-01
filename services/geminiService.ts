@@ -493,9 +493,9 @@ export const analyzeReceiptImage = async (
 
     const geminiClient = getAiClient();
 
-    // Switch to gemini-1.5-pro for better OCR performance on dense receipts
+    // Switch to gemini-1.5-pro-latest for better OCR performance on dense receipts
     const result = await geminiClient.models.generateContent({
-      model: "gemini-1.5-pro",
+      model: "gemini-1.5-pro-latest",
       contents: [
         {
           role: "user",
@@ -533,10 +533,10 @@ export const analyzeReceiptImage = async (
 
     // Fallback to Flash if Pro fails (e.g., quota or timeout)
     try {
-      console.log("Attempting fallback to gemini-1.5-flash...");
+      console.log("Attempting fallback to gemini-1.5-flash-latest...");
       const geminiClient = getAiClient();
       const flashResult = await geminiClient.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-1.5-flash-latest",
         contents: [
           {
             role: "user",
