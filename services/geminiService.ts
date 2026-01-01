@@ -3,6 +3,7 @@ import { categorizeGroceriesLocally, getCachedCategorization, setCachedCategoriz
 import { normalizeCategory, getCategoryPromptList, type Language } from './categoryTranslations';
 
 let ai: GoogleGenAI | null = null;
+const receiptFunctionUrl = import.meta.env.VITE_RECEIPT_FUNCTION_URL || '/.netlify/functions/analyze-receipt';
 // Lazily initialize the AI client on first use to prevent app crash on load.
 const getAiClient = (): GoogleGenAI => {
   if (ai) {
@@ -392,6 +393,40 @@ export interface ReceiptAnalysisResult {
   totalAmount: number;
 }
 
+const callServerlessReceiptAnalysis = async (
+  base64Image: string,
+  uiLanguage: 'en' | 'he' | 'es'
+): Promise<ReceiptAnalysisResult> => {
+  if (typeof fetch === 'undefined') {
+    throw new Error('fetch not available');
+  }
+
+  const response = await fetch(receiptFunctionUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64Image, language: uiLanguage })
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    let serverMessage = text;
+    try {
+      const parsed = JSON.parse(text);
+      serverMessage = parsed?.message || text;
+    } catch {
+      // ignore parse errors and use raw text
+    }
+    throw new Error(serverMessage || 'Receipt analysis failed on server');
+  }
+
+  const parsed = JSON.parse(text) as ReceiptAnalysisResult;
+  parsed.items = parsed.items.map(item => ({
+    ...item,
+    category: normalizeCategory(item.category, uiLanguage)
+  }));
+  return parsed;
+};
+
 export const analyzeReceiptImage = async (
   base64Image: string,
   uiLanguage: 'en' | 'he' | 'es'
@@ -436,6 +471,13 @@ export const analyzeReceiptImage = async (
   `;
 
   try {
+    // Prefer serverless function to avoid client-side CORS/quota hiccups
+    try {
+      return await callServerlessReceiptAnalysis(base64Image, uiLanguage);
+    } catch (serverErr) {
+      console.warn('Server receipt analysis unavailable, using client Gemini:', serverErr);
+    }
+
     const geminiClient = getAiClient();
 
     // Switch to gemini-1.5-pro for better OCR performance on dense receipts
@@ -512,7 +554,13 @@ export const analyzeReceiptImage = async (
       if (error instanceof Error && error.message.includes("SAFETY")) {
         throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
       }
-      throw new Error(uiLanguage === 'he' ? "שיפור הניתוח נכשל. המערכת לא הצליחה לקרוא את הטקסט. נסה לצלם תמונה ברורה יותר, מקרוב ועם תאורה טובה." : "Analysis failed. The AI couldn't parse the text. Try a clearer photo, close-up and with good lighting.");
+      const friendlyMessage =
+        uiLanguage === 'he'
+          ? "ניתוח הקבלה נכשל. ודא שהתמונה חדה, ללא השתקפויות והטקסט כולו נראה. נסה לצלם שוב מקרוב עם תאורה טובה."
+          : uiLanguage === 'es'
+            ? "El análisis del recibo falló. Asegúrate de que la foto sea nítida, sin reflejos y que todo el texto sea visible."
+            : "Receipt analysis failed. Make sure the photo is sharp, without glare, and all text is visible.";
+      throw new Error(friendlyMessage);
     }
   }
 };
