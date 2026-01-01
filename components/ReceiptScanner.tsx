@@ -80,8 +80,31 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             const analysis = await analyzeReceiptImage(image, language);
             setResult(analysis);
         } catch (err: any) {
-            console.error(err);
-            setError(err.message || (language === 'he' ? 'שגיאה בניתוח הקבלה. נסה שוב.' : language === 'es' ? 'Error al analizar el recibo. Inténtalo de nuevo.' : 'Error analyzing receipt. Try again.'));
+            console.error('Receipt analysis error:', err);
+            let errorMessage = err.message || '';
+            
+            // Provide helpful error messages based on the error
+            if (errorMessage.includes('API key') || errorMessage.includes('missing on server')) {
+                errorMessage = language === 'he' 
+                    ? 'שגיאת הגדרות שרת. אנא פנה לתמיכה.' 
+                    : language === 'es' 
+                    ? 'Error de configuración del servidor. Contacte soporte.'
+                    : 'Server configuration error. Please contact support.';
+            } else if (errorMessage.includes('too large') || errorMessage.includes('4MB')) {
+                errorMessage = language === 'he'
+                    ? 'התמונה גדולה מדי. נסה לצלם מקרוב או להקטין את הקובץ.'
+                    : language === 'es'
+                    ? 'Imagen demasiado grande. Intenta tomar una foto más cercana.'
+                    : 'Image too large. Try taking a closer photo or reduce file size.';
+            } else if (!errorMessage || errorMessage === 'Receipt analysis failed on server') {
+                errorMessage = language === 'he'
+                    ? 'שגיאה בניתוח הקבלה. ודא תאורה טובה ותמונה ברורה.'
+                    : language === 'es'
+                    ? 'Error al analizar el recibo. Asegúrate de buena iluminación y claridad.'
+                    : 'Error analyzing receipt. Ensure good lighting and clear image.';
+            }
+            
+            setError(errorMessage);
         } finally {
             setIsAnalyzing(false);
         }
@@ -248,7 +271,17 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                                     <>✨ {t.analyze}</>
                                 )}
                             </button>
-                            {error && <p className="text-red-500 text-center font-medium">{error}</p>}
+                            {error && (
+                                <div className="space-y-3">
+                                    <p className="text-red-500 text-center font-medium bg-red-50 p-4 rounded-xl border border-red-200">{error}</p>
+                                    <button
+                                        onClick={handleReset}
+                                        className="w-full py-3 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                    >
+                                        {t.retake}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         /* Result State */
