@@ -1,5 +1,5 @@
 import type { Handler } from '@netlify/functions';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { getCategoryPromptList, normalizeCategory, type Language } from '../../services/categoryTranslations';
 
 interface ReceiptItem {
@@ -19,39 +19,39 @@ interface ReceiptAnalysisResult {
 }
 
 const receiptSchema = {
-  type: Type.OBJECT,
+  type: SchemaType.OBJECT,
   properties: {
-    storeName: { type: Type.STRING },
-    purchaseDate: { type: Type.STRING },
-    currency: { type: Type.STRING },
+    storeName: { type: SchemaType.STRING },
+    purchaseDate: { type: SchemaType.STRING },
+    currency: { type: SchemaType.STRING },
     items: {
-      type: Type.ARRAY,
+      type: SchemaType.ARRAY,
       items: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          name: { type: Type.STRING },
-          category: { type: Type.STRING },
-          price: { type: Type.NUMBER },
-          quantity: { type: Type.NUMBER },
-          unit: { type: Type.STRING }
+          name: { type: SchemaType.STRING },
+          category: { type: SchemaType.STRING },
+          price: { type: SchemaType.NUMBER },
+          quantity: { type: SchemaType.NUMBER },
+          unit: { type: SchemaType.STRING }
         },
         required: ['name', 'category', 'price', 'quantity']
       }
     },
-    totalAmount: { type: Type.NUMBER }
+    totalAmount: { type: SchemaType.NUMBER }
   },
   required: ['storeName', 'purchaseDate', 'currency', 'items', 'totalAmount']
 };
 
-let ai: GoogleGenAI | null = null;
+let genAI: GoogleGenerativeAI | null = null;
 const getAiClient = () => {
-  if (ai) return ai;
+  if (genAI) return genAI;
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key missing on server');
   }
-  ai = new GoogleGenAI({ apiKey });
-  return ai;
+  genAI = new GoogleGenerativeAI(apiKey);
+  return genAI;
 };
 
 const buildPrompt = (uiLanguage: Language) => {
@@ -122,43 +122,33 @@ export const handler: Handler = async (event) => {
     const client = getAiClient();
     const prompt = buildPrompt(language);
 
-    const runModel = async (model: string) => {
-      const response = await client.models.generateContent({
-        model,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  data,
-                  mimeType
-                }
-              }
-            ]
-          }
-        ],
-        config: {
+    const runModel = async (modelName: string) => {
+      const model = client.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
           responseMimeType: 'application/json',
-          responseSchema: receiptSchema
+          responseSchema: receiptSchema as any
         }
       });
-      return response.text.trim();
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data,
+            mimeType
+          }
+        }
+      ]);
+      return result.response.text().trim();
     };
 
     let jsonText: string;
     try {
-      // Try Gemini 2.0 Flash first (faster and newer)
-      jsonText = await runModel('gemini-2.0-flash-exp');
+      // Try Gemini 1.5 Pro first for best OCR accuracy
+      jsonText = await runModel('gemini-1.5-pro-latest');
     } catch (err) {
-      console.warn('Gemini 2.0 Flash failed, trying 1.5 Pro', err);
-      try {
-        jsonText = await runModel('gemini-1.5-pro');
-      } catch (err2) {
-        console.warn('Gemini 1.5 Pro failed, trying 1.5 Flash', err2);
-        jsonText = await runModel('gemini-1.5-flash');
-      }
+      console.warn('Gemini 1.5 Pro failed, trying 1.5 Flash', err);
+      jsonText = await runModel('gemini-1.5-flash-latest');
     }
 
     const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;
