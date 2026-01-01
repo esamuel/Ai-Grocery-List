@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PayPalSubscribeButton } from './PayPalSubscribeButton';
+import { validatePromoCode, type PromoCode } from '../services/promoCodeService';
 
 interface PricingTier {
   id: 'free' | 'pro' | 'family';
@@ -30,6 +31,12 @@ interface PaywallModalProps {
     selectButton: string;
     continueButton: string;
     trialInfo: string;
+    promoCode: string;
+    promoCodePlaceholder: string;
+    applyPromoCode: string;
+    promoCodeApplied: string;
+    promoCodeInvalid: string;
+    discount: string;
     features: {
       free: string[];
       pro: string[];
@@ -46,6 +53,64 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
   translations
 }) => {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly');
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<PromoCode | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+
+  // Handle promo code application
+  const handleApplyPromoCode = async () => {
+    if (!promoCodeInput.trim()) {
+      setPromoError(translations.promoCodeInvalid);
+      return;
+    }
+
+    setIsValidatingPromo(true);
+    setPromoError('');
+
+    try {
+      // Get base price based on current selection
+      const basePrice = billingPeriod === 'monthly' ? 4.99 : 39.99;
+      const validation = await validatePromoCode(promoCodeInput, basePrice);
+
+      if (validation.valid && validation.promoCode) {
+        setAppliedPromoCode(validation.promoCode);
+        setPromoError('');
+      } else {
+        setPromoError(validation.error || translations.promoCodeInvalid);
+        setAppliedPromoCode(null);
+      }
+    } catch (error) {
+      console.error('Error validating promo code:', error);
+      setPromoError(translations.promoCodeInvalid);
+      setAppliedPromoCode(null);
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  // Calculate discounted price
+  const calculateDiscountedPrice = (originalPrice: number): number => {
+    if (!appliedPromoCode) return originalPrice;
+
+    if (appliedPromoCode.type === 'percentage') {
+      const discount = originalPrice * (appliedPromoCode.value / 100);
+      return Math.max(0, originalPrice - discount);
+    } else {
+      return Math.max(0, originalPrice - appliedPromoCode.value);
+    }
+  };
+
+  // Get discount text
+  const getDiscountText = (): string => {
+    if (!appliedPromoCode) return '';
+
+    if (appliedPromoCode.type === 'percentage') {
+      return `${appliedPromoCode.value}% ${translations.discount}`;
+    } else {
+      return `$${appliedPromoCode.value} ${translations.discount}`;
+    }
+  };
 
   const tiers: PricingTier[] = [
     {
@@ -116,6 +181,56 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
               </span>
             </button>
           </div>
+
+          {/* Promo Code Input */}
+          <div className="mt-6 max-w-md mx-auto">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🎁 {translations.promoCode}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoCodeInput}
+                onChange={(e) => {
+                  setPromoCodeInput(e.target.value.toUpperCase());
+                  setPromoError('');
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleApplyPromoCode();
+                  }
+                }}
+                placeholder={translations.promoCodePlaceholder}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isValidatingPromo}
+              />
+              <button
+                onClick={handleApplyPromoCode}
+                disabled={isValidatingPromo || !promoCodeInput.trim()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+              >
+                {isValidatingPromo ? '...' : translations.applyPromoCode}
+              </button>
+            </div>
+
+            {/* Promo Code Status */}
+            {appliedPromoCode && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                <span className="text-lg">✅</span>
+                <span className="font-medium">
+                  {translations.promoCodeApplied}: {getDiscountText()}
+                  {appliedPromoCode.duration > 1 && ` (${appliedPromoCode.duration} months)`}
+                </span>
+              </div>
+            )}
+
+            {promoError && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                <span className="text-lg">❌</span>
+                <span>{promoError}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Pricing Cards */}
@@ -149,11 +264,29 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
                 {/* Price */}
                 <div className="mb-4">
-                  <div className="text-4xl font-bold text-gray-900">{tier.price}</div>
-                  {tier.yearlyPrice && billingPeriod === 'yearly' && (
-                    <div className="text-sm text-gray-500 mt-1">
-                      ({tier.yearlyPrice} {translations.monthly.toLowerCase()})
-                    </div>
+                  {appliedPromoCode && tier.id !== 'free' ? (
+                    <>
+                      <div className="text-2xl text-gray-400 line-through">{tier.price}</div>
+                      <div className="text-4xl font-bold text-green-600">
+                        ${calculateDiscountedPrice(
+                          billingPeriod === 'monthly' 
+                            ? (tier.id === 'pro' ? 4.99 : 7.99)
+                            : (tier.id === 'pro' ? 39.99 : 69.99)
+                        ).toFixed(2)}/{billingPeriod === 'monthly' ? 'mo' : 'yr'}
+                      </div>
+                      <div className="text-sm text-green-600 font-medium mt-1">
+                        🎉 {getDiscountText()}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-4xl font-bold text-gray-900">{tier.price}</div>
+                      {tier.yearlyPrice && billingPeriod === 'yearly' && (
+                        <div className="text-sm text-gray-500 mt-1">
+                          ({tier.yearlyPrice} {translations.monthly.toLowerCase()})
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
