@@ -401,6 +401,8 @@ const callServerlessReceiptAnalysis = async (
     throw new Error('fetch not available');
   }
 
+  console.log('Calling serverless receipt function:', receiptFunctionUrl);
+  
   const response = await fetch(receiptFunctionUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -408,13 +410,17 @@ const callServerlessReceiptAnalysis = async (
   });
 
   const text = await response.text();
+  console.log('Server response status:', response.status);
+  console.log('Server response text:', text);
+  
   if (!response.ok) {
     let serverMessage = text;
     try {
       const parsed = JSON.parse(text);
       serverMessage = parsed?.message || text;
+      console.error('Server error parsed:', parsed);
     } catch {
-      // ignore parse errors and use raw text
+      console.error('Could not parse server error, raw text:', text);
     }
     throw new Error(serverMessage || 'Receipt analysis failed on server');
   }
@@ -474,8 +480,15 @@ export const analyzeReceiptImage = async (
     // Prefer serverless function to avoid client-side CORS/quota hiccups
     try {
       return await callServerlessReceiptAnalysis(base64Image, uiLanguage);
-    } catch (serverErr) {
-      console.warn('Server receipt analysis unavailable, using client Gemini:', serverErr);
+    } catch (serverErr: any) {
+      console.error('Server receipt analysis failed:', serverErr);
+      console.error('Server error message:', serverErr?.message);
+      console.error('Server error details:', JSON.stringify(serverErr, null, 2));
+      // If server has API key issues, throw immediately instead of falling back
+      if (serverErr?.message?.includes('API key')) {
+        throw serverErr;
+      }
+      console.warn('Falling back to client-side Gemini');
     }
 
     const geminiClient = getAiClient();
