@@ -4,8 +4,8 @@ import { AppScreenshot } from './AppScreenshots';
 interface EnhancedLandingPageProps {
   onGetStarted: () => void;
   onLogin: () => void;
-  language: 'en' | 'he' | 'es';
-  onLanguageChange: (lang: 'en' | 'he' | 'es') => void;
+  language: 'en' | 'he' | 'es' | 'ru';
+  onLanguageChange: (lang: 'en' | 'he' | 'es' | 'ru') => void;
 }
 
 export const EnhancedLandingPage: React.FC<EnhancedLandingPageProps> = ({
@@ -640,12 +640,13 @@ export const EnhancedLandingPage: React.FC<EnhancedLandingPageProps> = ({
               {/* Language Selector */}
               <select
                 value={language}
-                onChange={(e) => onLanguageChange(e.target.value as 'en' | 'he' | 'es')}
+                onChange={(e) => onLanguageChange(e.target.value as 'en' | 'he' | 'es' | 'ru')}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
               >
                 <option value="en">🇺🇸 English</option>
                 <option value="he">🇮🇱 עברית</option>
                 <option value="es">🇪🇸 Español</option>
+                <option value="ru">🇷🇺 Русский</option>
               </select>
 
               <button onClick={onLogin} className="text-gray-700 dark:text-gray-300 hover:text-blue-600">

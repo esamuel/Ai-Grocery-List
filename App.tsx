@@ -2785,6 +2785,7 @@ function App() {
                     <LanguageButton lang="en">EN</LanguageButton>
                     <LanguageButton lang="he">עב</LanguageButton>
                     <LanguageButton lang="es">ES</LanguageButton>
+                    <LanguageButton lang="ru">RU</LanguageButton>
                   </div>
                 </div>
 
