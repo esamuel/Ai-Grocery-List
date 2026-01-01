@@ -58,7 +58,7 @@ import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
-type Language = 'en' | 'he' | 'es';
+type Language = 'en' | 'he' | 'es' | 'ru';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
 
 const translations = {
@@ -1140,6 +1140,164 @@ const translations = {
     itemName: "Artículo",
     trend: "Tendencia",
     back: "Atrás",
+  },
+  ru: {
+    title: "AI Список покупок",
+    subtitle: "Ваш умный помощник для покупок",
+    error: "Не удалось категоризировать товары. Попробуйте еще раз.",
+    inputPlaceholder: "например, '2 авокадо, молоко, хлеб'",
+    adding: "Добавление...",
+    add: "Добавить",
+    emptyTitle: "Ваш список пуст",
+    emptySubtitle: "Добавьте товары ниже, чтобы начать!",
+    uncategorized: "Без категории",
+    clearCompleted: "Очистить выполненные",
+    list: "Список",
+    favorites: "История",
+    family: "Семья",
+    favoritesTitle: "История покупок",
+    favoritesSubtitle: "Делайте покупки быстрее, добавляя часто покупаемые товары.",
+    familyTitle: "Семейный список",
+    familySubtitle: "Общий доступ для членов семьи",
+    familyMembersTitle: "Члены семьи",
+    familyOwner: "Владелец",
+    familyMember: "Член",
+    familyActiveNow: "Сейчас активен",
+    familyRecentActivity: "Недавняя активность",
+    familyNoActivity: "Нет недавней активности",
+    familyCheckedOff: "отметил",
+    familyAdded: "добавил",
+    familyRemoved: "удалил",
+    familyYou: "Вы",
+    familyMinutesAgo: "мин назад",
+    familyHoursAgo: "ч назад",
+    familyDaysAgo: "д назад",
+    familyJustNow: "Только что",
+    purchased: "куплено",
+    times: "раз",
+    deleteFromHistory: "Удалить",
+    addToList: "Добавить",
+    shareCode: "Код доступа",
+    leaveList: "Покинуть список",
+    syncing: "Синхронизация...",
+    loginTitle: "Aii Список покупок",
+    loginSubtitle: "Войдите для синхронизации на всех устройствах",
+    email: "Email",
+    password: "Пароль",
+    signIn: "Войти",
+    signUp: "Создать аккаунт",
+    switchToSignUp: "Нужен аккаунт? Зарегистрируйтесь",
+    switchToSignIn: "Уже есть аккаунт? Войдите",
+    signingIn: "Вход...",
+    signingUp: "Создание аккаунта...",
+    signOut: "Выйти",
+    help: "Помощь",
+    displayName: "Отображаемое имя",
+    displayNameDesc: "Установите имя для отображения в семейных активностях",
+    saveDisplayName: "Сохранить имя",
+    savingDisplayName: "Сохранение...",
+    welcomeUser: "Добро пожаловать",
+    welcome: "Добро пожаловать в Aii Список покупок!",
+    onboardingSubtitle: "Давайте начнем с вашим умным помощником для покупок",
+    step1Title: "Умные списки покупок",
+    step1Desc: "Добавляйте товары печатая или говоря. Наш AI автоматически организует их по категориям.",
+    step2Title: "Голосовое распознавание",
+    step2Desc: "Нажмите на микрофон и произнесите товары естественно. Работает на нескольких языках.",
+    step3Title: "Организация с AI",
+    step3Desc: "Товары автоматически категоризируются (продукты, молочное и т.д.) для вашего удобства.",
+    step4Title: "Семейный доступ",
+    step4Desc: "Пригласите членов семьи для совместной работы. Изменения синхронизируются в реальном времени.",
+    step5Title: "Умные избранные",
+    step5Desc: "Завершенные товары становятся избранными. Легко добавляйте часто покупаемые товары одним нажатием.",
+    step6Title: "Руководство по началу работы",
+    step6Desc: "Готовы начать? Вот ваше краткое руководство по настройке и семейному доступу.",
+    next: "Далее",
+    previous: "Назад",
+    getStarted: "Начать",
+    skip: "Пропустить",
+    suggestionsTitle: "Умные предложения",
+    suggestionsSubtitle: "На основе ваших покупательских привычек и времени суток",
+    addSuggestion: "Добавить",
+    noSuggestions: "Нет доступных предложений",
+    predictive: "Умный прогноз",
+    timeBased: "По времени",
+    frequencyBased: "Частые",
+    seasonal: "Сезонные",
+    complementary: "Хорошо сочетается",
+    importExport: "Импорт/Экспорт",
+    importExportTitle: "Импорт и экспорт списков",
+    importTab: "Импорт",
+    exportTab: "Экспорт",
+    importFromFile: "Импорт из файла",
+    importFromClipboard: "Импорт из буфера обмена",
+    exportAsCSV: "Экспорт как CSV",
+    exportAsText: "Экспорт как текст",
+    selectFile: "Выбрать файл",
+    pasteFromClipboard: "Вставить из буфера обмена",
+    importing: "Импорт...",
+    exporting: "Экспорт...",
+    importSuccess: "Успешно импортировано",
+    exportSuccess: "Успешно экспортировано",
+    importError: "Ошибка импорта",
+    exportError: "Ошибка экспорта",
+    noItemsToExport: "Нет товаров для экспорта",
+    settings: "Настройки",
+    enablePriceTracking: "Отслеживание цен",
+    priceTrackingDesc: "Отслеживайте цены при завершении товаров",
+    monthlyBudget: "Месячный бюджет",
+    setBudget: "Установить бюджет",
+    noBudget: "Бюджет не установлен",
+    budgetWarning: "Вы превысили свой бюджет!",
+    budgetOnTrack: "Вы в рамках бюджета",
+    spendingInsights: "Анализ расходов",
+    spendingThisMonth: "Расходы в этом месяце",
+    avgSpending: "Средние расходы",
+    topCategories: "Топ категорий",
+    priceModalTitle: "Отслеживание цен",
+    priceModalSubtitle: "Помогите нам отслеживать цены для лучшего анализа",
+    priceModalTotal: "Цена",
+    priceModalStore: "Магазин",
+    priceModalOptional: "Необязательно - пропустите, если не уверены",
+    priceModalSkip: "Пропустить",
+    priceModalSave: "Сохранить",
+    priceModalSaving: "Сохранение...",
+    dailyPurchases: "Ежедневные покупки",
+    dailyPurchasesTitle: "История покупок",
+    dailyPurchasesSubtitle: "Просмотр покупок по дням",
+    selectMonth: "Выбрать месяц",
+    noDataForMonth: "Нет данных за этот месяц",
+    totalSpent: "Всего потрачено",
+    itemsPurchased: "Товаров куплено",
+    deleteDay: "Удалить день",
+    confirmDeleteDay: "Вы уверены, что хотите удалить все покупки за этот день?",
+    dashboard: "Панель управления",
+    listDesc: "Управление списком покупок",
+    historyDesc: "Просмотр истории покупок",
+    familyDesc: "Члены семьи и активности",
+    priceCompare: "Сравнение цен",
+    priceCompareDesc: "Отслеживание и сравнение цен",
+    basketComparison: "Сравнение корзин",
+    basketComparisonDesc: "Сравнение корзин между магазинами",
+    insightsDesc: "Просмотр анализа расходов",
+    dailyDesc: "История ежедневных покупок",
+    voiceDesc: "Добавление товаров голосом",
+    importExportDesc: "Импорт/экспорт списков",
+    suggestionsDesc: "Умные предложения товаров",
+    quickSearch: "Быстрый поиск",
+    viewAll: "Посмотреть все",
+    addItem: "Добавить товар",
+    bestDeals: "Лучшие предложения",
+    dashboardHelpText: "Нажмите на карточку, чтобы открыть, наведите для быстрых действий",
+    searchPlaceholder: "Поиск товаров...",
+    lowestPrice: "Самая низкая",
+    highestPrice: "Самая высокая",
+    avgPrice: "Средняя",
+    lastPurchased: "Последняя покупка",
+    priceHistory: "История цен",
+    trackNewItem: "Отслеживайте цены при завершении товаров",
+    itemName: "Товар",
+    trend: "Тренд",
+    back: "Назад",
   }
 };
 
@@ -1151,7 +1309,7 @@ const getInitialLanguage = (): Language => {
 
     // Check saved preference first
     const savedLanguage = localStorage.getItem('groceryListLanguage') as Language;
-    if (savedLanguage && ['en', 'he', 'es'].includes(savedLanguage)) {
+    if (savedLanguage && ['en', 'he', 'es', 'ru'].includes(savedLanguage)) {
       return savedLanguage;
     }
 
@@ -1165,6 +1323,16 @@ const getInitialLanguage = (): Language => {
         normalizedLang.includes('hebrew') ||
         normalizedLang.includes('il')) {
         return 'he';
+      }
+
+      // Russian detection (comprehensive)
+      if (normalizedLang.includes('ru') ||
+        normalizedLang.includes('russian') ||
+        normalizedLang.includes('русский') ||
+        normalizedLang.includes('by') ||  // Belarus
+        normalizedLang.includes('kz') ||  // Kazakhstan
+        normalizedLang.includes('ua')) {  // Ukraine (many Russian speakers)
+        return 'ru';
       }
 
       // Spanish detection (comprehensive)

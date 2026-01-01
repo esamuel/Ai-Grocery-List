@@ -19,79 +19,93 @@ export type StandardCategory =
   | 'Personal Care'
   | 'Other';
 
-export type Language = 'en' | 'he' | 'es';
+export type Language = 'en' | 'he' | 'es' | 'ru';
 
 // Standard category translations
 export const CATEGORY_TRANSLATIONS: Record<StandardCategory, Record<Language, string>> = {
   'Produce': {
     en: 'Produce',
     he: 'פירות וירקות',
-    es: 'Frutas y Verduras'
+    es: 'Frutas y Verduras',
+    ru: 'Фрукты и овощи'
   },
   'Fruits': {
     en: 'Fruits',
     he: 'פירות וירקות', // Map to combined category in Hebrew
-    es: 'Frutas y Verduras'
+    es: 'Frutas y Verduras',
+    ru: 'Фрукты и овощи'
   },
   'Vegetables': {
     en: 'Vegetables',
     he: 'פירות וירקות', // Map to combined category in Hebrew
-    es: 'Frutas y Verduras'
+    es: 'Frutas y Verduras',
+    ru: 'Фрукты и овощи'
   },
   'Meat': {
     en: 'Meat & Seafood',
     he: 'בשר ודגים',
-    es: 'Carnes y Pescados'
+    es: 'Carnes y Pescados',
+    ru: 'Мясо и морепродукты'
   },
   'Fish': {
     en: 'Meat & Seafood',
     he: 'בשר ודגים', // Map to combined category in Hebrew
-    es: 'Carnes y Pescados'
+    es: 'Carnes y Pescados',
+    ru: 'Мясо и морепродукты'
   },
   'Dairy': {
     en: 'Dairy & Eggs',
     he: 'חלב וביצים',
-    es: 'Lácteos y Huevos'
+    es: 'Lácteos y Huevos',
+    ru: 'Молочные продукты и яйца'
   },
   'Bread & Bakery': {
     en: 'Pantry',
     he: 'מוצרי מזווה',
-    es: 'Despensa'
+    es: 'Despensa',
+    ru: 'Кладовая'
   },
   'Grains & Cereals': {
     en: 'Breakfast & Snacks',
     he: 'דגני בוקר וחטיפים',
-    es: 'Desayuno y Bocadillos'
+    es: 'Desayuno y Bocadillos',
+    ru: 'Завтрак и закуски'
   },
   'Beverages': {
     en: 'Beverages',
     he: 'משקאות',
-    es: 'Bebidas'
+    es: 'Bebidas',
+    ru: 'Напитки'
   },
   'Snacks': {
     en: 'Breakfast & Snacks',
     he: 'דגני בוקר וחטיפים',
-    es: 'Desayuno y Bocadillos'
+    es: 'Desayuno y Bocadillos',
+    ru: 'Завтрак и закуски'
   },
   'Frozen': {
     en: 'Frozen',
     he: 'קפואים',
-    es: 'Congelados'
+    es: 'Congelados',
+    ru: 'Замороженные продукты'
   },
   'Household & Cleaning': {
     en: 'Household & Cleaning',
     he: 'בית וניקוי',
-    es: 'Limpieza del Hogar'
+    es: 'Limpieza del Hogar',
+    ru: 'Бытовая химия'
   },
   'Personal Care': {
     en: 'Personal Care',
     he: 'טיפוח אישי',
-    es: 'Cuidado Personal'
+    es: 'Cuidado Personal',
+    ru: 'Личная гигиена'
   },
   'Other': {
     en: 'Pantry',
     he: 'מוצרי מזווה',
-    es: 'Despensa'
+    es: 'Despensa',
+    ru: 'Кладовая'
   }
 };
 
