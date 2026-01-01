@@ -37,7 +37,7 @@ let currentUser: User | null = null;
 
 // Lazily initialize Firebase on first use to prevent app from crashing on load
 // if the config is missing.
-const getFirebaseServices = () => {
+export const getFirebaseServices = () => {
     console.log('getFirebaseServices: Called');
     if (app && db && auth) {
         console.log('getFirebaseServices: Using existing services');
