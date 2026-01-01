@@ -44,6 +44,8 @@ interface DashboardPageProps {
     dashboardHelpText: string;
     scanReceipt?: string;
     scanReceiptDesc?: string;
+    basketComparison?: string;
+    basketComparisonDesc?: string;
   };
   itemsCount?: number;
   historyCount?: number;
@@ -94,6 +96,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       iconBg: 'bg-gradient-to-br from-green-400 to-green-600',
       badge: trackedPricesCount > 0 ? `${trackedPricesCount}` : undefined,
       onClick: () => onNavigate('priceCompare')
+    },
+    {
+      id: 'basketComparison',
+      icon: '🛒',
+      title: translations.basketComparison || 'Basket Comparison',
+      description: translations.basketComparisonDesc || 'Compare shopping baskets',
+      color: 'from-teal-400 to-teal-600',
+      iconBg: 'bg-gradient-to-br from-teal-400 to-teal-600',
+      onClick: () => onNavigate('basketComparison')
     },
     {
       id: 'insights',

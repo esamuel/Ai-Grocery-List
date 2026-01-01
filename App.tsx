@@ -29,6 +29,7 @@ import { EnhancedLandingPage } from './components/EnhancedLandingPage';
 import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
+import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
@@ -58,7 +59,7 @@ import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/c
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
 type Language = 'en' | 'he' | 'es';
-type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history';
+type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
 
 const translations = {
   en: {
@@ -398,6 +399,8 @@ const translations = {
     familyDesc: "Family members & activities",
     priceCompare: "Price Compare",
     priceCompareDesc: "Track & compare prices",
+    basketComparison: "Basket Comparison",
+    basketComparisonDesc: "Compare shopping baskets",
     insightsDesc: "View spending insights",
     dailyDesc: "Daily purchase history",
     voiceDesc: "Voice input shopping",
@@ -756,6 +759,8 @@ const translations = {
     familyDesc: "בני משפחה ופעילויות",
     priceCompare: "השוואת מחירים",
     priceCompareDesc: "עקוב והשווה מחירים",
+    basketComparison: "השוואת סלים",
+    basketComparisonDesc: "השווה סלי קניות בין חנויות",
     insightsDesc: "צפה בתובנות הוצאות",
     dailyDesc: "היסטוריית קניות יומית",
     voiceDesc: "קניות בקלט קולי",
@@ -1113,6 +1118,8 @@ const translations = {
     familyDesc: "Miembros y actividades familiares",
     priceCompare: "Comparar Precios",
     priceCompareDesc: "Rastrear y comparar precios",
+    basketComparison: "Comparación de Cestas",
+    basketComparisonDesc: "Comparar cestas entre tiendas",
     insightsDesc: "Ver información de gastos",
     dailyDesc: "Historial de compras diario",
     voiceDesc: "Compras por voz",
@@ -2186,6 +2193,8 @@ function App() {
               familyDesc: currentText.familyDesc,
               priceCompare: currentText.priceCompare,
               priceCompareDesc: currentText.priceCompareDesc,
+              basketComparison: currentText.basketComparison,
+              basketComparisonDesc: currentText.basketComparisonDesc,
               insights: currentText.spendingInsights,
               insightsDesc: currentText.insightsDesc,
               daily: currentText.dailyPurchases,
@@ -2290,6 +2299,14 @@ function App() {
               localStorage.setItem('enablePriceTracking', String(enabled));
             }}
             historyItemsCount={historyItems.length}
+          />
+        ) : currentView === 'basketComparison' ? (
+          <BasketComparisonPage
+            listId={listId!}
+            history={historyItems}
+            currency={currency}
+            language={language}
+            userId={user?.uid || ''}
           />
         ) : currentView === 'suggestions' ? (
           <div className="mb-6">

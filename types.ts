@@ -107,3 +107,61 @@ export interface UserSubscription {
     lastResetDate?: string;
   };
 }
+
+// 🛒 Basket Comparison Types
+export type BasketType = 'weekly' | 'monthly';
+
+export interface BasketItem {
+  name: string; // Product name
+  category: string;
+  quantity: number; // How many units
+  unit?: string; // kg, piece, liter, etc.
+  
+  // Price per store (from history or manual entry)
+  storePrices: {
+    [storeName: string]: {
+      price: number; // Total price for this quantity
+      unitPrice?: number; // Price per unit
+      lastUpdated: string; // ISO date
+      isManual: boolean; // True if manually entered, false if from history
+    };
+  };
+}
+
+export interface ComparisonBasket {
+  id: string; // Unique basket ID
+  type: BasketType; // 'weekly' or 'monthly'
+  name: string; // User-friendly name
+  items: BasketItem[];
+  
+  // Auto-update settings
+  autoUpdate: boolean; // If true, basket updates based on purchase history
+  lastAutoUpdate?: string; // ISO date of last auto-update
+  
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string; // User ID
+}
+
+// Store comparison result
+export interface StoreComparison {
+  storeName: string;
+  totalPrice: number;
+  itemsWithPrices: number; // How many items have prices for this store
+  missingItems: string[]; // Items without prices
+  savings?: number; // Compared to most expensive store
+  savingsPercent?: number;
+  isCheapest?: boolean;
+  isMostExpensive?: boolean;
+}
+
+// Full basket comparison result
+export interface BasketComparisonResult {
+  basket: ComparisonBasket;
+  stores: StoreComparison[];
+  cheapestStore?: string;
+  mostExpensiveStore?: string;
+  maxSavings?: number; // Maximum possible savings
+  recommendations?: string[]; // Smart recommendations
+}
