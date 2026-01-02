@@ -83,7 +83,7 @@
 
 ### ב-Firebase Console:
 ```
-https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data/promoCodes
+https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/data/promoCodes
 ```
 
 תוכל לראות:
@@ -136,7 +136,7 @@ https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data
 
 ### אם יש שגיאות בהוספת קודים:
 1. בדוק את כללי ה-Firestore:
-   - פתח: https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/rules
+   - פתח: https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/rules
    - ודא שהכללים מעודכנים (צריך להיות `allow read: if true;` ל-promoCodes)
 
 2. בדוק את החיבור ל-Firebase:

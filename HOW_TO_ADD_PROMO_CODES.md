@@ -3,7 +3,7 @@
 ## ✅ Quick Setup (3 Steps)
 
 ### Step 1: Go to Firebase Console
-Open: https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data
+Open: https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/data
 
 ### Step 2: Create Collection
 1. Click **"Start collection"** (if first time) or **"Add collection"**

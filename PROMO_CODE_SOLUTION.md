@@ -109,7 +109,7 @@ match /promoCodes/{code} {
 
 ### Firebase Console:
 ```
-https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data/promoCodes
+https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/data/promoCodes
 ```
 
 ### What You'll See:

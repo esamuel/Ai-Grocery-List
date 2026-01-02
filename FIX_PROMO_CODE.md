@@ -8,7 +8,7 @@
 ### אופציה 1: הוסף את השדה החסר ידנית
 
 1. **פתח את ה-document BETA2025 ב-Firestore:**
-   https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data/promoCodes/BETA2025
+   https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/data/promoCodes/BETA2025
 
 2. **לחץ על "+ Add field"**
 

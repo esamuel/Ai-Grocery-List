@@ -9,9 +9,9 @@ import { getFirestore, doc, setDoc, Timestamp } from 'firebase/firestore';
 // Firebase config (same as your app)
 const firebaseConfig = {
   apiKey: "AIzaSyCqSv-CKJqITLqWcJvHKZ0Gg3yNRpZJTOo",
-  authDomain: "grocery-list-ai-1e7a5.firebaseapp.com",
-  projectId: "grocery-list-ai-1e7a5",
-  storageBucket: "grocery-list-ai-1e7a5.firebasestorage.app",
+  authDomain: "family-grocery-list-ee6d3.firebaseapp.com",
+  projectId: "family-grocery-list-ee6d3",
+  storageBucket: "family-grocery-list-ee6d3.firebasestorage.app",
   messagingSenderId: "1077031234571",
   appId: "1:1077031234571:web:e1e8b8eea1c8b6f0e5e5e5"
 };
@@ -247,7 +247,7 @@ async function createPromoCodes() {
   console.log('═══════════════════════════════════════════════');
   console.log('\n✨ Promo codes are ready to use!');
   console.log('📊 View in Firebase Console:');
-  console.log('   https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/data/promoCodes');
+  console.log('   https://console.firebase.google.com/project/family-grocery-list-ee6d3/firestore/data/promoCodes');
   console.log('');
 }
 
