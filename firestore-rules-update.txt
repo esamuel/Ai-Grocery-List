@@ -1,0 +1,101 @@
+# 🔧 עדכון Firestore Rules לקודי פרומו
+
+## הבעיה:
+```
+Error validating promo code: FirebaseError: Missing or insufficient permissions.
+```
+
+האפליקציה לא יכולה לקרוא את collection `promoCodes` כי אין הרשאות ב-Firestore Rules.
+
+---
+
+## ✅ הפתרון (2 דקות):
+
+### 1. פתח Firestore Rules:
+👉 https://console.firebase.google.com/project/grocery-list-ai-1e7a5/firestore/rules
+
+### 2. הוסף את הכללים הבאים:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===== הכללים הקיימים שלך (אל תמחק!) =====
+    // ... (השאר את כל הכללים הקיימים)
+    
+    // ===== קודי פרומו - הוסף את זה! =====
+    match /promoCodes/{code} {
+      // כולם יכולים לקרוא קודי פרומו (לאימות)
+      allow read: if true;
+      
+      // רק משתמשים מחוברים יכולים לעדכן (למעקב אחרי שימוש)
+      allow write: if request.auth != null;
+    }
+    
+    // ===== סלי השוואה - תקן גם את זה! =====
+    match /comparisonBaskets/{basketId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+### 3. לחץ על **"Publish"** למעלה
+
+### 4. רענן את האפליקציה ונסה שוב!
+
+---
+
+## 📋 אם אתה רוצה להוסיף את הכללים בצורה מדויקת:
+
+### מצא את השורה שמסתיימת ב:
+```javascript
+  match /databases/{database}/documents {
+```
+
+### הוסף אחריה (לפני ה-} הסוגר):
+```javascript
+    // Promo Codes - Public read, authenticated write
+    match /promoCodes/{code} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Comparison Baskets - Authenticated users only
+    match /comparisonBaskets/{basketId} {
+      allow read, write: if request.auth != null;
+    }
+```
+
+---
+
+## 🎯 מה זה עושה:
+
+### `promoCodes`:
+- ✅ **כולם יכולים לקרוא** (`allow read: if true`) - כדי לאמת קודים
+- ✅ **רק משתמשים מחוברים יכולים לכתוב** - כדי לעדכן שימוש
+
+### `comparisonBaskets`:
+- ✅ **רק משתמשים מחוברים** יכולים לקרוא/לכתוב
+- ✅ תקן את השגיאה: "Unsupported field value: undefined"
+
+---
+
+## ⚠️ חשוב:
+
+**אל תמחק את הכללים הקיימים!** רק הוסף את השורות החדשות.
+
+---
+
+## ✅ אחרי העדכון:
+
+1. ✅ קודי הפרומו יעבדו
+2. ✅ לא יהיו שגיאות permissions
+3. ✅ סלי ההשוואה יעבדו
+4. ✅ הכל מאובטח
+
+---
+
+**עדכן את ה-Rules והכל יעבוד!** 🚀
+

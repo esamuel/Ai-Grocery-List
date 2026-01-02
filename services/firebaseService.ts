@@ -45,6 +45,10 @@ export const getFirebaseServices = () => {
     }
 
     console.log('getFirebaseServices: Initializing Firebase...');
+    // Helpful debugging: confirm which Firebase project the deployed app is pointing to.
+    // This avoids updating Firestore rules on the wrong Firebase project.
+    console.log('getFirebaseServices: Firebase projectId =', firebaseConfig.projectId);
+    console.log('getFirebaseServices: Firebase authDomain =', firebaseConfig.authDomain);
     // Validate config presence and provide clear errors
     const missing = Object.entries(firebaseConfig)
       .filter(([, v]) => !v)

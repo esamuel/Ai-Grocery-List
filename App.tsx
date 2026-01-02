@@ -31,6 +31,7 @@ import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
 import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
+import { PromoCodeAdmin } from './components/PromoCodeAdmin';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1529,6 +1530,7 @@ function App() {
   const [addMemberStatus, setAddMemberStatus] = useState<string | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPromoAdmin, setShowPromoAdmin] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
@@ -2993,6 +2995,14 @@ function App() {
                       Add Family
                     </button>
                   )}
+                  {isOwner && (
+                    <button
+                      onClick={() => { setShowSettings(false); setShowPromoAdmin(true); }}
+                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-semibold"
+                    >
+                      🎁 Add Promo Codes
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowSettings(false); handleSignOut(); }}
                     className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
@@ -3227,6 +3237,10 @@ function App() {
             },
           }}
         />
+      )}
+
+      {showPromoAdmin && (
+        <PromoCodeAdmin onClose={() => setShowPromoAdmin(false)} />
       )}
 
     </div>

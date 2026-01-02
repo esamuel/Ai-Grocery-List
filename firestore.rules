@@ -1,102 +1,101 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
+    
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    // Helper function to check if user owns the document
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    
+    function isHouseholdMember(hid) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/households/$(hid)) &&
+             get(/databases/$(database)/documents/households/$(hid)).data.memberUids
+               .hasAny([request.auth.uid]);
+    }
+    
+    function isHouseholdOwner(hid) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/households/$(hid)) &&
+             get(/databases/$(database)/documents/households/$(hid)).data.ownerUid == request.auth.uid;
     }
 
-    // Users collection - users can read other users for family member search
-    match /users/{userId} {
-      // Allow any authenticated user to read user documents (needed for family member search)
-      allow read: if isAuthenticated();
-      // Only allow users to write their own document
-      allow write: if isOwner(userId);
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+    // Users can read and write their own profile
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && uid == request.auth.uid;
     }
 
-    // Grocery Lists - owner and members can access
+    // Grocery Lists - allow read/write for list members
     match /groceryLists/{listId} {
-      // Helper to check if user is owner or member of this list
-      function hasListAccess() {
-        let listData = resource.data;
-        return isAuthenticated() && (
-          // Check if user is the owner
-          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
-          // Or check if user is in members array
-          request.auth.uid in listData.get('members', []) ||
-          // MIGRATION: Allow access if ownerId is missing (for migration)
-          !exists(/databases/$(database)/documents/groceryLists/$(listId)) ||
-          (listData.ownerId == null && listData.owner == null)
-        );
+      allow read: if isSignedIn() && 
+                     (resource.data.ownerId == request.auth.uid || 
+                      resource.data.members.hasAny([request.auth.uid]));
+      allow write: if isSignedIn() && 
+                      (resource.data.ownerId == request.auth.uid || 
+                       resource.data.members.hasAny([request.auth.uid]));
+      allow create: if isSignedIn();
+    }
+
+    // Promo Codes - PUBLIC READ for validation, owner write only
+    match /promoCodes/{code} {
+      allow read: if true; // Anyone can read promo codes to validate them
+      allow write: if isSignedIn() && 
+                      exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mainListId != null;
+    }
+
+    // Comparison Baskets - authenticated users only
+    match /comparisonBaskets/{basketId} {
+      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Subscriptions - users can read/write their own
+    match /subscriptions/{uid} {
+      allow read, write: if isSignedIn() && uid == request.auth.uid;
+    }
+
+    // Households and all subcollections
+    match /households/{hid} {
+      // Allow creating new households (for initial creation)
+      allow create: if isSignedIn() && 
+                       request.resource.data.ownerUid == request.auth.uid &&
+                       request.resource.data.memberUids.hasAny([request.auth.uid]);
+      
+      // Allow read/write for existing household members
+      allow read, write: if isHouseholdMember(hid);
+
+      // Lists within households
+      match /lists/{lid} {
+        allow read, write: if isHouseholdMember(hid);
+        
+        // Items within lists
+        match /items/{iid} {
+          allow read, write: if isHouseholdMember(hid);
+        }
       }
 
-      // Helper to check if user is the list owner (for adding members)
-      function isListOwner() {
-        let listData = resource.data;
-        return isAuthenticated() && (
-          (listData.ownerId != null && listData.ownerId == request.auth.uid) ||
-          // MIGRATION: Allow if ownerId is missing (for migration)
-          (listData.ownerId == null && listData.owner == null)
-        );
+      // Categories within households
+      match /categories/{cid} {
+        allow read, write: if isHouseholdMember(hid);
+        // Allow creating categories during household creation (when household doesn't exist yet)
+        allow create: if isSignedIn();
       }
 
-      // Allow read if user is owner or member OR if list needs migration
-      allow read: if isAuthenticated();
+      // Recipes within households
+      match /recipes/{rid} {
+        allow read, write: if isHouseholdMember(hid);
+      }
 
-      // Allow create if user is authenticated and sets themselves as owner
-      allow create: if isAuthenticated() &&
-        request.resource.data.ownerId == request.auth.uid;
+      // Pantry items within households
+      match /pantry/{pid} {
+        allow read, write: if isHouseholdMember(hid);
+      }
 
-      // Allow update if user is owner or member
-      // TEMPORARY: Allow all authenticated while debugging ID mismatch
-      allow update: if isAuthenticated();
-
-      // Allow delete only if user is owner
-      allow delete: if isListOwner();
-    }
-
-    // Subscriptions - users can read/write their own subscription
-    match /subscriptions/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
-
-      // Allow server-side writes (from Cloud Functions/webhooks)
-      allow write: if request.auth == null;
-    }
-
-    // Family Activities - read if user has access to the list
-    match /familyActivities/{activityId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
-    }
-
-    // Purchase History - allow authenticated users to read/write
-    match /purchaseHistory/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // Suggestions - allow authenticated users to access their suggestions
-    match /suggestions/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // Price History - allow authenticated users to access their price data
-    match /priceHistory/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // Default: deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+      // Stores within households
+      match /stores/{sid} {
+        allow read, write: if isHouseholdMember(hid);
+      }
     }
   }
 }

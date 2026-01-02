@@ -33,7 +33,10 @@ export const validatePromoCode = async (
       return { valid: false, error: 'Please enter a promo code' };
     }
 
-    const { db } = getFirebaseServices();
+    const { app, db } = getFirebaseServices();
+    // Debugging aid: when rules are applied on the wrong Firebase project, promo reads will fail
+    // with "Missing or insufficient permissions". This makes it obvious which project the client is using.
+    console.log('validatePromoCode: Firebase projectId =', app.options.projectId);
     const promoRef = doc(db, 'promoCodes', code.toUpperCase().trim());
     const promoSnap = await getDoc(promoRef);
 
@@ -67,8 +70,21 @@ export const validatePromoCode = async (
       discountedPrice
     };
   } catch (error) {
-    console.error('Error validating promo code:', error);
-    return { valid: false, error: 'Error validating promo code' };
+    const { app } = getFirebaseServices();
+    const projectId = app?.options?.projectId || 'unknown';
+    console.error('Error validating promo code:', { projectId, error });
+
+    const msg = (error as any)?.message || '';
+    const isPermissionDenied =
+      (error as any)?.code === 'permission-denied' ||
+      /missing or insufficient permissions/i.test(msg);
+
+    return {
+      valid: false,
+      error: isPermissionDenied
+        ? `Promo code access denied (projectId: ${projectId}). Check Firestore rules for /promoCodes/*`
+        : 'Error validating promo code'
+    };
   }
 };
 
