@@ -53,13 +53,11 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   const isTargetPeriod = (dateStr: string): boolean => {
     const date = new Date(dateStr);
     const year = date.getFullYear();
-    const month = date.getMonth(); // 0-indexed (0=Jan, 9=Oct, 10=Nov, 11=Dec)
+    const month = date.getMonth(); // 0-indexed (9=Oct)
+    const day = date.getDate();
     
-    // Oct/Nov/Dec 2024 OR 2025, OR Jan 2025
-    return (
-      (year === 2024 && (month === 9 || month === 10 || month === 11)) || // Oct, Nov, Dec 2024
-      (year === 2025 && (month === 9 || month === 10 || month === 11 || month === 0)) // Oct, Nov, Dec 2025 OR Jan 2025
-    );
+    // ONLY October 19, 2025
+    return year === 2025 && month === 9 && day === 19;
   };
 
   const findMostRecentPrice = (
@@ -111,7 +109,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       const history: PurchaseHistoryItem[] = data.history || [];
 
       addLog(`✅ Loaded ${history.length} items`);
-      addLog('🔍 Analyzing Oct/Nov 2024 items...');
+      addLog('🔍 Analyzing October 19, 2025 items...');
 
       const foundCandidates: FixCandidate[] = [];
 
@@ -240,7 +238,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-lg">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-900">
-              🔧 Fix Placeholder Prices
+              🔧 Fix October 19, 2025
             </h2>
             <button
               onClick={onClose}
@@ -250,7 +248,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
             </button>
           </div>
           <p className="text-gray-600 mt-2">
-            Fix ALL items with 12.00 ₪ from Oct/Nov/Dec 2024/2025 & Jan 2025
+            Fix ALL items with 12.00 ₪ from October 19, 2025 ONLY
           </p>
         </div>
 
@@ -263,8 +261,8 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
                 Ready to Analyze
               </h3>
               <p className="text-gray-600 mb-6">
-                This will find ALL items with 12.00 ₪ from Oct/Nov/Dec 2024/2025 & Jan 2025<br />
-                and update them with real prices from other months (regardless of store name).
+                This will find ALL items with 12.00 ₪ from <strong>October 19, 2025</strong><br />
+                and update them with real prices + store name "קורפור"
               </p>
               <button
                 onClick={analyze}
