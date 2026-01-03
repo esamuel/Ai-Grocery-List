@@ -31,6 +31,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   const [candidates, setCandidates] = useState<FixCandidate[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [rawMatches, setRawMatches] = useState<PurchaseHistoryItem[]>([]);
 
   const addLog = (message: string) => {
     setLog(prev => [...prev, message]);
@@ -128,6 +129,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       addLog('🔍 Analyzing October 19, 2025 items...');
 
       const foundCandidates: FixCandidate[] = [];
+      const debugMatches: PurchaseHistoryItem[] = [];
 
       // Debug: Log ALL items from target period with price 12.00
       let targetCount = 0;
@@ -141,6 +143,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
         if (targetCheck.match) {
           if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001) {
             targetCount++;
+            debugMatches.push(item);
             addLog(`🔍 TARGET item: ${item.name} | price=${item.price} (${typeof item.price}) | rawDate="${item.purchaseDate}" | parsed="${new Date(item.purchaseDate).toISOString()}" | store="${item.storeName || 'EMPTY'}"`);
           } else {
             priceMismatchCount++;
@@ -183,6 +186,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       }
 
       setCandidates(foundCandidates);
+      setRawMatches(debugMatches);
 
       const canFix = foundCandidates.filter(c => c.status === 'can_fix').length;
       const noMatch = foundCandidates.filter(c => c.status === 'no_match').length;
@@ -316,6 +320,20 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
             <div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h4 className="font-semibold text-blue-900 mb-2">📊 Analysis Complete:</h4>
+              {rawMatches.length > 0 && (
+                <details className="mb-6">
+                  <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
+                    View {rawMatches.length} raw matches
+                  </summary>
+                  <div className="mt-2 max-h-48 overflow-y-auto text-xs font-mono bg-gray-50 rounded p-3 space-y-1">
+                    {rawMatches.map((item, idx) => (
+                      <div key={idx}>
+                        {idx + 1}. {item.name} | price={item.price} | date="{item.purchaseDate}" | store="{item.storeName || 'EMPTY'}"
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
                 <div className="text-sm text-blue-800">
                   <div>✅ Items that can be fixed: <strong>{canFix.length}</strong></div>
                   <div>⚠️ Items with no match: <strong>{noMatch.length}</strong></div>
