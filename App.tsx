@@ -32,6 +32,7 @@ import { PriceComparePage } from './components/PriceComparePage';
 import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
 import { PromoCodeAdmin } from './components/PromoCodeAdmin';
+import { FixOctNovPrices } from './components/FixOctNovPrices';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1531,6 +1532,7 @@ function App() {
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPromoAdmin, setShowPromoAdmin] = useState(false);
+  const [showFixPrices, setShowFixPrices] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
@@ -3003,6 +3005,14 @@ function App() {
                       🎁 Add Promo Codes
                     </button>
                   )}
+                  {isOwner && (
+                    <button
+                      onClick={() => { setShowSettings(false); setShowFixPrices(true); }}
+                      className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-semibold"
+                    >
+                      🔧 Fix Oct/Nov Prices
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowSettings(false); handleSignOut(); }}
                     className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
@@ -3241,6 +3251,13 @@ function App() {
 
       {showPromoAdmin && (
         <PromoCodeAdmin onClose={() => setShowPromoAdmin(false)} />
+      )}
+
+      {showFixPrices && listId && (
+        <FixOctNovPrices 
+          listId={listId} 
+          onClose={() => setShowFixPrices(false)} 
+        />
       )}
 
     </div>
