@@ -50,14 +50,21 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
     return item.price === 12.00;
   };
 
-  const isTargetPeriod = (dateStr: string): boolean => {
-    const date = new Date(dateStr);
-    const year = date.getFullYear();
-    const month = date.getMonth(); // 0-indexed (9=Oct)
-    const day = date.getDate();
+  const isTargetPeriod = (item: PurchaseHistoryItem): { match: boolean; reason?: string } => {
+    const rawDate = item.purchaseDate;
+    const parsed = new Date(rawDate);
+
+    if (isNaN(parsed.getTime())) {
+      return { match: false, reason: `Invalid date format: ${rawDate}` };
+    }
+
+    const year = parsed.getFullYear();
+    const month = parsed.getMonth(); // 0-indexed (9=Oct)
+    const day = parsed.getDate();
     
     // ONLY October 19, 2025
-    return year === 2025 && month === 9 && day === 19;
+    const match = year === 2025 && month === 9 && day === 19;
+    return { match, reason: match ? undefined : `Different date (${parsed.toISOString().slice(0,10)})` };
   };
 
   const findMostRecentPrice = (
@@ -115,15 +122,21 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
       // Debug: Log ALL items from target period with price 12.00
       let debugCount = 0;
+      let invalidDates = 0;
       for (let i = 0; i < history.length; i++) {
         const item = history[i];
-        
-        if (item.price === 12.00 && isTargetPeriod(item.purchaseDate)) {
-          debugCount++;
-          addLog(`🔍 Found 12.00: ${item.name} | Date: ${item.purchaseDate} | Store: "${item.storeName || 'EMPTY'}"`);
+
+        const targetCheck = isTargetPeriod(item);
+        if (item.price === 12.00) {
+          if (targetCheck.match) {
+            debugCount++;
+            addLog(`🔍 Found TARGET item: ${item.name} | RawDate="${item.purchaseDate}" | Parsed=${new Date(item.purchaseDate).toISOString()} | Store="${item.storeName || 'EMPTY'}"`);
+          } else {
+            addLog(`ℹ️ Non-target 12₪ item: ${item.name} | Date="${item.purchaseDate}" | Reason=${targetCheck.reason}`);
+          }
         }
 
-        if (isPlaceholder(item) && isTargetPeriod(item.purchaseDate)) {
+        if (isPlaceholder(item) && targetCheck.match) {
           const priceMatch = findMostRecentPrice(item.name, history, i);
 
           if (priceMatch) {
@@ -145,10 +158,15 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
               matchSource: undefined
             });
           }
+        } else if (item.price === 12.00 && targetCheck.reason?.startsWith('Invalid')) {
+          invalidDates++;
         }
       }
       
       addLog(`📊 Found ${debugCount} items with 12.00 in target period`);
+      if (invalidDates > 0) {
+        addLog(`⚠️ Found ${invalidDates} items with INVALID date format`);
+      }
 
       setCandidates(foundCandidates);
 
