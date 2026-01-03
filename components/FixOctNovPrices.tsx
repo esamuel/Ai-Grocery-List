@@ -123,8 +123,15 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
       const foundCandidates: FixCandidate[] = [];
 
+      // Debug: Log ALL items from target period with price 12.00
+      let debugCount = 0;
       for (let i = 0; i < history.length; i++) {
         const item = history[i];
+        
+        if (item.price === 12.00 && isTargetPeriod(item.purchaseDate)) {
+          debugCount++;
+          addLog(`🔍 Found 12.00: ${item.name} | Date: ${item.purchaseDate} | Store: "${item.storeName || 'EMPTY'}"`);
+        }
 
         if (isPlaceholder(item) && isTargetPeriod(item.purchaseDate)) {
           const priceMatch = findMostRecentPrice(item.name, history, i);
@@ -150,6 +157,8 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
           }
         }
       }
+      
+      addLog(`📊 Found ${debugCount} items with 12.00 in target period`);
 
       setCandidates(foundCandidates);
 
