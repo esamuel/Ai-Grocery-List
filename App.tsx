@@ -33,6 +33,7 @@ import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
 import { PromoCodeAdmin } from './components/PromoCodeAdmin';
 import { FixOctNovPrices } from './components/FixOctNovPrices';
+import { FixShmoulikItems } from './components/FixShmoulikItems';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1533,6 +1534,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPromoAdmin, setShowPromoAdmin] = useState(false);
   const [showFixPrices, setShowFixPrices] = useState(false);
+  const [showFixShmoulik, setShowFixShmoulik] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
@@ -3006,12 +3008,20 @@ function App() {
                     </button>
                   )}
                   {isOwner && (
-                    <button
-                      onClick={() => { setShowSettings(false); setShowFixPrices(true); }}
-                      className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-semibold"
-                    >
-                      🔧 Fix Placeholder Prices
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setShowSettings(false); setShowFixPrices(true); }}
+                        className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-semibold"
+                      >
+                        🔧 Fix Oct 19 Placeholders
+                      </button>
+                      <button
+                        onClick={() => { setShowSettings(false); setShowFixShmoulik(true); }}
+                        className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-semibold"
+                      >
+                        🔧 Fix "שמוליק אשכנזי" Items
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => { setShowSettings(false); handleSignOut(); }}
@@ -3257,6 +3267,13 @@ function App() {
         <FixOctNovPrices 
           listId={listId} 
           onClose={() => setShowFixPrices(false)} 
+        />
+      )}
+
+      {showFixShmoulik && listId && (
+        <FixShmoulikItems 
+          listId={listId} 
+          onClose={() => setShowFixShmoulik(false)} 
         />
       )}
 
