@@ -121,19 +121,24 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       const foundCandidates: FixCandidate[] = [];
 
       // Debug: Log ALL items from target period with price 12.00
-      let debugCount = 0;
+      let targetCount = 0;
       let invalidDates = 0;
+      let priceMismatchCount = 0;
       for (let i = 0; i < history.length; i++) {
         const item = history[i];
 
         const targetCheck = isTargetPeriod(item);
-        if (item.price === 12.00) {
-          if (targetCheck.match) {
-            debugCount++;
-            addLog(`🔍 Found TARGET item: ${item.name} | RawDate="${item.purchaseDate}" | Parsed=${new Date(item.purchaseDate).toISOString()} | Store="${item.storeName || 'EMPTY'}"`);
+        const numericPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+        if (targetCheck.match) {
+          if (numericPrice === 12 || numericPrice === 12.0) {
+            targetCount++;
+            addLog(`🔍 TARGET item: ${item.name} | price=${item.price} (${typeof item.price}) | rawDate="${item.purchaseDate}" | parsed="${new Date(item.purchaseDate).toISOString()}" | store="${item.storeName || 'EMPTY'}"`);
           } else {
-            addLog(`ℹ️ Non-target 12₪ item: ${item.name} | Date="${item.purchaseDate}" | Reason=${targetCheck.reason}`);
+            priceMismatchCount++;
+            addLog(`⚠️ Target date but price != 12: ${item.name} | price=${item.price} (${typeof item.price})`);
           }
+        } else if (numericPrice === 12) {
+          addLog(`ℹ️ 12₪ but wrong date: ${item.name} | date="${item.purchaseDate}" | reason=${targetCheck.reason}`);
         }
 
         if (isPlaceholder(item) && targetCheck.match) {
@@ -158,12 +163,12 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
               matchSource: undefined
             });
           }
-        } else if (item.price === 12.00 && targetCheck.reason?.startsWith('Invalid')) {
+        } else if ((numericPrice === 12 || numericPrice === 12.0) && targetCheck.reason?.startsWith('Invalid')) {
           invalidDates++;
         }
       }
-      
-      addLog(`📊 Found ${debugCount} items with 12.00 in target period`);
+
+      addLog(`📊 Summary: target= ${targetCount}, price mismatch=${priceMismatchCount}`);
       if (invalidDates > 0) {
         addLog(`⚠️ Found ${invalidDates} items with INVALID date format`);
       }
