@@ -46,16 +46,8 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   };
 
   const isPlaceholder = (item: PurchaseHistoryItem): boolean => {
-    if (item.price !== 12.00) return false;
-    
-    // Check for various placeholder store names
-    const storeName = item.storeName?.toLowerCase().trim() || '';
-    return (
-      storeName === 'שמוליק אשכנזי' ||
-      storeName.includes('estimated') ||
-      storeName === '' ||
-      !item.storeName
-    );
+    // Simply check if price is 12.00 - we know these are all placeholders
+    return item.price === 12.00;
   };
 
   const isTargetPeriod = (dateStr: string): boolean => {
@@ -258,7 +250,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
             </button>
           </div>
           <p className="text-gray-600 mt-2">
-            Fix placeholder prices (12.00 ₪) from Oct/Nov/Dec 2024 & Jan 2025
+            Fix ALL items with 12.00 ₪ from Oct/Nov/Dec 2024/2025 & Jan 2025
           </p>
         </div>
 
@@ -271,8 +263,8 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
                 Ready to Analyze
               </h3>
               <p className="text-gray-600 mb-6">
-                This will find all items from Oct/Nov/Dec 2024 & Jan 2025 with price 12.00 ₪<br />
-                and update them with real prices from other months.
+                This will find ALL items with 12.00 ₪ from Oct/Nov/Dec 2024/2025 & Jan 2025<br />
+                and update them with real prices from other months (regardless of store name).
               </p>
               <button
                 onClick={analyze}
