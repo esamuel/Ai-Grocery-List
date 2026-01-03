@@ -50,6 +50,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   const [candidates, setCandidates] = useState<FixCandidate[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [manualEdits, setManualEdits] = useState<Record<string, number>>({});
 
   const addLog = (message: string) => {
     setLog(prev => [...prev, message]);
@@ -234,6 +235,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
         if (!item.prices) return;
 
         const priceEntry = item.prices[candidate.priceIndex];
+        const candidateKey = `${candidate.itemIndex}-${candidate.priceIndex}`;
 
         if (candidate.status === 'can_fix' && candidate.newPrice) {
           priceEntry.price = candidate.newPrice;
@@ -241,9 +243,18 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
           fixedCount++;
           addLog(`✅ ${candidate.itemName} → ${candidate.newPrice.toFixed(2)} ₪ @ קורפור`);
         } else if (candidate.status === 'no_match') {
-          priceEntry.store = candidate.newStore;
-          keptCount++;
-          addLog(`⚠️  ${candidate.itemName} → kept at 12.00 ₪, changed store to קורפור`);
+          // Check if user manually entered a price
+          const manualPrice = manualEdits[candidateKey];
+          if (manualPrice && manualPrice > 0) {
+            priceEntry.price = manualPrice;
+            priceEntry.store = candidate.newStore;
+            fixedCount++;
+            addLog(`✅ ${candidate.itemName} → ${manualPrice.toFixed(2)} ₪ @ קורפור (manual)`);
+          } else {
+            priceEntry.store = candidate.newStore;
+            keptCount++;
+            addLog(`⚠️  ${candidate.itemName} → kept at 12.00 ₪, changed store to קורפור`);
+          }
         }
       });
 
@@ -266,6 +277,9 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
   const canFix = candidates.filter(c => c.status === 'can_fix');
   const noMatch = candidates.filter(c => c.status === 'no_match');
+  
+  const manualEditCount = Object.values(manualEdits).filter(price => price > 0).length;
+  const totalToFix = canFix.length + manualEditCount;
 
   return (
     <div 
@@ -352,33 +366,78 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
               {noMatch.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-3">⚠️ Items With No Match:</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {noMatch.map((c, idx) => (
-                      <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
-                        <div className="font-semibold">{c.itemName}</div>
-                        <div className="text-gray-600">Date: {c.priceEntry.purchaseDate.split('T')[0]}</div>
-                        <div className="text-yellow-700">Will keep 12.00 ₪ and change store to קורפור</div>
-                      </div>
-                    ))}
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    ⚠️ Items With No Match: 
+                    <span className="text-sm font-normal text-gray-600 ml-2">
+                      (Enter price manually or leave at 12.00)
+                    </span>
+                  </h4>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {noMatch.map((c, idx) => {
+                      const candidateKey = `${c.itemIndex}-${c.priceIndex}`;
+                      const manualPrice = manualEdits[candidateKey];
+                      return (
+                        <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="font-semibold">{c.itemName}</div>
+                              <div className="text-gray-600 text-xs">Date: {c.priceEntry.purchaseDate.split('T')[0]}</div>
+                              <div className="text-yellow-700 text-xs mt-1">
+                                Current: 12.00 ₪ @ {c.priceEntry.store || 'Estimated'}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Price (₪)"
+                                value={manualPrice || ''}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  setManualEdits(prev => ({
+                                    ...prev,
+                                    [candidateKey]: isNaN(value) ? 0 : value
+                                  }));
+                                }}
+                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <span className="text-gray-600">₪</span>
+                            </div>
+                          </div>
+                          {manualPrice && manualPrice > 0 && (
+                            <div className="text-green-600 text-xs mt-2">
+                              → Will update to: {manualPrice.toFixed(2)} ₪ @ קורפור
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={applyFixes}
-                  disabled={candidates.length === 0}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Apply Fixes ({candidates.length} items)
-                </button>
-                <button
-                  onClick={onClose}
-                  className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="space-y-3">
+                {manualEditCount > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                    ✏️ You've manually entered <strong>{manualEditCount}</strong> price{manualEditCount !== 1 ? 's' : ''}
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={applyFixes}
+                    disabled={candidates.length === 0}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Apply Fixes ({totalToFix} with prices, {noMatch.length - manualEditCount} kept at 12.00)
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           )}
