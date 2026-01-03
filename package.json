@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "fix-prices": "tsx scripts/fix-october-november-prices.ts"
+    "fix-prices": "tsx scripts/fix-october-november-prices.ts",
+    "list-placeholders": "tsx scripts/list-placeholder-items.ts"
   },
   "dependencies": {
     "@google/genai": "^1.20.0",

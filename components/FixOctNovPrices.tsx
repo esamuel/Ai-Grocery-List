@@ -45,9 +45,18 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       .replace(/\.$/, '');
   };
 
+  const normalizePrice = (price?: number | string): number | null => {
+    if (typeof price === 'number') return price;
+    if (typeof price === 'string') {
+      const numeric = parseFloat(price.replace(/[^0-9.\-]/g, ''));
+      return isNaN(numeric) ? null : numeric;
+    }
+    return null;
+  };
+
   const isPlaceholder = (item: PurchaseHistoryItem): boolean => {
-    // Simply check if price is 12.00 - we know these are all placeholders
-    return item.price === 12.00;
+    const normalized = normalizePrice(item.price);
+    return normalized !== null && Math.abs(normalized - 12) < 0.001;
   };
 
   const isTargetPeriod = (item: PurchaseHistoryItem): { match: boolean; reason?: string } => {
@@ -128,16 +137,16 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
         const item = history[i];
 
         const targetCheck = isTargetPeriod(item);
-        const numericPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+        const numericPrice = normalizePrice(item.price);
         if (targetCheck.match) {
-          if (numericPrice === 12 || numericPrice === 12.0) {
+          if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001) {
             targetCount++;
             addLog(`🔍 TARGET item: ${item.name} | price=${item.price} (${typeof item.price}) | rawDate="${item.purchaseDate}" | parsed="${new Date(item.purchaseDate).toISOString()}" | store="${item.storeName || 'EMPTY'}"`);
           } else {
             priceMismatchCount++;
             addLog(`⚠️ Target date but price != 12: ${item.name} | price=${item.price} (${typeof item.price})`);
           }
-        } else if (numericPrice === 12) {
+        } else if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001) {
           addLog(`ℹ️ 12₪ but wrong date: ${item.name} | date="${item.purchaseDate}" | reason=${targetCheck.reason}`);
         }
 
@@ -163,7 +172,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
               matchSource: undefined
             });
           }
-        } else if ((numericPrice === 12 || numericPrice === 12.0) && targetCheck.reason?.startsWith('Invalid')) {
+        } else if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001 && targetCheck.reason?.startsWith('Invalid')) {
           invalidDates++;
         }
       }
