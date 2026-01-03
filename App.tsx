@@ -3010,7 +3010,7 @@ function App() {
                       onClick={() => { setShowSettings(false); setShowFixPrices(true); }}
                       className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-semibold"
                     >
-                      🔧 Fix Oct/Nov Prices
+                      🔧 Fix Placeholder Prices
                     </button>
                   )}
                   <button

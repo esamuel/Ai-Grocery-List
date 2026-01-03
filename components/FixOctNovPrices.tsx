@@ -46,14 +46,28 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   };
 
   const isPlaceholder = (item: PurchaseHistoryItem): boolean => {
-    return item.price === 12.00 && item.storeName === 'שמוליק אשכנזי';
+    if (item.price !== 12.00) return false;
+    
+    // Check for various placeholder store names
+    const storeName = item.storeName?.toLowerCase().trim() || '';
+    return (
+      storeName === 'שמוליק אשכנזי' ||
+      storeName.includes('estimated') ||
+      storeName === '' ||
+      !item.storeName
+    );
   };
 
-  const isOctNov2024 = (dateStr: string): boolean => {
+  const isTargetPeriod = (dateStr: string): boolean => {
     const date = new Date(dateStr);
     const year = date.getFullYear();
-    const month = date.getMonth();
-    return year === 2024 && (month === 9 || month === 10);
+    const month = date.getMonth(); // 0-indexed
+    
+    // Oct/Nov/Dec 2024 OR Jan 2025
+    return (
+      (year === 2024 && (month === 9 || month === 10 || month === 11)) || // Oct, Nov, Dec 2024
+      (year === 2025 && month === 0) // Jan 2025
+    );
   };
 
   const findMostRecentPrice = (
@@ -112,7 +126,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       for (let i = 0; i < history.length; i++) {
         const item = history[i];
 
-        if (isPlaceholder(item) && isOctNov2024(item.purchaseDate)) {
+        if (isPlaceholder(item) && isTargetPeriod(item.purchaseDate)) {
           const priceMatch = findMostRecentPrice(item.name, history, i);
 
           if (priceMatch) {
@@ -225,7 +239,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-lg">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-900">
-              🔧 Fix Oct/Nov 2024 Prices
+              🔧 Fix Placeholder Prices
             </h2>
             <button
               onClick={onClose}
@@ -235,7 +249,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
             </button>
           </div>
           <p className="text-gray-600 mt-2">
-            Fix placeholder prices (12.00 ₪) with real prices from other months
+            Fix placeholder prices (12.00 ₪) from Oct/Nov/Dec 2024 & Jan 2025
           </p>
         </div>
 
@@ -248,7 +262,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
                 Ready to Analyze
               </h3>
               <p className="text-gray-600 mb-6">
-                This will find all items from October/November 2024 with price 12.00 ₪<br />
+                This will find all items from Oct/Nov/Dec 2024 & Jan 2025 with price 12.00 ₪<br />
                 and update them with real prices from other months.
               </p>
               <button
