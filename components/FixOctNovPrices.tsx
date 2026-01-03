@@ -61,12 +61,12 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   const isTargetPeriod = (dateStr: string): boolean => {
     const date = new Date(dateStr);
     const year = date.getFullYear();
-    const month = date.getMonth(); // 0-indexed
+    const month = date.getMonth(); // 0-indexed (0=Jan, 9=Oct, 10=Nov, 11=Dec)
     
-    // Oct/Nov/Dec 2024 OR Jan 2025
+    // Oct/Nov/Dec 2024 OR 2025, OR Jan 2025
     return (
       (year === 2024 && (month === 9 || month === 10 || month === 11)) || // Oct, Nov, Dec 2024
-      (year === 2025 && month === 0) // Jan 2025
+      (year === 2025 && (month === 9 || month === 10 || month === 11 || month === 0)) // Oct, Nov, Dec 2025 OR Jan 2025
     );
   };
 
