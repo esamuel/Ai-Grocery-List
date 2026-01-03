@@ -2,21 +2,40 @@ import React, { useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getFirebaseServices } from '../services/firebaseService';
 
+interface PriceHistory {
+  price: number;
+  currency: string;
+  purchaseDate: string;
+  store?: string;
+  quantity?: number;
+  unitPrice?: number;
+  unit?: string;
+  estimatedPrice?: boolean;
+}
+
 interface PurchaseHistoryItem {
   name: string;
   category: string;
-  purchaseDate: string;
-  price?: number;
-  storeName?: string;
-  quantity?: number;
-  unit?: string;
+  frequency: number;
+  lastPurchased: string;
+  firstPurchased?: string;
+  prices?: PriceHistory[];
+  lastPrice?: number;
+  avgPrice?: number;
+  lowestPrice?: number;
+  highestPrice?: number;
+  canonicalName?: string;
+  starred?: boolean;
+  tags?: string[];
 }
 
 interface FixCandidate {
-  index: number;
-  item: PurchaseHistoryItem;
+  itemIndex: number;
+  priceIndex: number;
+  itemName: string;
+  priceEntry: PriceHistory;
   newPrice?: number;
-  newStoreName: string;
+  newStore: string;
   status: 'can_fix' | 'no_match';
   matchSource?: string;
 }
@@ -31,7 +50,6 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
   const [candidates, setCandidates] = useState<FixCandidate[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [rawMatches, setRawMatches] = useState<PurchaseHistoryItem[]>([]);
 
   const addLog = (message: string) => {
     setLog(prev => [...prev, message]);
@@ -46,64 +64,59 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       .replace(/\.$/, '');
   };
 
-  const normalizePrice = (price?: number | string): number | null => {
-    if (typeof price === 'number') return price;
-    if (typeof price === 'string') {
-      const numeric = parseFloat(price.replace(/[^0-9.\-]/g, ''));
-      return isNaN(numeric) ? null : numeric;
-    }
-    return null;
-  };
-
-  const isPlaceholder = (item: PurchaseHistoryItem): boolean => {
-    const normalized = normalizePrice(item.price);
-    return normalized !== null && Math.abs(normalized - 12) < 0.001;
-  };
-
-  const isTargetPeriod = (item: PurchaseHistoryItem): { match: boolean; reason?: string } => {
-    const rawDate = item.purchaseDate;
-    const parsed = new Date(rawDate);
-
-    if (isNaN(parsed.getTime())) {
-      return { match: false, reason: `Invalid date format: ${rawDate}` };
-    }
-
-    const year = parsed.getFullYear();
-    const month = parsed.getMonth(); // 0-indexed (9=Oct)
-    const day = parsed.getDate();
+  const isOctober19_2025 = (dateStr: string): boolean => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
     
-    // ONLY October 19, 2025
-    const match = year === 2025 && month === 9 && day === 19;
-    return { match, reason: match ? undefined : `Different date (${parsed.toISOString().slice(0,10)})` };
+    const year = date.getFullYear();
+    const month = date.getMonth(); // 0-indexed (9=Oct)
+    const day = date.getDate();
+    
+    return year === 2025 && month === 9 && day === 19;
   };
 
-  const findMostRecentPrice = (
+  const findBestPrice = (
     productName: string,
     history: PurchaseHistoryItem[],
-    excludeIndex: number
+    excludeItemIndex: number,
+    excludePriceIndex: number
   ): { price: number; source: string } | null => {
     const normalized = normalizeProductName(productName);
 
-    const matches = history
-      .map((item, index) => ({ item, index }))
-      .filter(({ item, index }) => {
-        if (index === excludeIndex) return false;
-        if (isPlaceholder(item)) return false;
-        if (!item.price || item.price === 12.00) return false;
-        return normalizeProductName(item.name) === normalized;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.item.purchaseDate).getTime();
-        const dateB = new Date(b.item.purchaseDate).getTime();
-        return dateB - dateA;
+    const allPrices: { price: number; date: string; store: string; itemIdx: number; priceIdx: number }[] = [];
+
+    history.forEach((item, itemIdx) => {
+      if (normalizeProductName(item.name) !== normalized) return;
+      
+      item.prices?.forEach((priceEntry, priceIdx) => {
+        // Skip the current entry we're trying to fix
+        if (itemIdx === excludeItemIndex && priceIdx === excludePriceIndex) return;
+        
+        // Skip placeholder prices
+        if (priceEntry.price === 12 || priceEntry.price === 12.00) return;
+        
+        // Skip prices from Oct 19, 2025
+        if (isOctober19_2025(priceEntry.purchaseDate)) return;
+        
+        allPrices.push({
+          price: priceEntry.price,
+          date: priceEntry.purchaseDate,
+          store: priceEntry.store || 'unknown',
+          itemIdx,
+          priceIdx
+        });
       });
+    });
 
-    if (matches.length === 0) return null;
+    if (allPrices.length === 0) return null;
 
-    const mostRecent = matches[0];
+    // Sort by date descending (most recent first)
+    allPrices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const mostRecent = allPrices[0];
     return {
-      price: mostRecent.item.price!,
-      source: `${mostRecent.item.purchaseDate} (${mostRecent.item.storeName || 'unknown'})`
+      price: mostRecent.price,
+      source: `${mostRecent.date.split('T')[0]} @ ${mostRecent.store} (${mostRecent.price.toFixed(2)} ₪)`
     };
   };
 
@@ -126,67 +139,59 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       const history: PurchaseHistoryItem[] = data.history || [];
 
       addLog(`✅ Loaded ${history.length} items`);
-      addLog('🔍 Analyzing October 19, 2025 items...');
+      addLog('🔍 Searching for 12.00 prices on October 19, 2025...');
 
       const foundCandidates: FixCandidate[] = [];
-      const debugMatches: PurchaseHistoryItem[] = [];
+      let totalPriceEntries = 0;
+      let oct19Count = 0;
 
-      // Debug: Log ALL items from target period with price 12.00
-      let targetCount = 0;
-      let invalidDates = 0;
-      let priceMismatchCount = 0;
-      for (let i = 0; i < history.length; i++) {
-        const item = history[i];
+      history.forEach((item, itemIdx) => {
+        if (!item.prices || item.prices.length === 0) return;
 
-        const targetCheck = isTargetPeriod(item);
-        const numericPrice = normalizePrice(item.price);
-        if (targetCheck.match) {
-          if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001) {
-            targetCount++;
-            debugMatches.push(item);
-            addLog(`🔍 TARGET item: ${item.name} | price=${item.price} (${typeof item.price}) | rawDate="${item.purchaseDate}" | parsed="${new Date(item.purchaseDate).toISOString()}" | store="${item.storeName || 'EMPTY'}"`);
-          } else {
-            priceMismatchCount++;
-            addLog(`⚠️ Target date but price != 12: ${item.name} | price=${item.price} (${typeof item.price})`);
+        item.prices.forEach((priceEntry, priceIdx) => {
+          totalPriceEntries++;
+          
+          // Check if this is Oct 19, 2025 with price 12.00
+          if (isOctober19_2025(priceEntry.purchaseDate) && 
+              (priceEntry.price === 12 || priceEntry.price === 12.00)) {
+            
+            oct19Count++;
+            addLog(`🔍 Found: ${item.name} | ${priceEntry.price} ₪ | ${priceEntry.purchaseDate} | ${priceEntry.store || 'no store'}`);
+
+            // Find best replacement price
+            const bestPrice = findBestPrice(item.name, history, itemIdx, priceIdx);
+
+            if (bestPrice) {
+              foundCandidates.push({
+                itemIndex: itemIdx,
+                priceIndex: priceIdx,
+                itemName: item.name,
+                priceEntry,
+                newPrice: bestPrice.price,
+                newStore: 'קורפור',
+                status: 'can_fix',
+                matchSource: bestPrice.source
+              });
+            } else {
+              foundCandidates.push({
+                itemIndex: itemIdx,
+                priceIndex: priceIdx,
+                itemName: item.name,
+                priceEntry,
+                newPrice: undefined,
+                newStore: 'קורפור',
+                status: 'no_match',
+                matchSource: undefined
+              });
+            }
           }
-        } else if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001) {
-          addLog(`ℹ️ 12₪ but wrong date: ${item.name} | date="${item.purchaseDate}" | reason=${targetCheck.reason}`);
-        }
+        });
+      });
 
-        if (isPlaceholder(item) && targetCheck.match) {
-          const priceMatch = findMostRecentPrice(item.name, history, i);
-
-          if (priceMatch) {
-            foundCandidates.push({
-              index: i,
-              item,
-              newPrice: priceMatch.price,
-              newStoreName: 'קורפור',
-              status: 'can_fix',
-              matchSource: priceMatch.source
-            });
-          } else {
-            foundCandidates.push({
-              index: i,
-              item,
-              newPrice: undefined,
-              newStoreName: 'קורפור',
-              status: 'no_match',
-              matchSource: undefined
-            });
-          }
-        } else if (numericPrice !== null && Math.abs(numericPrice - 12) < 0.001 && targetCheck.reason?.startsWith('Invalid')) {
-          invalidDates++;
-        }
-      }
-
-      addLog(`📊 Summary: target= ${targetCount}, price mismatch=${priceMismatchCount}`);
-      if (invalidDates > 0) {
-        addLog(`⚠️ Found ${invalidDates} items with INVALID date format`);
-      }
+      addLog(`📊 Checked ${totalPriceEntries} price entries`);
+      addLog(`🎯 Found ${oct19Count} entries on Oct 19, 2025 with 12.00`);
 
       setCandidates(foundCandidates);
-      setRawMatches(debugMatches);
 
       const canFix = foundCandidates.filter(c => c.status === 'can_fix').length;
       const noMatch = foundCandidates.filter(c => c.status === 'no_match').length;
@@ -199,6 +204,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       setPhase('preview');
     } catch (err: any) {
       setError(err.message || 'Analysis failed');
+      addLog(`❌ Error: ${err.message}`);
       setPhase('idle');
     }
   };
@@ -218,29 +224,28 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       }
 
       const data = listSnap.data();
-      const history: PurchaseHistoryItem[] = [...data.history];
+      const history: PurchaseHistoryItem[] = JSON.parse(JSON.stringify(data.history || []));
 
       let fixedCount = 0;
       let keptCount = 0;
 
-      for (const candidate of candidates) {
+      candidates.forEach(candidate => {
+        const item = history[candidate.itemIndex];
+        if (!item.prices) return;
+
+        const priceEntry = item.prices[candidate.priceIndex];
+
         if (candidate.status === 'can_fix' && candidate.newPrice) {
-          history[candidate.index] = {
-            ...history[candidate.index],
-            price: candidate.newPrice,
-            storeName: candidate.newStoreName
-          };
+          priceEntry.price = candidate.newPrice;
+          priceEntry.store = candidate.newStore;
           fixedCount++;
-          addLog(`✅ ${candidate.item.name} → ${candidate.newPrice.toFixed(2)} ₪`);
+          addLog(`✅ ${candidate.itemName} → ${candidate.newPrice.toFixed(2)} ₪ @ קורפור`);
         } else if (candidate.status === 'no_match') {
-          history[candidate.index] = {
-            ...history[candidate.index],
-            storeName: candidate.newStoreName
-          };
+          priceEntry.store = candidate.newStore;
           keptCount++;
-          addLog(`⚠️  ${candidate.item.name} → kept at 12.00 ₪`);
+          addLog(`⚠️  ${candidate.itemName} → kept at 12.00 ₪, changed store to קורפור`);
         }
-      }
+      });
 
       addLog('');
       addLog('📤 Updating Firestore...');
@@ -248,12 +253,13 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
       addLog('');
       addLog('✅ MIGRATION COMPLETE!');
-      addLog(`✅ Fixed: ${fixedCount} items`);
-      addLog(`⚠️  Kept at 12.00: ${keptCount} items`);
+      addLog(`✅ Fixed with real prices: ${fixedCount}`);
+      addLog(`⚠️  Kept at 12.00 (no match): ${keptCount}`);
 
       setPhase('done');
     } catch (err: any) {
       setError(err.message || 'Failed to apply fixes');
+      addLog(`❌ Error: ${err.message}`);
       setPhase('preview');
     }
   };
@@ -320,20 +326,6 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
             <div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h4 className="font-semibold text-blue-900 mb-2">📊 Analysis Complete:</h4>
-              {rawMatches.length > 0 && (
-                <details className="mb-6">
-                  <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
-                    View {rawMatches.length} raw matches
-                  </summary>
-                  <div className="mt-2 max-h-48 overflow-y-auto text-xs font-mono bg-gray-50 rounded p-3 space-y-1">
-                    {rawMatches.map((item, idx) => (
-                      <div key={idx}>
-                        {idx + 1}. {item.name} | price={item.price} | date="{item.purchaseDate}" | store="{item.storeName || 'EMPTY'}"
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
                 <div className="text-sm text-blue-800">
                   <div>✅ Items that can be fixed: <strong>{canFix.length}</strong></div>
                   <div>⚠️ Items with no match: <strong>{noMatch.length}</strong></div>
@@ -347,9 +339,9 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {canFix.map((c, idx) => (
                       <div key={idx} className="bg-green-50 border border-green-200 rounded p-3 text-sm">
-                        <div className="font-semibold">{c.item.name}</div>
-                        <div className="text-gray-600">Date: {c.item.purchaseDate}</div>
-                        <div className="text-red-600">Current: 12.00 ₪ @ שמוליק אשכנזי</div>
+                        <div className="font-semibold">{c.itemName}</div>
+                        <div className="text-gray-600">Date: {c.priceEntry.purchaseDate.split('T')[0]}</div>
+                        <div className="text-red-600">Current: 12.00 ₪ @ {c.priceEntry.store || 'Estimated'}</div>
                         <div className="text-green-600">New: {c.newPrice!.toFixed(2)} ₪ @ קורפור</div>
                         <div className="text-xs text-gray-500">Source: {c.matchSource}</div>
                       </div>
@@ -364,8 +356,8 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {noMatch.map((c, idx) => (
                       <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm">
-                        <div className="font-semibold">{c.item.name}</div>
-                        <div className="text-gray-600">Date: {c.item.purchaseDate}</div>
+                        <div className="font-semibold">{c.itemName}</div>
+                        <div className="text-gray-600">Date: {c.priceEntry.purchaseDate.split('T')[0]}</div>
                         <div className="text-yellow-700">Will keep 12.00 ₪ and change store to קורפור</div>
                       </div>
                     ))}
@@ -418,7 +410,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
           {/* Log */}
           {log.length > 0 && (
-            <details className="mt-6">
+            <details className="mt-6" open>
               <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 font-semibold">
                 View Detailed Log
               </summary>
@@ -441,4 +433,3 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
     </div>
   );
 };
-
