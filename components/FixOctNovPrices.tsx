@@ -215,6 +215,7 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
       setPhase('applying');
       addLog('');
       addLog('🔧 Applying fixes...');
+      addLog('📥 Loading FRESH data from Firestore...');
 
       const { db } = getFirebaseServices();
       const listRef = doc(db, 'groceryLists', listId);
@@ -226,34 +227,69 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
       const data = listSnap.data();
       const history: PurchaseHistoryItem[] = JSON.parse(JSON.stringify(data.history || []));
+      
+      addLog(`✅ Loaded ${history.length} items from Firestore`);
+      addLog('🔍 Re-scanning for Oct 19 items in fresh data...');
+
+      // Re-scan fresh data to find current Oct 19 items
+      const freshCandidates: Array<{itemIndex: number; priceIndex: number; itemName: string}> = [];
+      history.forEach((item, itemIdx) => {
+        if (!item.prices || item.prices.length === 0) return;
+        item.prices.forEach((priceEntry, priceIdx) => {
+          if (isOctober19_2025(priceEntry.purchaseDate) && 
+              (priceEntry.price === 12 || priceEntry.price === 12.00)) {
+            freshCandidates.push({
+              itemIndex: itemIdx,
+              priceIndex: priceIdx,
+              itemName: item.name
+            });
+          }
+        });
+      });
+
+      addLog(`✅ Found ${freshCandidates.length} items in fresh data (was ${candidates.length} in preview)`);
 
       let fixedCount = 0;
+      let manualCount = 0;
       let keptCount = 0;
+      let skippedCount = 0;
 
-      candidates.forEach(candidate => {
-        const item = history[candidate.itemIndex];
+      // Process each fresh candidate
+      freshCandidates.forEach(freshCandidate => {
+        const item = history[freshCandidate.itemIndex];
         if (!item.prices) return;
 
-        const priceEntry = item.prices[candidate.priceIndex];
-        const candidateKey = `${candidate.itemIndex}-${candidate.priceIndex}`;
+        const priceEntry = item.prices[freshCandidate.priceIndex];
 
-        if (candidate.status === 'can_fix' && candidate.newPrice) {
-          priceEntry.price = candidate.newPrice;
-          priceEntry.store = candidate.newStore;
+        // Try to find matching candidate from preview (by name)
+        const originalCandidate = candidates.find(c => c.itemName === freshCandidate.itemName);
+        
+        if (!originalCandidate) {
+          // This item wasn't in the preview - skip it
+          skippedCount++;
+          addLog(`⏭️  ${freshCandidate.itemName} → not in preview, skipping`);
+          return;
+        }
+
+        const candidateKey = `${originalCandidate.itemIndex}-${originalCandidate.priceIndex}`;
+
+        if (originalCandidate.status === 'can_fix' && originalCandidate.newPrice) {
+          priceEntry.price = originalCandidate.newPrice;
+          priceEntry.store = originalCandidate.newStore;
           fixedCount++;
-          addLog(`✅ ${candidate.itemName} → ${candidate.newPrice.toFixed(2)} ₪ @ קורפור`);
-        } else if (candidate.status === 'no_match') {
+          addLog(`✅ ${freshCandidate.itemName} → ${originalCandidate.newPrice.toFixed(2)} ₪ @ קורפור`);
+        } else if (originalCandidate.status === 'no_match') {
           // Check if user manually entered a price
           const manualPrice = manualEdits[candidateKey];
           if (manualPrice && manualPrice > 0) {
             priceEntry.price = manualPrice;
-            priceEntry.store = candidate.newStore;
-            fixedCount++;
-            addLog(`✅ ${candidate.itemName} → ${manualPrice.toFixed(2)} ₪ @ קורפור (manual)`);
+            priceEntry.store = originalCandidate.newStore;
+            manualCount++;
+            addLog(`✅ ${freshCandidate.itemName} → ${manualPrice.toFixed(2)} ₪ @ קורפור (manual)`);
           } else {
-            priceEntry.store = candidate.newStore;
+            priceEntry.store = originalCandidate.newStore;
             keptCount++;
-            addLog(`⚠️  ${candidate.itemName} → kept at 12.00 ₪, changed store to קורפור`);
+            addLog(`⚠️  ${freshCandidate.itemName} → kept at 12.00 ₪, changed store to קורפור`);
           }
         }
       });
@@ -264,8 +300,12 @@ export const FixOctNovPrices: React.FC<Props> = ({ listId, onClose }) => {
 
       addLog('');
       addLog('✅ MIGRATION COMPLETE!');
-      addLog(`✅ Fixed with real prices: ${fixedCount}`);
-      addLog(`⚠️  Kept at 12.00 (no match): ${keptCount}`);
+      addLog(`✅ Auto-fixed with real prices: ${fixedCount}`);
+      addLog(`✏️  Manually updated: ${manualCount}`);
+      addLog(`⚠️  Kept at 12.00: ${keptCount}`);
+      if (skippedCount > 0) {
+        addLog(`⏭️  Skipped (not in preview): ${skippedCount}`);
+      }
 
       setPhase('done');
     } catch (err: any) {
