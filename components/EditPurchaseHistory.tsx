@@ -56,6 +56,11 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Bulk edit state
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkEditField, setBulkEditField] = useState<'price' | 'store' | 'date'>('store');
+  const [bulkEditValue, setBulkEditValue] = useState('');
 
   const addLog = (message: string) => {
     setLog(prev => [...prev, message]);
@@ -146,6 +151,44 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
     const newMap = new Map(editedEntries);
     newMap.set(key, existing);
     setEditedEntries(newMap);
+  };
+
+  const applyBulkEdit = () => {
+    if (!bulkEditValue) return;
+
+    const filteredEntries = getFilteredEntries();
+    const newMap = new Map(editedEntries);
+
+    filteredEntries.forEach(({ itemIndex, priceIndex, item, price }) => {
+      const key = getEntryKey(itemIndex, priceIndex);
+      const existing = newMap.get(key) || {
+        itemIndex,
+        priceIndex,
+        itemName: item.name,
+        originalPrice: price,
+        editedPrice: price.price,
+        editedStore: price.store,
+        editedDate: price.purchaseDate.split('T')[0]
+      };
+
+      // Don't edit items marked for deletion
+      if (existing.markedForDeletion) return;
+
+      if (bulkEditField === 'price') {
+        existing.editedPrice = parseFloat(bulkEditValue) || 0;
+      } else if (bulkEditField === 'store') {
+        existing.editedStore = bulkEditValue;
+      } else if (bulkEditField === 'date') {
+        existing.editedDate = bulkEditValue;
+      }
+
+      newMap.set(key, existing);
+    });
+
+    setEditedEntries(newMap);
+    setShowBulkEdit(false);
+    setBulkEditValue('');
+    addLog(`📦 Bulk edit applied to ${filteredEntries.length} filtered entries`);
   };
 
   const applyChanges = async () => {
@@ -402,11 +445,78 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  Showing {filteredEntries.length} entries
-                  {hasChanges && <span className="ml-2 text-blue-600 font-semibold">({changesCount} changes pending)</span>}
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing {filteredEntries.length} entries
+                    {hasChanges && <span className="ml-2 text-blue-600 font-semibold">({changesCount} changes pending)</span>}
+                  </div>
+                  <button
+                    onClick={() => setShowBulkEdit(!showBulkEdit)}
+                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-semibold"
+                  >
+                    📦 Bulk Edit ({filteredEntries.length})
+                  </button>
                 </div>
               </div>
+
+              {/* Bulk Edit Panel */}
+              {showBulkEdit && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                  <h3 className="font-semibold text-purple-900 mb-3">📦 Bulk Edit All Filtered Items:</h3>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-sm text-purple-900 mb-1">Field to Edit:</label>
+                      <select
+                        value={bulkEditField}
+                        onChange={(e) => setBulkEditField(e.target.value as 'price' | 'store' | 'date')}
+                        className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      >
+                        <option value="store">Store Name</option>
+                        <option value="price">Price (₪)</option>
+                        <option value="date">Date</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm text-purple-900 mb-1">New Value:</label>
+                      {bulkEditField === 'date' ? (
+                        <input
+                          type="date"
+                          value={bulkEditValue}
+                          onChange={(e) => setBulkEditValue(e.target.value)}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      ) : bulkEditField === 'price' ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Enter price..."
+                          value={bulkEditValue}
+                          onChange={(e) => setBulkEditValue(e.target.value)}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Enter store name..."
+                          value={bulkEditValue}
+                          onChange={(e) => setBulkEditValue(e.target.value)}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      )}
+                    </div>
+                    <button
+                      onClick={applyBulkEdit}
+                      disabled={!bulkEditValue}
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Apply to {filteredEntries.length} Items
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-purple-700">
+                    ⚠️ This will apply the change to ALL {filteredEntries.length} filtered entries shown below (excluding items marked for deletion)
+                  </div>
+                </div>
+              )}
 
               {/* Entries List */}
               <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
