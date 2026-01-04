@@ -34,6 +34,7 @@ import { PurchaseHistory } from './components/PurchaseHistory';
 import { PromoCodeAdmin } from './components/PromoCodeAdmin';
 import { FixOctNovPrices } from './components/FixOctNovPrices';
 import { FixShmoulikItems } from './components/FixShmoulikItems';
+import { DeletePlaceholderItems } from './components/DeletePlaceholderItems';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1535,6 +1536,7 @@ function App() {
   const [showPromoAdmin, setShowPromoAdmin] = useState(false);
   const [showFixPrices, setShowFixPrices] = useState(false);
   const [showFixShmoulik, setShowFixShmoulik] = useState(false);
+  const [showDeletePlaceholders, setShowDeletePlaceholders] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
@@ -3021,6 +3023,12 @@ function App() {
                       >
                         🔧 Fix "שמוליק אשכנזי" Items
                       </button>
+                      <button
+                        onClick={() => { setShowSettings(false); setShowDeletePlaceholders(true); }}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-semibold"
+                      >
+                        🗑️ Delete 12.00 ₪ Items
+                      </button>
                     </>
                   )}
                   <button
@@ -3274,6 +3282,13 @@ function App() {
         <FixShmoulikItems 
           listId={listId} 
           onClose={() => setShowFixShmoulik(false)} 
+        />
+      )}
+
+      {showDeletePlaceholders && listId && (
+        <DeletePlaceholderItems 
+          listId={listId} 
+          onClose={() => setShowDeletePlaceholders(false)} 
         />
       )}
 
