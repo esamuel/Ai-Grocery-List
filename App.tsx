@@ -32,10 +32,7 @@ import { PriceComparePage } from './components/PriceComparePage';
 import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
 import { PromoCodeAdmin } from './components/PromoCodeAdmin';
-import { FixOctNovPrices } from './components/FixOctNovPrices';
-import { FixShmoulikItems } from './components/FixShmoulikItems';
-import { DeletePlaceholderItems } from './components/DeletePlaceholderItems';
-import { DeleteTenShekelItems } from './components/DeleteTenShekelItems';
+import { EditPurchaseHistory } from './components/EditPurchaseHistory';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
@@ -1535,10 +1532,7 @@ function App() {
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPromoAdmin, setShowPromoAdmin] = useState(false);
-  const [showFixPrices, setShowFixPrices] = useState(false);
-  const [showFixShmoulik, setShowFixShmoulik] = useState(false);
-  const [showDeletePlaceholders, setShowDeletePlaceholders] = useState(false);
-  const [showDeleteTenShekel, setShowDeleteTenShekel] = useState(false);
+  const [showEditHistory, setShowEditHistory] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
   type ToastVariant = 'info' | 'success' | 'error' | 'warning';
@@ -3012,32 +3006,12 @@ function App() {
                     </button>
                   )}
                   {isOwner && (
-                    <>
-                      <button
-                        onClick={() => { setShowSettings(false); setShowFixPrices(true); }}
-                        className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-semibold"
-                      >
-                        🔧 Fix Oct 19 Placeholders
-                      </button>
-                      <button
-                        onClick={() => { setShowSettings(false); setShowFixShmoulik(true); }}
-                        className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-semibold"
-                      >
-                        🔧 Fix "שמוליק אשכנזי" Items
-                      </button>
-                      <button
-                        onClick={() => { setShowSettings(false); setShowDeletePlaceholders(true); }}
-                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-semibold"
-                      >
-                        🗑️ Delete 12.00 ₪ Items
-                      </button>
-                      <button
-                        onClick={() => { setShowSettings(false); setShowDeleteTenShekel(true); }}
-                        className="px-4 py-2 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors font-semibold"
-                      >
-                        🗑️ Delete 10.00 ₪ Items
-                      </button>
-                    </>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowEditHistory(true); }}
+                      className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-semibold"
+                    >
+                      ✏️ Edit Purchase History
+                    </button>
                   )}
                   <button
                     onClick={() => { setShowSettings(false); handleSignOut(); }}
@@ -3279,31 +3253,10 @@ function App() {
         <PromoCodeAdmin onClose={() => setShowPromoAdmin(false)} />
       )}
 
-      {showFixPrices && listId && (
-        <FixOctNovPrices 
+      {showEditHistory && listId && (
+        <EditPurchaseHistory 
           listId={listId} 
-          onClose={() => setShowFixPrices(false)} 
-        />
-      )}
-
-      {showFixShmoulik && listId && (
-        <FixShmoulikItems 
-          listId={listId} 
-          onClose={() => setShowFixShmoulik(false)} 
-        />
-      )}
-
-      {showDeletePlaceholders && listId && (
-        <DeletePlaceholderItems 
-          listId={listId} 
-          onClose={() => setShowDeletePlaceholders(false)} 
-        />
-      )}
-
-      {showDeleteTenShekel && listId && (
-        <DeleteTenShekelItems 
-          listId={listId} 
-          onClose={() => setShowDeleteTenShekel(false)} 
+          onClose={() => setShowEditHistory(false)} 
         />
       )}
 
