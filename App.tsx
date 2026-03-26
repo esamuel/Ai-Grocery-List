@@ -171,6 +171,7 @@ const translations = {
     moveSelectedToFavorites: "Move Selected to Favorites",
     deleteSelected: "Delete Selected",
     selectAll: "Select All",
+    clearAll: "Clear All",
     deselectAll: "Deselect All",
     selectedCount: "{count} selected",
     addAll: "Add All",
@@ -537,6 +538,7 @@ const translations = {
     moveSelectedToFavorites: "העבר נבחרים למועדפים",
     deleteSelected: "מחק נבחרים",
     selectAll: "בחר הכל",
+    clearAll: "נקה הכל",
     deselectAll: "בטל בחירה",
     selectedCount: "{count} נבחרו",
     addAll: "הוסף הכל",
@@ -903,6 +905,7 @@ const translations = {
     moveSelectedToFavorites: "Mover Seleccionados a Favoritos",
     deleteSelected: "Eliminar Seleccionados",
     selectAll: "Seleccionar Todo",
+    clearAll: "Borrar todo",
     deselectAll: "Deseleccionar Todo",
     selectedCount: "{count} seleccionados",
     addAll: "Agregar Todo",
@@ -1059,7 +1062,7 @@ const translations = {
     promoCodeInvalid: "Código inválido o expirado",
     discount: "descuento",
     freeFeature1: "Lista de compras básica",
-    freeFeature2: "Categorización IA (50/mes)",
+    freeFeature2: "50 categorizaciones IA/mes",
     freeFeature3: "1 lista compartida",
     freeFeature4: "Incluye anuncios",
     proFeature1: "Todo en Gratis",
@@ -1166,7 +1169,7 @@ const translations = {
     subtitle: "Ваш умный помощник для покупок",
     error: "Не удалось категоризировать товары. Попробуйте еще раз.",
     inputPlaceholder: "например, '2 авокадо, молоко, хлеб'",
-    adding: "Добавление...",
+    adding: "Добавляю...",
     add: "Добавить",
     emptyTitle: "Ваш список пуст",
     emptySubtitle: "Добавьте товары ниже, чтобы начать!",
@@ -1176,7 +1179,7 @@ const translations = {
     favorites: "История",
     family: "Семья",
     favoritesTitle: "История покупок",
-    favoritesSubtitle: "Делайте покупки быстрее, добавляя часто покупаемые товары.",
+    favoritesSubtitle: "Покупайте быстрее, добавляя часто покупаемые товары.",
     familyTitle: "Семейный список",
     familySubtitle: "Общий доступ для членов семьи",
     familyMembersTitle: "Члены семьи",
@@ -1454,6 +1457,56 @@ function App() {
   // Subscription & Paywall
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+
+  const OWNER_PRO_BYPASS_STORAGE_KEY = 'ownerProBypassEnabled';
+  const OWNER_PRO_VALID_CODE = 'OWNER-PRO-2026';
+  const [ownerProBypassEnabled, setOwnerProBypassEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(OWNER_PRO_BYPASS_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [ownerCodeInput, setOwnerCodeInput] = useState('');
+  const [ownerCodeError, setOwnerCodeError] = useState<string | null>(null);
+
+  const handleOwnerCodeSubmit = useCallback(() => {
+    const code = ownerCodeInput.trim();
+    if (!code) return;
+
+    if (code === OWNER_PRO_VALID_CODE) {
+      setOwnerProBypassEnabled(true);
+      setOwnerCodeInput('');
+      setOwnerCodeError(null);
+      try {
+        localStorage.setItem(OWNER_PRO_BYPASS_STORAGE_KEY, 'true');
+      } catch {
+        // ignore
+      }
+      showToast('Pro features unlocked for testing', 'success');
+      return;
+    }
+
+    setOwnerCodeError('Invalid code');
+    showToast('Invalid owner code', 'error');
+  }, [ownerCodeInput, showToast]);
+
+  const handleDisableOwnerBypass = useCallback(() => {
+    setOwnerProBypassEnabled(false);
+    setOwnerCodeInput('');
+    setOwnerCodeError(null);
+    try {
+      localStorage.removeItem(OWNER_PRO_BYPASS_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    showToast('Owner bypass disabled', 'info');
+  }, [showToast]);
+
+  const effectivePlan = useMemo<PlanTier>(() => {
+    if (isOwner && ownerProBypassEnabled) return 'pro';
+    return subscription?.plan || 'free';
+  }, [isOwner, ownerProBypassEnabled, subscription?.plan]);
 
   // Function to refresh subscription from Firestore
   const refreshSubscription = useCallback(async () => {
@@ -2105,6 +2158,12 @@ function App() {
     await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
   }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
 
+  const isAllCompleted = useMemo(() => items.length > 0 && items.every(item => item.completed), [items]);
+
+  const handleToggleCompleteAll = useCallback(() => {
+    setItems(prevItems => prevItems.map(item => ({ ...item, completed: !isAllCompleted })));
+  }, [isAllCompleted, setItems]);
+
   const handleInlinePriceSave = useCallback(async (itemsWithPrices: {
     name: string;
     category: string;
@@ -2257,11 +2316,11 @@ function App() {
   if (!user && !isDemoMode) {
     if (showLandingPage) {
       return (
-        <EnhancedLandingPage
+        <LandingPage
           onGetStarted={() => setShowLandingPage(false)}
           onLogin={() => setShowLandingPage(false)}
           language={language}
-          onLanguageChange={setLanguage}
+          onLanguageChange={handleLanguageChange}
         />
       );
     }
@@ -2673,18 +2732,16 @@ function App() {
             />
 
             {/* Ad Banner for Free Users */}
-            {(!subscription || subscription.plan === 'free') && (
+            {effectivePlan === 'free' && (
               <>
                 <AdBanner
                   adSlot={import.meta.env.VITE_ADSENSE_SLOT_ID}
-                  format="auto"
-                  responsive={true}
-                  className="my-6"
+                  className="mb-4"
                 />
-                {/* Remove Ads Banner */}
-                <div className="my-4 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700">
-                  <div className="flex items-center justify-between gap-4 rtl:flex-row-reverse">
-                    <div className="flex-1">
+
+                <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div>
                       <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
                         {currentText.removeAdsTitle || 'Remove Ads'}
                       </h3>
@@ -2704,10 +2761,17 @@ function App() {
             )}
 
             {/* Clear Completed Button at Bottom */}
-            {hasCompletedItems && (
-              <div className="mt-6 flex justify-center">
+            {items.length > 0 && (
+              <div className="mt-6 flex justify-center gap-3">
+                <button
+                  onClick={handleToggleCompleteAll}
+                  className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md"
+                >
+                  {isAllCompleted ? currentText.clearAll : currentText.selectAll}
+                </button>
                 <button
                   onClick={handleClearCompleted}
+                  disabled={!hasCompletedItems}
                   className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
                 >
                   {currentText.clearCompleted}
@@ -2716,7 +2780,7 @@ function App() {
             )}
           </>
         ) : currentView === 'favorites' ? (
-          <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical }} />
+          <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical, selectAll: currentText.selectAll, clearAll: currentText.clearAll }} />
         ) : currentView === 'family' ? (
           <FamilyActivities
             userId={user?.uid || ''}
@@ -2858,6 +2922,47 @@ function App() {
                     <LanguageButton lang="ru">RU</LanguageButton>
                   </div>
                 </div>
+
+                {isOwner && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🔑 Owner Testing Code</h3>
+
+                    {ownerProBypassEnabled ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          Pro bypass is enabled on this device.
+                        </p>
+                        <button
+                          onClick={handleDisableOwnerBypass}
+                          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+                        >
+                          Disable Pro Bypass
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="password"
+                          value={ownerCodeInput}
+                          onChange={(e) => { setOwnerCodeInput(e.target.value); setOwnerCodeError(null); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleOwnerCodeSubmit(); }}
+                          placeholder="Enter owner code"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {ownerCodeError && (
+                          <p className="text-xs text-red-600 dark:text-red-400">{ownerCodeError}</p>
+                        )}
+                        <button
+                          onClick={handleOwnerCodeSubmit}
+                          disabled={!ownerCodeInput.trim()}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                        >
+                          Unlock
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Dark Mode Toggle */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
@@ -3195,7 +3300,7 @@ function App() {
         <PaywallModal
           onClose={() => setShowPaywall(false)}
           onSelectPlan={handleSelectPlan}
-          currentPlan={subscription?.plan || 'free'}
+          currentPlan={effectivePlan}
           userId={user?.uid}
           onSubscriptionUpdated={refreshSubscription}
           translations={{

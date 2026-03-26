@@ -22,6 +22,8 @@ interface FavoritesPageProps {
     times: string;
     delete: string;
     add: string;
+    selectAll: string;
+    clearAll: string;
     // Price alerts
     bestPriceEver: string;
     greatDeal: string;
@@ -165,6 +167,20 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
     setIsBatchMode(false);
   };
 
+  const areAllItemsSelected = useMemo(() => {
+    if (!isBatchMode) return false;
+    if (sortedItems.length === 0) return false;
+    return sortedItems.every(item => selectedItems.has(item.name));
+  }, [isBatchMode, selectedItems, sortedItems]);
+
+  const handleToggleSelectAll = () => {
+    setSelectedItems(prev => {
+      const allSelected = sortedItems.length > 0 && sortedItems.every(item => prev.has(item.name));
+      if (allSelected) return new Set();
+      return new Set(sortedItems.map(item => item.name));
+    });
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -262,6 +278,12 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ historyItems, onAd
               </button>
             ) : (
               <>
+                <button
+                  onClick={handleToggleSelectAll}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  {areAllItemsSelected ? translations.clearAll : translations.selectAll}
+                </button>
                 <button
                   onClick={handleAddSelected}
                   disabled={selectedItems.size === 0}

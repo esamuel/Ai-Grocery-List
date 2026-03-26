@@ -9,7 +9,7 @@ As the app owner, you can now unlock pro features for testing without purchasing
 1. **Open the app** and log in as the owner
 2. **Go to Settings** (click your profile icon or open the settings menu)
 3. **Scroll down** to the "🔑 Owner Testing Code" section (only visible to the list owner)
-4. **Enter the code**: `OWNER-PRO-2024`
+4. **Enter the code**: `OWNER-PRO-2026`
 5. **Click "Unlock"** or press Enter
 
 ### What Happens:
@@ -26,10 +26,10 @@ In the same settings section, click **"Disable Pro Bypass"** to return to normal
 
 ### Changing the Code:
 
-If you want to change the owner code, edit the `handleOwnerCodeSubmit` function in `App.tsx`:
+If you want to change the owner code, edit the `OWNER_PRO_VALID_CODE` constant in `App.tsx`:
 
 ```typescript
-const validCode = 'OWNER-PRO-2024'; // Change this to any code you want
+const OWNER_PRO_VALID_CODE = 'OWNER-PRO-2026'; // Change this to any code you want
 ```
 
 ### Security Notes:
@@ -37,7 +37,7 @@ const validCode = 'OWNER-PRO-2024'; // Change this to any code you want
 - This code only appears for the **list owner** (not family members)
 - The code is stored in the client-side source code, so it's meant for your testing only
 - For production, this feature is only accessible to users marked as `isOwner`
-- The bypass is stored in localStorage and persists until manually disabled or cleared
+- The bypass is stored in localStorage under `ownerProBypassEnabled` and persists until manually disabled or cleared
 
 ## Testing the Problem
 
