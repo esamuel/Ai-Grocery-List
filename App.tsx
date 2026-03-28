@@ -1678,7 +1678,7 @@ function App() {
   };
   const [showLanguageDetected, setShowLanguageDetected] = useState(false);
 
-  const currentText = translations[language];
+  const currentText = translations[language] ?? translations['en'];
 
   // Show language detection notification
   useEffect(() => {
