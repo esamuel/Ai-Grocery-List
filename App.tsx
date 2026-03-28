@@ -2320,9 +2320,67 @@ function App() {
       return (
         <LandingPage
           onGetStarted={() => setShowLandingPage(false)}
-          onLogin={() => setShowLandingPage(false)}
-          language={language}
-          onLanguageChange={handleLanguageChange}
+          translations={{
+            hero: {
+              title: currentText.landingHeroTitle,
+              subtitle: currentText.landingHeroSubtitle,
+              cta: currentText.landingHeroCta,
+              secondaryCta: currentText.landingHeroSecondaryCta,
+            },
+            features: {
+              title: currentText.landingFeaturesTitle,
+              subtitle: currentText.landingFeaturesSubtitle,
+              feature1Title: currentText.landingFeature1Title,
+              feature1Desc: currentText.landingFeature1Desc,
+              feature2Title: currentText.landingFeature2Title,
+              feature2Desc: currentText.landingFeature2Desc,
+              feature3Title: currentText.landingFeature3Title,
+              feature3Desc: currentText.landingFeature3Desc,
+              feature4Title: currentText.landingFeature4Title,
+              feature4Desc: currentText.landingFeature4Desc,
+              feature5Title: currentText.landingFeature5Title,
+              feature5Desc: currentText.landingFeature5Desc,
+              feature6Title: currentText.landingFeature6Title,
+              feature6Desc: currentText.landingFeature6Desc,
+            },
+            pricing: {
+              title: currentText.landingPricingTitle,
+              subtitle: currentText.landingPricingSubtitle,
+              free: currentText.landingPricingFree,
+              pro: currentText.landingPricingPro,
+              family: currentText.landingPricingFamily,
+              monthly: currentText.monthly,
+              yearly: currentText.yearly,
+              mostPopular: currentText.landingPricingMostPopular,
+              getStarted: currentText.landingPricingGetStarted,
+              feature1: currentText.landingPricingFreeFeature1,
+              feature2: currentText.landingPricingFreeFeature2,
+              feature3: currentText.landingPricingFreeFeature3,
+              feature4: currentText.landingPricingFreeFeature4,
+              proFeature1: currentText.landingPricingProFeature1,
+              proFeature2: currentText.landingPricingProFeature2,
+              proFeature3: currentText.landingPricingProFeature3,
+              proFeature4: currentText.landingPricingProFeature4,
+              proFeature5: currentText.landingPricingProFeature5,
+              familyFeature1: currentText.landingPricingFamilyFeature1,
+              familyFeature2: currentText.landingPricingFamilyFeature2,
+              familyFeature3: currentText.landingPricingFamilyFeature3,
+            },
+            howItWorks: {
+              title: currentText.landingHowItWorksTitle,
+              step1: currentText.landingHowItWorksStep1,
+              step1Desc: currentText.landingHowItWorksStep1Desc,
+              step2: currentText.landingHowItWorksStep2,
+              step2Desc: currentText.landingHowItWorksStep2Desc,
+              step3: currentText.landingHowItWorksStep3,
+              step3Desc: currentText.landingHowItWorksStep3Desc,
+            },
+            cta: {
+              title: currentText.landingCtaTitle,
+              subtitle: currentText.landingCtaSubtitle,
+              button: currentText.landingCtaButton,
+            },
+          }}
         />
       );
     }
