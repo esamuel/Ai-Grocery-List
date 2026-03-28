@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { GroceryItem, Category, PurchaseHistoryItem, GroceryHistoryItem, UserSubscription } from './types';
+import type { GroceryItem, Category, PurchaseHistoryItem, GroceryHistoryItem, UserSubscription, PlanTier } from './types';
 import { ItemInput } from './components/ItemInput';
 import { GroceryList } from './components/GroceryList';
 import { categorizeGroceries } from './services/geminiService';
@@ -1454,6 +1453,15 @@ function App() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
 
+  type ToastVariant = 'info' | 'success' | 'error' | 'warning';
+  const [toast, setToast] = useState<{ message: string; variant?: ToastVariant } | null>(null);
+
+  // Toast helper
+  const showToast = useCallback((message: string, variant: ToastVariant = 'info') => {
+    setToast({ message, variant });
+    setTimeout(() => setToast(null), 2500);
+  }, []);
+
   // Subscription & Paywall
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -1586,10 +1594,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showPromoAdmin, setShowPromoAdmin] = useState(false);
   const [showEditHistory, setShowEditHistory] = useState(false);
+
+  // Display name state
   const [displayName, setDisplayName] = useState('');
   const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
-  type ToastVariant = 'info' | 'success' | 'error' | 'warning';
-  const [toast, setToast] = useState<{ message: string; variant?: ToastVariant } | null>(null);
 
   // Firestore sync hook
   const { items, historyItems, setItems, setHistoryItems, isSyncing } = useFirestoreSync(listId);
@@ -1690,13 +1698,6 @@ function App() {
     if (items.length === 0) return;
     // keep whatever current state is; this effect simply ensures conditionally visible
   }, [currentView, items.length]);
-
-  // Toast helper
-  const showToast = useCallback((message: string, variant: ToastVariant = 'info') => {
-    setToast({ message, variant });
-    setTimeout(() => setToast(null), 2500);
-  }, []);
-
 
   // Using shared service isSemanticDuplicate()
 
