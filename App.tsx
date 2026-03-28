@@ -1511,6 +1511,11 @@ function App() {
     showToast('Owner bypass disabled', 'info');
   }, [showToast]);
 
+  // Auth states must be declared BEFORE effectivePlan to avoid TDZ
+  const [listId, setListId] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
   const effectivePlan = useMemo<PlanTier>(() => {
     if (isOwner && ownerProBypassEnabled) return 'pro';
     return subscription?.plan || 'free';
@@ -1580,10 +1585,6 @@ function App() {
   const [pendingCompletedItems, setPendingCompletedItems] = useState<GroceryItem[]>([]);
   const [showInlinePriceEntry, setShowInlinePriceEntry] = useState(false);
 
-  // Get list ID and other states from auth
-  const [listId, setListId] = useState<string | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
