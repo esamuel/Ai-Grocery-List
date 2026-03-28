@@ -1,15 +1,15 @@
-functionsDirectory = "/Users/samueleskenasy/ai-grocery-list/netlify/functions"
+functionsDirectory = "/Users/samueleskenasy/CascadeProjects/Ai-Grocery-List/netlify/functions"
 functionsDirectoryOrigin = "default"
 headersOrigin = "config"
 redirectsOrigin = "config"
 plugins = []
 
 [build]
-publish = "/Users/samueleskenasy/ai-grocery-list/dist"
+publish = "/Users/samueleskenasy/CascadeProjects/Ai-Grocery-List/dist"
 publishOrigin = "config"
 commandOrigin = "config"
 command = "npm run build"
-functions = "/Users/samueleskenasy/ai-grocery-list/netlify/functions"
+functions = "/Users/samueleskenasy/CascadeProjects/Ai-Grocery-List/netlify/functions"
 
 [build.environment]
 NODE_VERSION = "18"
