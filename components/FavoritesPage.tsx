@@ -14,7 +14,7 @@ interface FavoritesPageProps {
   onAddItem: (item: PurchaseHistoryItem) => void;
   onDeleteItem: (itemName: string) => void;
   currency: string;
-  language: 'en' | 'he' | 'es';
+  language: 'en' | 'he' | 'es' | 'ru';
   translations: {
     title: string;
     subtitle: string;

@@ -672,12 +672,14 @@ export const spanishStarterItems: StarterItem[] = [
 ];
 
 // Function to get starter items based on language
-export function getStarterItemsByLanguage(language: 'en' | 'he' | 'es'): StarterItem[] {
+export function getStarterItemsByLanguage(language: 'en' | 'he' | 'es' | 'ru'): StarterItem[] {
   switch (language) {
     case 'he':
       return hebrewStarterItems;
     case 'es':
       return spanishStarterItems;
+    case 'ru':
+      return englishStarterItems;
     case 'en':
     default:
       return englishStarterItems;
