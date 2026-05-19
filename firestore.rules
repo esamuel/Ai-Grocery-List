@@ -20,6 +20,27 @@ service cloud.firestore {
              get(/databases/$(database)/documents/households/$(hid)).data.ownerUid == request.auth.uid;
     }
 
+    function userHasListAccess(listId) {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userData.mainListId == listId ||
+             ('sharedListId' in userData && userData.sharedListId == listId);
+    }
+
+    function isGroceryListMember(listId) {
+      return exists(/databases/$(database)/documents/groceryLists/$(listId)) &&
+             (
+               get(/databases/$(database)/documents/groceryLists/$(listId)).data.ownerId == request.auth.uid ||
+               (
+                 'members' in get(/databases/$(database)/documents/groceryLists/$(listId)).data &&
+                 get(/databases/$(database)/documents/groceryLists/$(listId)).data.members.hasAny([request.auth.uid])
+               )
+             );
+    }
+
+    function canAccessGroceryList(listId) {
+      return isSignedIn() && (isGroceryListMember(listId) || userHasListAccess(listId));
+    }
+
     // Users can read and write their own profile
     match /users/{uid} {
       allow read, write: if isSignedIn() && uid == request.auth.uid;
@@ -31,6 +52,14 @@ service cloud.firestore {
       // This is safe because users can only access lists they have the ID for
       allow read, write: if isSignedIn();
       allow create: if isSignedIn();
+    }
+
+    // Family activity log (check-offs, adds) — used by UI and history recovery
+    match /familyActivities/{activityId} {
+      allow read: if canAccessGroceryList(resource.data.listId);
+      allow create: if canAccessGroceryList(request.resource.data.listId) &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
 
     // Promo Codes - PUBLIC READ for validation, owner write only
