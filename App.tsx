@@ -1645,26 +1645,26 @@ function App() {
       });
 
       // Repair purchase dates so all historical months appear in Monthly Purchases
-      const monthsFixKey = `monthsVisibleFix_v3:${listId}`;
+      const monthsFixKey = `monthsVisibleFix_v4:${listId}`;
       const alreadyRanMonthsFix = localStorage.getItem(monthsFixKey) === 'done';
       if (!alreadyRanMonthsFix) {
         ensureAllMonthsVisible(listId)
           .then(result => {
+            console.log('📅 History repair:', result);
             if (result.itemsFixed > 0 || result.pricesFixed > 0) {
-              localStorage.setItem(monthsFixKey, 'done');
-              showToast(
-                language === 'he'
-                  ? `שוחזרו ${result.monthsFound.length} חודשים בהיסטוריה`
-                  : `Restored ${result.monthsFound.length} months in purchase history`,
-                'success'
-              );
               import('./services/purchaseHistoryService').then(({ getPurchaseHistory }) =>
                 getPurchaseHistory(listId).then(setHistoryItems)
               );
-            } else if (result.monthsFound.length > 0) {
-              localStorage.setItem(monthsFixKey, 'done');
             }
-            console.log('📅 Months in history:', result.monthsFound.join(', '));
+            if (result.monthsFound.length > 0) {
+              localStorage.setItem(monthsFixKey, 'done');
+              showToast(
+                language === 'he'
+                  ? `נמצאו ${result.monthsFound.length} חודשים (${result.uniqueShoppingDays} ימי קניות)`
+                  : `Found ${result.monthsFound.length} months (${result.uniqueShoppingDays} shopping days)`,
+                result.monthsFound.length >= 3 ? 'success' : 'info'
+              );
+            }
           })
           .catch(error => {
             console.error('❌ ensureAllMonthsVisible failed:', error);

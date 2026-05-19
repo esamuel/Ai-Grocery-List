@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { PurchaseHistoryItem } from '../types';
 import { getDailyPurchases, type DailyPurchase } from '../services/exportService';
 import { getPurchaseHistory, setPurchaseHistory } from '../services/purchaseHistoryService';
+import { ensureAllMonthsVisible } from '../services/ensureAllMonthsVisible';
 import { format } from 'date-fns';
 import { he, es } from 'date-fns/locale';
 
@@ -49,6 +50,27 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
   const [deletingDay, setDeletingDay] = useState<string | null>(null);
+  const [repairing, setRepairing] = useState(false);
+
+  const handleRepairHistory = async () => {
+    if (!listId || repairing) return;
+    setRepairing(true);
+    try {
+      localStorage.removeItem(`monthsVisibleFix_v4:${listId}`);
+      const result = await ensureAllMonthsVisible(listId);
+      onDataChange();
+      const msg =
+        language === 'he'
+          ? `תוקנו ${result.itemsFixed} פריטים. ${result.monthsFound.length} חודשים, ${result.uniqueShoppingDays} ימי קניות.`
+          : `Fixed ${result.itemsFixed} items. ${result.monthsFound.length} months, ${result.uniqueShoppingDays} shopping days.`;
+      alert(msg + '\n\n' + result.monthsFound.join(', '));
+    } catch (e) {
+      console.error(e);
+      alert(language === 'he' ? 'תיקון ההיסטוריה נכשל' : 'History repair failed');
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   // Get all daily purchases
   const dailyPurchases = useMemo(() => {
@@ -430,7 +452,19 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
     return (
       <div className="text-center py-20">
         <div className="text-6xl mb-4">📅</div>
-        <p className="text-gray-500">{translations.noMonths}</p>
+        <p className="text-gray-500 mb-4">{translations.noMonths}</p>
+        {historyItems.length > 0 && (
+          <button
+            type="button"
+            onClick={handleRepairHistory}
+            disabled={repairing}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+          >
+            {repairing
+              ? (language === 'he' ? 'מתקן...' : 'Repairing...')
+              : (language === 'he' ? 'שחזר היסטוריית קניות' : 'Restore purchase history')}
+          </button>
+        )}
       </div>
     );
   }
@@ -440,6 +474,18 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
       {/* Header */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800">{translations.selectMonth}</h2>
+        {monthlyData.length <= 3 && historyItems.length > 0 && (
+          <button
+            type="button"
+            onClick={handleRepairHistory}
+            disabled={repairing}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
+          >
+            {repairing
+              ? (language === 'he' ? 'מתקן היסטוריה...' : 'Repairing history...')
+              : (language === 'he' ? '🔄 שחזר חודשים חסרים' : '🔄 Restore missing months')}
+          </button>
+        )}
       </div>
 
       {/* Month cards grid */}

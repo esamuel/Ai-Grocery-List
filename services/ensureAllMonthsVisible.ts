@@ -1,45 +1,58 @@
 /**
  * Ensure ALL historical months appear in Monthly/Daily purchase views.
- *
- * Fixes:
- * - Missing or invalid purchaseDate on price entries (Firestore Timestamps, etc.)
- * - Empty prices[] when frequency > 0
- * - Fewer price entries than frequency (spread across firstPurchased → lastPurchased)
  */
 
 import { getPurchaseHistory, setPurchaseHistory } from './purchaseHistoryService';
 import type { PurchaseHistoryItem, PriceHistory } from '../types';
 import {
   isValidPurchaseDate,
+  parsePurchaseDate,
   parsePurchaseDateISO,
   toMonthKey,
 } from '../utils/parsePurchaseDate';
 
-interface FixResult {
+export interface FixResult {
   success: boolean;
   itemsChecked: number;
   itemsFixed: number;
   pricesFixed: number;
   monthsFound: string[];
+  uniqueShoppingDays: number;
   errors: string[];
 }
 
-function inferFirstPurchased(item: PurchaseHistoryItem): string {
-  if (isValidPurchaseDate(item.firstPurchased)) {
-    return parsePurchaseDateISO(item.firstPurchased)!;
+function getUniqueMonths(prices: PriceHistory[]): Set<string> {
+  const months = new Set<string>();
+  prices.forEach((p) => {
+    const m = toMonthKey(p.purchaseDate);
+    if (m) months.add(m);
+  });
+  return months;
+}
+
+/** Best estimate of first / last purchase from all fields on the item */
+function getDateSpan(item: PurchaseHistoryItem): { first: Date; last: Date } {
+  let first: Date | null = parsePurchaseDate(item.firstPurchased);
+  let last: Date | null = parsePurchaseDate(item.lastPurchased);
+
+  (item.prices || []).forEach((p) => {
+    const d = parsePurchaseDate(p.purchaseDate);
+    if (!d) return;
+    if (!first || d < first) first = d;
+    if (!last || d > last) last = d;
+  });
+
+  if (!last) last = first;
+  if (!first && last) {
+    const stepDays = item.avgDaysBetween && item.avgDaysBetween > 0 ? item.avgDaysBetween : 7;
+    const lookback = Math.max((item.frequency - 1) * stepDays, item.frequency > 1 ? 30 : 0);
+    first = new Date(last);
+    first.setDate(first.getDate() - lookback);
   }
-  if (isValidPurchaseDate(item.lastPurchased) && item.frequency > 1) {
-    const last = new Date(parsePurchaseDateISO(item.lastPurchased)!);
-    const stepDays =
-      item.avgDaysBetween && item.avgDaysBetween > 0 ? item.avgDaysBetween : 7;
-    const first = new Date(last);
-    first.setDate(first.getDate() - stepDays * (item.frequency - 1));
-    return first.toISOString();
-  }
-  if (isValidPurchaseDate(item.lastPurchased)) {
-    return parsePurchaseDateISO(item.lastPurchased)!;
-  }
-  return new Date().toISOString();
+  if (!last && first) last = first;
+
+  const now = new Date();
+  return { first: first || now, last: last || now };
 }
 
 function inferPurchaseDate(
@@ -50,59 +63,118 @@ function inferPurchaseDate(
   if (isValidPurchaseDate(priceEntry.purchaseDate)) {
     return parsePurchaseDateISO(priceEntry.purchaseDate)!;
   }
-  if (isValidPurchaseDate(item.lastPurchased)) {
-    return parsePurchaseDateISO(item.lastPurchased)!;
-  }
-  if (isValidPurchaseDate(item.firstPurchased)) {
-    const base = new Date(parsePurchaseDateISO(item.firstPurchased)!);
-    base.setDate(base.getDate() + priceIndex * 7);
-    return base.toISOString();
-  }
-  const fallback = new Date();
-  fallback.setDate(fallback.getDate() - priceIndex * 7);
-  return fallback.toISOString();
+  const { first } = getDateSpan(item);
+  const d = new Date(first);
+  d.setDate(d.getDate() + priceIndex * 7);
+  return d.toISOString();
 }
 
-/** Spread extra purchase entries between first and last dates when frequency > prices.length */
+/** Dates exist but all cluster in 1–2 months while span is much longer */
+function shouldRedistributeClusteredDates(item: PurchaseHistoryItem): boolean {
+  if (!item.prices?.length || item.frequency < 2) return false;
+
+  const { first, last } = getDateSpan(item);
+  const spanDays = (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24);
+  if (spanDays < 45) return false;
+
+  const uniqueMonths = getUniqueMonths(item.prices).size;
+  if (uniqueMonths <= 2 && item.prices.length >= 1) return true;
+
+  const uniqueDays = new Set(
+    item.prices.map((p) => toMonthKey(p.purchaseDate)).filter(Boolean)
+  ).size;
+  if (spanDays > 90 && uniqueDays <= 2 && item.frequency >= 3) return true;
+
+  return false;
+}
+
+/** Spread price entries evenly from first → last (keeps price, store, qty) */
+function redistributePriceDates(item: PurchaseHistoryItem): PriceHistory[] {
+  const { first, last } = getDateSpan(item);
+  const count = Math.max(item.frequency, item.prices?.length || 0, 1);
+  const existing = item.prices || [];
+
+  const stepMs = count > 1 ? (last.getTime() - first.getTime()) / (count - 1) : 0;
+
+  if (existing.length === 0) {
+    const out: PriceHistory[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push({
+        purchaseDate: new Date(first.getTime() + stepMs * i).toISOString(),
+        price: item.lastPrice || item.avgPrice,
+        currency: 'ILS',
+        quantity: 1,
+        estimatedPrice: !item.lastPrice,
+      });
+    }
+    return out;
+  }
+
+  return existing.map((p, i) => {
+    const slot = count > 1 ? Math.round((i / Math.max(existing.length - 1, 1)) * (count - 1)) : 0;
+    return {
+      ...p,
+      purchaseDate: new Date(first.getTime() + stepMs * slot).toISOString(),
+    };
+  });
+}
+
 function backfillMissingPriceEntries(item: PurchaseHistoryItem): PriceHistory[] {
-  const existing: PriceHistory[] = (item.prices || []).map((p) => ({
+  if (shouldRedistributeClusteredDates(item)) {
+    return redistributePriceDates(item);
+  }
+
+  const existing: PriceHistory[] = (item.prices || []).map((p, i) => ({
     ...p,
     purchaseDate: isValidPurchaseDate(p.purchaseDate)
       ? parsePurchaseDateISO(p.purchaseDate)
-      : undefined,
+      : inferPurchaseDate(p, item, i),
   }));
 
   const targetCount = Math.max(item.frequency || 0, existing.length);
-  if (targetCount <= existing.length) {
-    return existing.map((p, i) => ({
-      ...p,
-      purchaseDate: p.purchaseDate || inferPurchaseDate(p, item, i),
-    }));
-  }
+  if (targetCount <= existing.length) return existing;
 
-  const first = new Date(inferFirstPurchased(item));
-  const last = isValidPurchaseDate(item.lastPurchased)
-    ? new Date(parsePurchaseDateISO(item.lastPurchased)!)
-    : first;
-  const missing = targetCount - existing.length;
+  const { first, last } = getDateSpan(item);
   const stepMs =
-    targetCount > 1
-      ? (last.getTime() - first.getTime()) / Math.max(targetCount - 1, 1)
-      : 0;
+    targetCount > 1 ? (last.getTime() - first.getTime()) / (targetCount - 1) : 0;
 
   const backfilled: PriceHistory[] = [...existing];
-  for (let i = 0; i < missing; i++) {
-    const d = new Date(first.getTime() + stepMs * (existing.length + i));
+  for (let i = 0; i < targetCount - existing.length; i++) {
+    const idx = existing.length + i;
     backfilled.push({
-      purchaseDate: d.toISOString(),
+      purchaseDate: new Date(first.getTime() + stepMs * idx).toISOString(),
       price: item.lastPrice || item.avgPrice,
       currency: existing[0]?.currency || 'ILS',
       quantity: 1,
       estimatedPrice: !item.lastPrice,
     });
   }
-
   return backfilled;
+}
+
+function collectMonthsFromHistory(history: PurchaseHistoryItem[]): string[] {
+  const monthsSet = new Set<string>();
+  history.forEach((item) => {
+    item.prices?.forEach((p) => {
+      const month = toMonthKey(p.purchaseDate);
+      if (month) monthsSet.add(month);
+    });
+  });
+  return Array.from(monthsSet).sort().reverse();
+}
+
+function countUniqueShoppingDays(history: PurchaseHistoryItem[]): number {
+  const days = new Set<string>();
+  history.forEach((item) => {
+    item.prices?.forEach((p) => {
+      const d = parsePurchaseDate(p.purchaseDate);
+      if (d) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        days.add(key);
+      }
+    });
+  });
+  return days.size;
 }
 
 export async function ensureAllMonthsVisible(listId: string): Promise<FixResult> {
@@ -112,6 +184,7 @@ export async function ensureAllMonthsVisible(listId: string): Promise<FixResult>
     itemsFixed: 0,
     pricesFixed: 0,
     monthsFound: [],
+    uniqueShoppingDays: 0,
     errors: [],
   };
 
@@ -123,44 +196,38 @@ export async function ensureAllMonthsVisible(listId: string): Promise<FixResult>
     }
 
     result.itemsChecked = history.length;
-    const monthsSet = new Set<string>();
     let needsSave = false;
 
     const fixedHistory = history.map((item) => {
       let updatedItem = { ...item };
       let itemChanged = false;
 
-      if (!updatedItem.firstPurchased && updatedItem.frequency > 1) {
-        updatedItem.firstPurchased = inferFirstPurchased(item);
+      const span = getDateSpan(item);
+      if (!updatedItem.firstPurchased || parsePurchaseDate(updatedItem.firstPurchased)! > span.first) {
+        updatedItem.firstPurchased = span.first.toISOString();
         itemChanged = true;
       }
 
-      if (!updatedItem.prices || updatedItem.prices.length === 0) {
-        if (item.frequency > 0 && isValidPurchaseDate(item.lastPurchased)) {
-          updatedItem.prices = backfillMissingPriceEntries({
-            ...updatedItem,
-            prices: [],
-          });
-          itemChanged = true;
-          result.pricesFixed += updatedItem.prices.length;
-        }
-      } else if ((updatedItem.prices.length < updatedItem.frequency) || updatedItem.prices.some((p) => !isValidPurchaseDate(p.purchaseDate))) {
+      const needsPrices =
+        !updatedItem.prices?.length ||
+        updatedItem.prices.length < updatedItem.frequency ||
+        updatedItem.prices.some((p) => !isValidPurchaseDate(p.purchaseDate)) ||
+        shouldRedistributeClusteredDates(updatedItem);
+
+      if (needsPrices && updatedItem.frequency > 0) {
+        const before = getUniqueMonths(updatedItem.prices || []).size;
         updatedItem.prices = backfillMissingPriceEntries(updatedItem);
-        itemChanged = true;
-        result.pricesFixed++;
-      }
-
-      if (updatedItem.prices?.length) {
-        updatedItem.prices = updatedItem.prices.map((price, priceIndex) => {
-          const updatedPrice = { ...price };
-          if (!isValidPurchaseDate(updatedPrice.purchaseDate)) {
-            updatedPrice.purchaseDate = inferPurchaseDate(price, item, priceIndex);
-            itemChanged = true;
-            result.pricesFixed++;
-          }
-          const month = toMonthKey(updatedPrice.purchaseDate);
-          if (month) monthsSet.add(month);
-          return updatedPrice;
+        const after = getUniqueMonths(updatedItem.prices).size;
+        if (after > before || needsPrices) {
+          itemChanged = true;
+          result.pricesFixed++;
+        }
+      } else if (updatedItem.prices?.length) {
+        updatedItem.prices = updatedItem.prices.map((p, i) => {
+          if (isValidPurchaseDate(p.purchaseDate)) return p;
+          itemChanged = true;
+          result.pricesFixed++;
+          return { ...p, purchaseDate: inferPurchaseDate(p, item, i) };
         });
       }
 
@@ -173,14 +240,8 @@ export async function ensureAllMonthsVisible(listId: string): Promise<FixResult>
       await setPurchaseHistory(listId, fixedHistory);
     }
 
-    fixedHistory.forEach((item) => {
-      item.prices?.forEach((p) => {
-        const month = toMonthKey(p.purchaseDate);
-        if (month) monthsSet.add(month);
-      });
-    });
-
-    result.monthsFound = Array.from(monthsSet).sort().reverse();
+    result.monthsFound = collectMonthsFromHistory(fixedHistory);
+    result.uniqueShoppingDays = countUniqueShoppingDays(fixedHistory);
     result.success = true;
     return result;
   } catch (error) {
@@ -190,19 +251,8 @@ export async function ensureAllMonthsVisible(listId: string): Promise<FixResult>
 }
 
 export async function verifyMonthsVisible(listId: string): Promise<string[]> {
-  try {
-    const history = await getPurchaseHistory(listId);
-    const monthsSet = new Set<string>();
-    history.forEach((item) => {
-      item.prices?.forEach((price) => {
-        const month = toMonthKey(price.purchaseDate);
-        if (month) monthsSet.add(month);
-      });
-    });
-    return Array.from(monthsSet).sort().reverse();
-  } catch {
-    return [];
-  }
+  const history = await getPurchaseHistory(listId);
+  return collectMonthsFromHistory(history);
 }
 
 if (typeof window !== 'undefined') {
