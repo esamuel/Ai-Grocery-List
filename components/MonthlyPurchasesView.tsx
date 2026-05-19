@@ -4,6 +4,7 @@ import { getDailyPurchases, type DailyPurchase } from '../services/exportService
 import { getPurchaseHistory, setPurchaseHistory } from '../services/purchaseHistoryService';
 import { ensureAllMonthsVisible } from '../services/ensureAllMonthsVisible';
 import { auditFirebaseHistory } from '../services/auditFirebaseHistory';
+import { recoverHistoryFromActivities } from '../services/recoverHistoryFromActivities';
 import { format } from 'date-fns';
 import { he, es } from 'date-fns/locale';
 
@@ -52,6 +53,37 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
   const [deletingDay, setDeletingDay] = useState<string | null>(null);
   const [repairing, setRepairing] = useState(false);
+  const [recoveringActivities, setRecoveringActivities] = useState(false);
+
+  const handleRecoverFromActivities = async () => {
+    if (!listId || recoveringActivities) return;
+    const confirmMsg =
+      language === 'he'
+        ? 'לשחזר חודשים מיומן הפעילות (אוקטובר 2025 ואילך)? מחירים יסומנו כמשוערים אם חסרים.'
+        : 'Recover months from your activity log (Oct 2025+)? Missing prices will be marked as estimated.';
+    if (!window.confirm(confirmMsg)) return;
+
+    setRecoveringActivities(true);
+    try {
+      const result = await recoverHistoryFromActivities(listId, currency);
+      localStorage.removeItem(`monthsVisibleFix_v4:${listId}`);
+      onDataChange();
+      const msg =
+        language === 'he'
+          ? `נוספו ${result.priceEntriesAdded} רשומות מ-${result.activitiesScanned} פעילויות.\n${result.monthsFound.length} חודשים, ${result.uniqueShoppingDays} ימי קניות.\n\n${result.monthsFound.join('\n')}`
+          : `Added ${result.priceEntriesAdded} entries from ${result.activitiesScanned} check-offs.\n${result.monthsFound.length} months, ${result.uniqueShoppingDays} shopping days.\n\n${result.monthsFound.join('\n')}`;
+      alert(msg);
+    } catch (e) {
+      console.error(e);
+      alert(
+        language === 'he'
+          ? 'שחזור מיומן הפעילות נכשל. נסה שוב או בדוק חיבור.'
+          : 'Activity log recovery failed. Try again or check connection.'
+      );
+    } finally {
+      setRecoveringActivities(false);
+    }
+  };
 
   const handleRepairHistory = async () => {
     if (!listId || repairing) return;
@@ -487,16 +519,28 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800">{translations.selectMonth}</h2>
         {monthlyData.length <= 3 && historyItems.length > 0 && (
-          <button
-            type="button"
-            onClick={handleRepairHistory}
-            disabled={repairing}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
-          >
-            {repairing
-              ? (language === 'he' ? 'מתקן היסטוריה...' : 'Repairing history...')
-              : (language === 'he' ? '🔄 שחזר חודשים חסרים' : '🔄 Restore missing months')}
-          </button>
+          <div className="flex flex-col gap-2 w-full max-w-xs">
+            <button
+              type="button"
+              onClick={handleRecoverFromActivities}
+              disabled={recoveringActivities || repairing}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {recoveringActivities
+                ? (language === 'he' ? 'משחזר מיומן...' : 'Recovering from log...')
+                : (language === 'he' ? '📅 שחזר מיומן קניות (אוק׳ 2025+)' : '📅 Recover from activity log (Oct 2025+)')}
+            </button>
+            <button
+              type="button"
+              onClick={handleRepairHistory}
+              disabled={repairing || recoveringActivities}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
+            >
+              {repairing
+                ? (language === 'he' ? 'מתקן היסטוריה...' : 'Repairing history...')
+                : (language === 'he' ? '🔄 תיקון תאריכים' : '🔄 Fix dates')}
+            </button>
+          </div>
         )}
       </div>
 
