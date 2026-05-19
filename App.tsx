@@ -59,6 +59,7 @@ import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { ensureAllMonthsVisible } from './services/ensureAllMonthsVisible';
+import './services/auditFirebaseHistory';
 type Language = 'en' | 'he' | 'es' | 'ru';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
 

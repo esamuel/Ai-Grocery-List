@@ -3,6 +3,7 @@ import type { PurchaseHistoryItem } from '../types';
 import { getDailyPurchases, type DailyPurchase } from '../services/exportService';
 import { getPurchaseHistory, setPurchaseHistory } from '../services/purchaseHistoryService';
 import { ensureAllMonthsVisible } from '../services/ensureAllMonthsVisible';
+import { auditFirebaseHistory } from '../services/auditFirebaseHistory';
 import { format } from 'date-fns';
 import { he, es } from 'date-fns/locale';
 
@@ -57,13 +58,24 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
     setRepairing(true);
     try {
       localStorage.removeItem(`monthsVisibleFix_v4:${listId}`);
+      const audit = await auditFirebaseHistory();
       const result = await ensureAllMonthsVisible(listId);
       onDataChange();
-      const msg =
+      const otherLists = audit.lists.filter(
+        (l) => l.exists && l.listId !== listId && l.uniqueMonths.length > result.monthsFound.length
+      );
+      let msg =
         language === 'he'
-          ? `תוקנו ${result.itemsFixed} פריטים. ${result.monthsFound.length} חודשים, ${result.uniqueShoppingDays} ימי קניות.`
-          : `Fixed ${result.itemsFixed} items. ${result.monthsFound.length} months, ${result.uniqueShoppingDays} shopping days.`;
-      alert(msg + '\n\n' + result.monthsFound.join(', '));
+          ? `תוקנו ${result.itemsFixed} פריטים. ${result.monthsFound.length} חודשים, ${result.uniqueShoppingDays} ימי קניות.\n\nחודשים: ${result.monthsFound.join(', ') || '—'}`
+          : `Fixed ${result.itemsFixed} items. ${result.monthsFound.length} months, ${result.uniqueShoppingDays} shopping days.\n\nMonths: ${result.monthsFound.join(', ') || '—'}`;
+      if (otherLists.length > 0) {
+        msg +=
+          language === 'he'
+            ? `\n\nנמצאה היסטוריה ברשימה אחרת: ${otherLists.map((l) => `${l.listId} (${l.uniqueMonths.length} חודשים)`).join(', ')}`
+            : `\n\nMore history on other list(s): ${otherLists.map((l) => `${l.listId} (${l.uniqueMonths.length} mo)`).join(', ')}`;
+      }
+      msg += `\n\n${audit.recommendation}`;
+      alert(msg);
     } catch (e) {
       console.error(e);
       alert(language === 'he' ? 'תיקון ההיסטוריה נכשל' : 'History repair failed');
