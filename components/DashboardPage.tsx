@@ -18,6 +18,7 @@ interface FeatureCard {
 
 interface DashboardPageProps {
   onNavigate: (view: string) => void;
+  onScanReceipt?: () => void;
   translations: {
     list: string;
     listDesc: string;
@@ -56,6 +57,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   onNavigate,
+  onScanReceipt,
   translations,
   itemsCount = 0,
   historyCount = 0,
@@ -124,6 +126,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       iconBg: 'bg-gradient-to-br from-orange-400 to-orange-600',
       onClick: () => onNavigate('daily')
     },
+    ...(translations.scanReceipt && onScanReceipt
+      ? [
+          {
+            id: 'scanReceipt',
+            icon: '🧾',
+            title: translations.scanReceipt,
+            description: translations.scanReceiptDesc || translations.scanReceipt,
+            color: 'from-cyan-400 to-cyan-600',
+            iconBg: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
+            onClick: onScanReceipt,
+          } as FeatureCard,
+        ]
+      : []),
     {
       id: 'family',
       icon: '👥',

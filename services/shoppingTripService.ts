@@ -72,12 +72,21 @@ export async function commitShoppingTrip(
   const resolved: ResolvedLine[] = lines.map((line) => {
     const canonicalName = getCanonicalName(line.name);
     const existing = historyByCanonical.get(canonicalName);
-    const resolvedPrice = resolvePurchasePrice({
-      userPrice: line.price,
-      category: line.category || existing?.category,
-      currency: line.currency || options.currency,
-      existingItem: existing,
-    });
+    const hasOcrPrice =
+      options.source === 'receipt_ocr' && line.price !== undefined && line.price > 0;
+    const resolvedPrice = hasOcrPrice
+      ? {
+          price: line.price!,
+          currency: line.currency || options.currency || 'ILS',
+          priceSource: 'receipt_ocr' as const,
+          estimated: false,
+        }
+      : resolvePurchasePrice({
+          userPrice: line.price,
+          category: line.category || existing?.category,
+          currency: line.currency || options.currency,
+          existingItem: existing,
+        });
 
     return {
       ...line,

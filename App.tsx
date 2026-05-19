@@ -37,6 +37,7 @@ import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
 import { logFamilyActivity } from './services/familyActivityService';
 import { commitShoppingTrip } from './services/shoppingTripService';
+import { ReceiptScanModal } from './components/ReceiptScanModal';
 import { migrateListOwnershipFields, checkListNeedsMigration } from './services/listMigration';
 import type { User } from 'firebase/auth';
 
@@ -421,6 +422,22 @@ const translations = {
     addItem: "Add Item",
     bestDeals: "Best Deals",
     dashboardHelpText: "Click a card to open, hover for quick actions",
+    scanReceipt: "Scan Receipt",
+    scanReceiptDesc: "Photo of your bill → items, prices & store saved automatically",
+    receiptScanTitle: "Scan grocery receipt",
+    receiptScanPickHint: "Take a clear photo of the full receipt (Hebrew bills work best).",
+    receiptScanTakePhoto: "Take photo",
+    receiptScanChooseFile: "Choose from gallery",
+    receiptScanAnalyzing: "Reading receipt…",
+    receiptScanReview: "Check items — edit if needed, then confirm",
+    receiptScanStore: "Store",
+    receiptScanDate: "Date",
+    receiptScanTotal: "Total",
+    receiptScanConfirm: "Add to purchases",
+    receiptScanBack: "Retake",
+    receiptScanCancel: "Close",
+    receiptScanError: "Could not read receipt. Try better lighting or a flatter photo.",
+    receiptScanSuccess: "Receipt added to your purchase history!",
     searchPlaceholder: "Search items...",
     lowestPrice: "Lowest",
     highestPrice: "Highest",
@@ -788,6 +805,22 @@ const translations = {
     addItem: "הוסף פריט",
     bestDeals: "עסקאות מובילות",
     dashboardHelpText: "לחץ על כרטיס כדי לפתוח, רחף לפעולות מהירות",
+    scanReceipt: "סרוק קבלה",
+    scanReceiptDesc: "צילום קבלה → פריטים, מחירים וחנות נשמרים אוטומטית",
+    receiptScanTitle: "סריקת קבלת קניות",
+    receiptScanPickHint: "צלם את הקבלה המלאה בבירור (קבלות בעברית עובדות הכי טוב).",
+    receiptScanTakePhoto: "צלם קבלה",
+    receiptScanChooseFile: "בחר מהגלריה",
+    receiptScanAnalyzing: "קורא את הקבלה…",
+    receiptScanReview: "בדוק פריטים — ערוך במידת הצורך ואשר",
+    receiptScanStore: "חנות",
+    receiptScanDate: "תאריך",
+    receiptScanTotal: "סה״כ",
+    receiptScanConfirm: "הוסף לרכישות",
+    receiptScanBack: "צלם שוב",
+    receiptScanCancel: "סגור",
+    receiptScanError: "לא הצלחנו לקרוא את הקבלה. נסה תאורה טובה יותר.",
+    receiptScanSuccess: "הקבלה נוספה להיסטוריית הקניות!",
     searchPlaceholder: "חפש פריטים...",
     lowestPrice: "הנמוך",
     highestPrice: "הגבוה",
@@ -1154,6 +1187,22 @@ const translations = {
     addItem: "Añadir Artículo",
     bestDeals: "Mejores Ofertas",
     dashboardHelpText: "Haz clic en una tarjeta para abrir, pasa el cursor para acciones rápidas",
+    scanReceipt: "Escanear recibo",
+    scanReceiptDesc: "Foto del ticket → artículos, precios y tienda guardados",
+    receiptScanTitle: "Escanear ticket",
+    receiptScanPickHint: "Toma una foto clara del ticket completo.",
+    receiptScanTakePhoto: "Tomar foto",
+    receiptScanChooseFile: "Elegir archivo",
+    receiptScanAnalyzing: "Leyendo ticket…",
+    receiptScanReview: "Revisa los artículos y confirma",
+    receiptScanStore: "Tienda",
+    receiptScanDate: "Fecha",
+    receiptScanTotal: "Total",
+    receiptScanConfirm: "Agregar a compras",
+    receiptScanBack: "Otra foto",
+    receiptScanCancel: "Cerrar",
+    receiptScanError: "No se pudo leer el ticket.",
+    receiptScanSuccess: "¡Recibo agregado al historial!",
     searchPlaceholder: "Buscar artículos...",
     lowestPrice: "Más Bajo",
     highestPrice: "Más Alto",
@@ -1586,6 +1635,7 @@ function App() {
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [pendingCompletedItems, setPendingCompletedItems] = useState<GroceryItem[]>([]);
   const [showInlinePriceEntry, setShowInlinePriceEntry] = useState(false);
+  const [showReceiptScan, setShowReceiptScan] = useState(false);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -2553,6 +2603,7 @@ function App() {
         {currentView === 'dashboard' ? (
           <DashboardPage
             onNavigate={(view) => setCurrentView(view as View)}
+            onScanReceipt={() => setShowReceiptScan(true)}
             translations={{
               dashboard: currentText.dashboard,
               list: currentText.list,
@@ -2834,23 +2885,34 @@ function App() {
             )}
 
             {/* Clear Completed Button at Bottom */}
-            {items.length > 0 && (
-              <div className="mt-6 flex justify-center gap-3">
-                <button
-                  onClick={handleToggleCompleteAll}
-                  className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md"
-                >
-                  {isAllCompleted ? currentText.clearAll : currentText.selectAll}
-                </button>
-                <button
-                  onClick={handleClearCompleted}
-                  disabled={!hasCompletedItems}
-                  className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
-                >
-                  {currentText.clearCompleted}
-                </button>
-              </div>
-            )}
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowReceiptScan(true)}
+                className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-cyan-600 text-white hover:bg-cyan-700 shadow-md"
+              >
+                🧾 {currentText.scanReceipt}
+              </button>
+              {items.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleToggleCompleteAll}
+                    className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 shadow-md"
+                  >
+                    {isAllCompleted ? currentText.clearAll : currentText.selectAll}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearCompleted}
+                    disabled={!hasCompletedItems}
+                    className="px-6 py-3 text-sm font-semibold rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md"
+                  >
+                    {currentText.clearCompleted}
+                  </button>
+                </>
+              )}
+            </div>
           </>
         ) : currentView === 'favorites' ? (
           <FavoritesPage historyItems={sortedHistory} onAddItem={handleAddItemFromHistory} onDeleteItem={handleDeleteHistoryItem} currency={currency} language={language} translations={{ title: currentText.favoritesTitle, subtitle: currentText.favoritesSubtitle, purchased: currentText.purchased, times: currentText.times, delete: currentText.deleteFromHistory, add: currentText.addToList, bestPriceEver: currentText.bestPriceEver, greatDeal: currentText.greatDeal, priceIncreased: currentText.priceIncreased, higherThanUsual: currentText.higherThanUsual, bestAtStore: currentText.bestAtStore, cheaper: currentText.cheaper, mostFrequent: currentText.mostFrequent, today: currentText.today, starred: currentText.starred, category: currentText.category, alphabetical: currentText.alphabetical, selectAll: currentText.selectAll, clearAll: currentText.clearAll }} />
@@ -3207,6 +3269,42 @@ function App() {
       {/* Toast */}
       {toast && (
         <Toast message={toast.message} onClose={() => setToast(null)} variant={toast.variant || 'info'} rtl={language === 'he'} />
+      )}
+
+      {listId && (
+        <ReceiptScanModal
+          isOpen={showReceiptScan}
+          onClose={() => setShowReceiptScan(false)}
+          listId={listId}
+          userId={user?.uid}
+          language={language}
+          currency={currency}
+          historyItems={historyItems}
+          onSuccess={async () => {
+            await handleLoadHistoryItems();
+            setCurrentView('daily');
+          }}
+          translations={{
+            title: currentText.receiptScanTitle,
+            pickHint: currentText.receiptScanPickHint,
+            takePhoto: currentText.receiptScanTakePhoto,
+            chooseFile: currentText.receiptScanChooseFile,
+            analyzing: currentText.receiptScanAnalyzing,
+            reviewTitle: currentText.receiptScanReview,
+            store: currentText.receiptScanStore,
+            date: currentText.receiptScanDate,
+            total: currentText.receiptScanTotal,
+            item: currentText.itemName || 'Item',
+            category: currentText.category,
+            price: currentText.priceModalTotal,
+            qty: currentText.priceModalQuantity,
+            confirm: currentText.receiptScanConfirm,
+            cancel: currentText.receiptScanCancel,
+            back: currentText.receiptScanBack,
+            errorGeneric: currentText.receiptScanError,
+            success: currentText.receiptScanSuccess,
+          }}
+        />
       )}
 
       {currentView === 'list' && <ItemInput onAddItem={handleAddItem} isProcessing={isLoading} language={language} placeholders={{ main: currentText.inputPlaceholder, adding: currentText.adding, add: currentText.add }} />}
