@@ -239,6 +239,39 @@ export async function auditFirebaseHistory(): Promise<FirebaseHistoryAudit> {
   return audit;
 }
 
+/** Compare specific list IDs (e.g. WPEH3I, RCNZMG, QM94NW, J339F4) */
+export async function compareSpecificLists(listIds: string[]): Promise<ListHistoryReport[]> {
+  const { db } = getFirebaseServices();
+  const reports: ListHistoryReport[] = [];
+  for (const listId of listIds) {
+    reports.push(await loadListReport(db, listId));
+  }
+  reports.sort((a, b) => b.uniqueMonths.length - a.uniqueMonths.length);
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📊 LIST COMPARISON');
+  reports.forEach((r, i) => {
+    console.log(
+      `${i + 1}. ${r.listId} — ${r.exists ? '' : '(missing) '}${r.uniqueMonths.length} months, ` +
+        `${r.historyItemCount} items, ${r.totalPriceEntries} prices, ${r.uniqueShoppingDays} days`
+    );
+    if (r.uniqueMonths.length) console.log(`   Months: ${r.uniqueMonths.join(', ')}`);
+    if (r.oldestPurchase) console.log(`   Range: ${r.oldestPurchase.split('T')[0]} → ${r.newestPurchase?.split('T')[0]}`);
+  });
+
+  const best = reports.filter((r) => r.exists && r.historyItemCount > 0)[0];
+  const wpe = reports.find((r) => r.listId === 'WPEH3I');
+  if (best && best.listId !== 'WPEH3I' && (wpe?.uniqueMonths.length || 0) < best.uniqueMonths.length) {
+    console.log(`\n⚠️ "${best.listId}" has MORE months than WPEH3I — merge recommended!`);
+    console.log(`   await mergeHistoricalLists('WPEH3I', ['${best.listId}'])`);
+  } else if (wpe) {
+    console.log(`\n✅ WPEH3I has the most (or same) data among compared lists.`);
+  }
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  return reports;
+}
+
 if (typeof window !== 'undefined') {
   (window as any).auditFirebaseHistory = auditFirebaseHistory;
+  (window as any).compareSpecificLists = compareSpecificLists;
 }
