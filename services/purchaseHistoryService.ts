@@ -176,7 +176,7 @@ export async function addOrIncrementPurchase(
       }
       
       const resolved =
-        purchase.priceSource && purchase.price !== undefined && purchase.price > 0
+        purchase.price !== undefined && purchase.price > 0 && purchase.priceSource
           ? {
               price: purchase.price,
               currency: purchase.currency || 'ILS',
@@ -230,7 +230,7 @@ export async function addOrIncrementPurchase(
       };
       
       const resolved =
-        purchase.priceSource && purchase.price !== undefined && purchase.price > 0
+        purchase.price !== undefined && purchase.price > 0 && purchase.priceSource
           ? {
               price: purchase.price,
               currency: purchase.currency || 'ILS',
