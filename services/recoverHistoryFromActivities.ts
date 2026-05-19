@@ -8,6 +8,7 @@ import { initializeApp, getApp } from 'firebase/app';
 import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
 import type { FamilyActivity } from './familyActivityService';
 import { getPurchaseHistory, setPurchaseHistory } from './purchaseHistoryService';
+import { backfillPricesFromAnchors } from './backfillPricesFromAnchors';
 import { getCanonicalName } from './semanticDupService';
 import type { PurchaseHistoryItem, PriceHistory } from '../types';
 import { parsePurchaseDate, toDateKey, toMonthKey } from '../utils/parsePurchaseDate';
@@ -158,6 +159,9 @@ export async function recoverHistoryFromActivities(
 
   const finalHistory = Array.from(map.values()).map(recalcItemStats);
   await setPurchaseHistory(listId, finalHistory);
+
+  // Use Apr–May real prices for recovered months when available
+  await backfillPricesFromAnchors(listId, ['2026-04', '2026-05']);
 
   return {
     activitiesScanned: activities.length,

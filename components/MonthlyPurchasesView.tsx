@@ -5,6 +5,7 @@ import { getPurchaseHistory, setPurchaseHistory } from '../services/purchaseHist
 import { ensureAllMonthsVisible } from '../services/ensureAllMonthsVisible';
 import { auditFirebaseHistory } from '../services/auditFirebaseHistory';
 import { recoverHistoryFromActivities } from '../services/recoverHistoryFromActivities';
+import { backfillPricesFromAnchors } from '../services/backfillPricesFromAnchors';
 import { format } from 'date-fns';
 import { he, es } from 'date-fns/locale';
 
@@ -54,6 +55,32 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
   const [deletingDay, setDeletingDay] = useState<string | null>(null);
   const [repairing, setRepairing] = useState(false);
   const [recoveringActivities, setRecoveringActivities] = useState(false);
+  const [backfillingPrices, setBackfillingPrices] = useState(false);
+
+  const handleBackfillPrices = async () => {
+    if (!listId || backfillingPrices) return;
+    const confirmMsg =
+      language === 'he'
+        ? 'למלא מחירים חסרים לפי המחירים האמיתיים מאפריל–מאי 2026 (לכל פריט)? מחירים יסומנו ≈'
+        : 'Fill missing prices using real Apr–May 2026 prices per item? Filled amounts will show ≈';
+    if (!window.confirm(confirmMsg)) return;
+
+    setBackfillingPrices(true);
+    try {
+      const result = await backfillPricesFromAnchors(listId, ['2026-04', '2026-05']);
+      onDataChange();
+      const msg =
+        language === 'he'
+          ? `עודכנו ${result.entriesUpdated} רשומות.\nמאפריל–מאי: ${result.fromAnchorMonth}\nמהיסטוריית פריט: ${result.fromItemHistory}\nברירת מחדל לפי קטגוריה: ${result.fromCategoryDefault}\n\nחודשי עוגן: ${result.anchorMonths.join(', ') || '—'} (${result.anchorItems} פריטים)`
+          : `Updated ${result.entriesUpdated} entries.\nFrom Apr–May anchors: ${result.fromAnchorMonth}\nFrom item history: ${result.fromItemHistory}\nCategory default: ${result.fromCategoryDefault}\n\nAnchor months: ${result.anchorMonths.join(', ') || '—'} (${result.anchorItems} items)`;
+      alert(msg);
+    } catch (e) {
+      console.error(e);
+      alert(language === 'he' ? 'מילוי מחירים נכשל.' : 'Price backfill failed.');
+    } finally {
+      setBackfillingPrices(false);
+    }
+  };
 
   const handleRecoverFromActivities = async () => {
     if (!listId || recoveringActivities) return;
@@ -518,28 +545,42 @@ export const MonthlyPurchasesView: React.FC<MonthlyPurchasesViewProps> = ({
       {/* Header */}
       <div className="flex flex-col items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800">{translations.selectMonth}</h2>
-        {monthlyData.length <= 3 && historyItems.length > 0 && (
+        {historyItems.length > 0 && (
           <div className="flex flex-col gap-2 w-full max-w-xs">
             <button
               type="button"
-              onClick={handleRecoverFromActivities}
-              disabled={recoveringActivities || repairing}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              onClick={handleBackfillPrices}
+              disabled={backfillingPrices || recoveringActivities || repairing}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {recoveringActivities
-                ? (language === 'he' ? 'משחזר מיומן...' : 'Recovering from log...')
-                : (language === 'he' ? '📅 שחזר מיומן קניות (אוק׳ 2025+)' : '📅 Recover from activity log (Oct 2025+)')}
+              {backfillingPrices
+                ? (language === 'he' ? 'ממלא מחירים...' : 'Filling prices...')
+                : (language === 'he' ? '💰 מלא מחירים מאפריל–מאי 2026' : '💰 Fill prices from Apr–May 2026')}
             </button>
-            <button
-              type="button"
-              onClick={handleRepairHistory}
-              disabled={repairing || recoveringActivities}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
-            >
-              {repairing
-                ? (language === 'he' ? 'מתקן היסטוריה...' : 'Repairing history...')
-                : (language === 'he' ? '🔄 תיקון תאריכים' : '🔄 Fix dates')}
-            </button>
+            {monthlyData.length <= 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleRecoverFromActivities}
+                  disabled={recoveringActivities || repairing || backfillingPrices}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {recoveringActivities
+                    ? (language === 'he' ? 'משחזר מיומן...' : 'Recovering from log...')
+                    : (language === 'he' ? '📅 שחזר מיומן קניות (אוק׳ 2025+)' : '📅 Recover from activity log (Oct 2025+)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRepairHistory}
+                  disabled={repairing || recoveringActivities || backfillingPrices}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 disabled:opacity-50"
+                >
+                  {repairing
+                    ? (language === 'he' ? 'מתקן היסטוריה...' : 'Repairing history...')
+                    : (language === 'he' ? '🔄 תיקון תאריכים' : '🔄 Fix dates')}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
