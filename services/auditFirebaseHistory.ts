@@ -120,15 +120,28 @@ async function loadListReport(db: ReturnType<typeof getFirestore>, listId: strin
       frequencyTotal: 0,
     };
   }
-  const history = (snap.data().history || []) as PurchaseHistoryItem[];
-  return { listId, exists: true, ...analyzeHistory(history) };
+  const data = snap.data();
+  const history = (data.history || []) as PurchaseHistoryItem[];
+  const report = { listId, exists: true, ...analyzeHistory(history) };
+  if (report.historyItemCount === 0) {
+    console.log(`  ⚠️ List ${listId}: history[] is EMPTY (created ${data.createdAt || '?'})`);
+  }
+  return report;
 }
 
 async function findListIdsForUser(db: ReturnType<typeof getFirestore>, userId: string): Promise<Set<string>> {
   const ids = new Set<string>();
 
-  const byOwner = await getDocs(query(collection(db, 'groceryLists'), where('ownerId', '==', userId)));
-  byOwner.forEach((d) => ids.add(d.id));
+  const byOwnerId = await getDocs(query(collection(db, 'groceryLists'), where('ownerId', '==', userId)));
+  byOwnerId.forEach((d) => ids.add(d.id));
+
+  // Legacy lists use `owner` instead of `ownerId` (your screenshot shows this pattern)
+  try {
+    const byOwner = await getDocs(query(collection(db, 'groceryLists'), where('owner', '==', userId)));
+    byOwner.forEach((d) => ids.add(d.id));
+  } catch (e) {
+    console.warn('owner query failed:', e);
+  }
 
   try {
     const byMember = await getDocs(
