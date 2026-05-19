@@ -1,7 +1,9 @@
 import { doc as docLite, getDoc as getDocLite, updateDoc as updateDocLite } from 'firebase/firestore/lite';
 import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
-import type { PurchaseHistoryItem, GroceryHistoryItem } from '../types';
+import type { PurchaseHistoryItem, GroceryHistoryItem, PriceSource } from '../types';
 import { getCanonicalName } from './semanticDupService';
+import { resolvePurchasePrice } from '../utils/priceResolution';
+import { buildPriceHistoryEntry } from '../utils/priceResolution';
 import type { SuggestedItem } from './suggestionsFirestoreService';
 
 type Language = 'en' | 'he' | 'es';
@@ -117,7 +119,19 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
 // Add or increment item in purchase history
 export async function addOrIncrementPurchase(
   listId: string,
-  items: { name: string; category?: string; price?: number; currency?: string; store?: string; quantity?: number; unit?: string; unitPrice?: number; purchaseDate?: string }[]
+  items: {
+    name: string;
+    category?: string;
+    price?: number;
+    currency?: string;
+    store?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+    purchaseDate?: string;
+    priceSource?: PriceSource;
+    tripId?: string;
+  }[]
 ): Promise<void> {
   const current = await getPurchaseHistory(listId);
   const map = new Map<string, PurchaseHistoryItem>();
@@ -161,80 +175,43 @@ export async function addOrIncrementPurchase(
         );
       }
       
-      // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
-      // Even if no price/store is provided, we need the purchaseDate for the calendar
-      // CRITICAL: Use provided purchaseDate to preserve historical accuracy
-      const priceEntry: any = {
-        purchaseDate: purchaseTimestamp,
-        quantity: purchase.quantity || 1,
-      };
+      const resolved =
+        purchase.priceSource && purchase.price !== undefined && purchase.price > 0
+          ? {
+              price: purchase.price,
+              currency: purchase.currency || 'ILS',
+              priceSource: purchase.priceSource,
+            }
+          : resolvePurchasePrice({
+              userPrice: purchase.price,
+              category: purchase.category || existing.category,
+              currency: purchase.currency,
+              existingItem: existing,
+            });
 
-      // Add price if provided
-      const hasPriceData = purchase.price !== undefined && purchase.price > 0;
-      if (hasPriceData) {
-        priceEntry.price = purchase.price;
-        priceEntry.currency = purchase.currency || 'USD';
-      } else {
-        // CRITICAL FIX: When no price provided, use last known price for this item
-        // This prevents ₪0.00 totals that make month comparisons useless
-        if (existing.lastPrice && existing.lastPrice > 0) {
-          priceEntry.price = existing.lastPrice;
-          priceEntry.currency = purchase.currency || 'ILS';
-          priceEntry.estimatedPrice = true; // Mark as estimated for transparency
-          console.log(`  💡 No price provided, using last known: ₪${existing.lastPrice}`);
-        } else if (existing.avgPrice && existing.avgPrice > 0) {
-          priceEntry.price = existing.avgPrice;
-          priceEntry.currency = purchase.currency || 'ILS';
-          priceEntry.estimatedPrice = true;
-          console.log(`  💡 No price provided, using average: ₪${existing.avgPrice}`);
+      const priceEntry = buildPriceHistoryEntry(
+        purchaseTimestamp,
+        { ...resolved, tripId: purchase.tripId },
+        {
+          quantity: purchase.quantity || 1,
+          store: purchase.store,
+          unit: purchase.unit,
+          unitPrice:
+            purchase.unitPrice ??
+            (purchase.price && purchase.quantity && purchase.quantity > 0
+              ? Number((purchase.price / purchase.quantity).toFixed(4))
+              : undefined),
         }
-        // If no price history exists at all, leave price undefined
-        // This is intentional - better to have no data than wrong data for new items
-      }
+      );
 
-      // Add unit information if provided
-      if (purchase.unit) {
-        priceEntry.unit = purchase.unit;
-      }
-
-      // Add/compute unitPrice when possible
-      if (purchase.unitPrice !== undefined && purchase.unitPrice > 0) {
-        priceEntry.unitPrice = purchase.unitPrice;
-      } else if (hasPriceData && purchase.quantity && purchase.quantity > 0) {
-        priceEntry.unitPrice = Number((purchase.price! / purchase.quantity).toFixed(4));
-      }
-
-      // Add store if provided
-      if (purchase.store && purchase.store.trim() !== '') {
-        priceEntry.store = purchase.store;
-      }
-
-      // Add unit information if provided
-      if (purchase.unit) {
-        priceEntry.unit = purchase.unit;
-      }
-
-      // Add/compute unitPrice when possible
-      if (purchase.unitPrice !== undefined && purchase.unitPrice > 0) {
-        priceEntry.unitPrice = purchase.unitPrice;
-      } else if (hasPriceData && purchase.quantity && purchase.quantity > 0) {
-        priceEntry.unitPrice = Number((purchase.price! / purchase.quantity).toFixed(4));
-      }
-
-      // Add to price history
       updated.prices = [...(existing.prices || []), priceEntry];
+      updated.lastPrice = resolved.price;
 
-      // Update price statistics only if price was provided
-      if (hasPriceData) {
-        updated.lastPrice = purchase.price;
-
-        // Calculate price statistics
-        const allPrices = updated.prices.map(p => p.price).filter(p => p !== undefined);
-        if (allPrices.length > 0) {
-          updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
-          updated.lowestPrice = Math.min(...allPrices);
-          updated.highestPrice = Math.max(...allPrices);
-        }
+      const allPrices = updated.prices.map((p) => p.price).filter((p): p is number => p !== undefined && p > 0);
+      if (allPrices.length > 0) {
+        updated.avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+        updated.lowestPrice = Math.min(...allPrices);
+        updated.highestPrice = Math.max(...allPrices);
       }
       
       console.log(`  ✅ New frequency: ${updated.frequency}, lastPurchased: ${updated.lastPurchased}`);
@@ -252,53 +229,36 @@ export async function addOrIncrementPurchase(
         avgDaysBetween: 0,
       };
       
-      // ALWAYS create a price entry for purchase date tracking (needed for Daily Purchases view)
-      // CRITICAL: Use provided purchaseDate to preserve historical accuracy
-      const priceEntry: any = {
-        purchaseDate: purchaseTimestamp,
-        quantity: purchase.quantity || 1,
-      };
+      const resolved =
+        purchase.priceSource && purchase.price !== undefined && purchase.price > 0
+          ? {
+              price: purchase.price,
+              currency: purchase.currency || 'ILS',
+              priceSource: purchase.priceSource,
+            }
+          : resolvePurchasePrice({
+              userPrice: purchase.price,
+              category: purchase.category,
+              currency: purchase.currency,
+              existingItem: null,
+            });
 
-      // Add price if provided
-      const hasPriceData = purchase.price !== undefined && purchase.price > 0;
-      if (hasPriceData) {
-        priceEntry.price = purchase.price;
-        priceEntry.currency = purchase.currency || 'USD';
-      } else {
-        // CRITICAL FIX: For NEW items without price, use category-based estimation
-        // This ensures month totals are never ₪0.00 which breaks comparisons
-        const categoryDefaults: Record<string, number> = {
-          'פירות וירקות': 10.0,
-          'מוצרי חלב וביצים': 12.0,
-          'בשר ועוף': 45.0,
-          'מאפים': 8.0,
-          'משקאות': 7.0,
-          'מוצרי מזווה': 15.0,
-          'קפואים': 18.0,
-          'חטיפים וממתקים': 10.0,
-        };
-        
-        const estimatedPrice = categoryDefaults[purchase.category || ''] || 12.0;
-        priceEntry.price = estimatedPrice;
-        priceEntry.currency = purchase.currency || 'ILS';
-        priceEntry.estimatedPrice = true; // Mark as estimated for transparency
-        console.log(`  💡 New item without price, using category estimate: ₪${estimatedPrice}`);
-      }
-
-      // Add store if provided
-      if (purchase.store && purchase.store.trim() !== '') {
-        priceEntry.store = purchase.store;
-      }
+      const priceEntry = buildPriceHistoryEntry(
+        purchaseTimestamp,
+        { ...resolved, tripId: purchase.tripId },
+        {
+          quantity: purchase.quantity || 1,
+          store: purchase.store,
+          unit: purchase.unit,
+          unitPrice: purchase.unitPrice,
+        }
+      );
 
       newItem.prices = [priceEntry];
-
-      // Set price statistics only if price was provided
-      if (hasPriceData) {
-        newItem.lastPrice = purchase.price;
-        newItem.avgPrice = purchase.price;
-        newItem.lowestPrice = purchase.price;
-        newItem.highestPrice = purchase.price;
-      }
+      newItem.lastPrice = resolved.price;
+      newItem.avgPrice = resolved.price;
+      newItem.lowestPrice = resolved.price;
+      newItem.highestPrice = resolved.price;
       
       map.set(canonicalName, newItem);
     }

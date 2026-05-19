@@ -41,13 +41,15 @@ const sanitizeListData = (data: any): GroceryListData => {
             const firstPurchased = parseDateField(historyItem?.firstPurchased || historyItem?.lastAdded);
 
             const sanitizePriceEntry = (price: any): PriceHistory => ({
-                price: price?.price != null ? Number(price.price) : undefined,
-                currency: price?.currency ? String(price.currency) : undefined,
+                price: price?.price != null ? Number(price.price) : 0,
+                currency: price?.currency ? String(price.currency) : 'ILS',
                 purchaseDate: parsePurchaseDateISO(price?.purchaseDate),
                 store: price?.store ? String(price.store) : undefined,
                 quantity: price?.quantity != null ? Number(price.quantity) : undefined,
                 unit: price?.unit ? String(price.unit) : undefined,
                 unitPrice: price?.unitPrice != null ? Number(price.unitPrice) : undefined,
+                priceSource: price?.priceSource,
+                tripId: price?.tripId ? String(price.tripId) : undefined,
                 estimatedPrice: price?.estimatedPrice ? true : undefined,
             });
 

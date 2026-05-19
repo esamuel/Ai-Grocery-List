@@ -19,25 +19,7 @@ export interface BackfillPricesResult {
   noMatchFound: number;
 }
 
-const CATEGORY_DEFAULTS: Record<string, number> = {
-  'פירות וירקות': 10,
-  'מוצרי חלב וביצים': 12,
-  'בשר ועוף': 45,
-  מאפים: 8,
-  משקאות: 7,
-  'מוצרי מזווה': 15,
-  קפואים: 18,
-  'חטיפים וממתקים': 10,
-  Fruits: 10,
-  Vegetables: 10,
-  Dairy: 12,
-  Meat: 45,
-  Bakery: 8,
-  Beverages: 7,
-  Pantry: 15,
-  Frozen: 18,
-  Snacks: 10,
-};
+import { getCategoryDefaultPrice } from '../utils/priceResolution';
 
 type AnchorPrice = {
   price: number;
@@ -206,7 +188,7 @@ export async function backfillPricesFromAnchors(
         };
         source = 'history';
       } else {
-        const catPrice = CATEGORY_DEFAULTS[item.category || ''] ?? 12;
+        const catPrice = getCategoryDefaultPrice(item.category);
         filled = {
           ...p,
           price: catPrice,

@@ -36,6 +36,7 @@ import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { onAuthStateChange, signOutUser, getAccessibleListId, addFamilyMember, isListOwner, getUserDisplayName, updateUserDisplayName } from './services/firebaseService';
 import { logFamilyActivity } from './services/familyActivityService';
+import { commitShoppingTrip } from './services/shoppingTripService';
 import { migrateListOwnershipFields, checkListNeedsMigration } from './services/listMigration';
 import type { User } from 'firebase/auth';
 
@@ -204,10 +205,10 @@ const translations = {
     inlinePriceLabel: "Price",
     inlinePriceLastPrice: "Last price",
     inlinePriceSaveAll: "Save All",
-    inlinePriceCancel: "Skip",
+    inlinePriceCancel: "Use last known prices",
     inlinePriceAt: "at",
     inlinePriceTitle: "Quick Price Entry",
-    inlinePriceSubtitle: "Add prices for checked items (optional)",
+    inlinePriceSubtitle: "Enter prices at checkout — empty fields use your last known price",
     inlinePricePurchaseDate: "Purchase Date",
     priceModalUnits: [
       { value: "kg", label: "kg" },
@@ -571,10 +572,10 @@ const translations = {
     inlinePriceLabel: "מחיר",
     inlinePriceLastPrice: "מחיר אחרון",
     inlinePriceSaveAll: "שמור הכל",
-    inlinePriceCancel: "דלג",
+    inlinePriceCancel: "מחיר אחרון לכל הפריטים",
     inlinePriceAt: "ב",
     inlinePriceTitle: "✏️ הזן מחירים",
-    inlinePriceSubtitle: "הוסף מחירים לפריטים שנבחרו (אופציונלי)",
+    inlinePriceSubtitle: "הזן מחירים בקופה — שדות ריקים ימולאו לפי המחיר האחרון",
     inlinePricePurchaseDate: "תאריך רכישה",
     priceModalUnits: [
       { value: "kg", label: "ק״ג" },
@@ -937,7 +938,7 @@ const translations = {
     inlinePriceLabel: "Precio",
     inlinePriceLastPrice: "Último precio",
     inlinePriceSaveAll: "Guardar Todo",
-    inlinePriceCancel: "Saltar",
+    inlinePriceCancel: "Usar último precio",
     inlinePriceAt: "en",
     inlinePriceTitle: "💰 Entrada Rápida de Precios",
     inlinePriceSubtitle: "Agregar precios para artículos seleccionados (opcional)",
@@ -2110,40 +2111,43 @@ function App() {
   }, [isInstallable, installApp, currentText, showToast]);
 
   // Define this FIRST since handleClearCompleted depends on it
-  const handleCompletedItemsWithPrices = useCallback(async (itemsWithPrices: { name: string; category: string; price?: number; store?: string; quantity?: number; unit?: string; unitPrice?: number; purchaseDate?: string }[]) => {
+  const handleCompletedItemsWithPrices = useCallback(async (
+    itemsWithPrices: {
+      name: string;
+      category: string;
+      price?: number;
+      store?: string;
+      quantity?: number;
+      unit?: string;
+      unitPrice?: number;
+      purchaseDate?: string;
+    }[],
+    tripSource: 'manual' | 'quick_checkout' = 'manual'
+  ) => {
     if (!listId) return;
 
-    console.log('🔄 Processing completed items with prices:', itemsWithPrices);
+    console.log('🔄 Committing shopping trip:', itemsWithPrices.length, 'items');
 
     try {
-      // FIRST: Update history in Firestore (with prices and store)
-      // CRITICAL: Pass through purchaseDate to preserve historical accuracy
-      await addOrIncrementPurchase(listId, itemsWithPrices.map(i => ({
-        name: i.name,
-        category: i.category,
-        price: i.price,
-        store: i.store,
-        currency: currency,
-        quantity: i.quantity,
-        unit: i.unit,
-        unitPrice: i.unitPrice,
-        purchaseDate: i.purchaseDate  // NEW: Preserve custom purchase dates
-      })));
+      const store = itemsWithPrices.find((i) => i.store)?.store;
+      const result = await commitShoppingTrip(listId, itemsWithPrices, {
+        source: tripSource,
+        store,
+        currency,
+        userId: user?.uid,
+      });
 
-      console.log('✅ Purchase history updated in Firestore');
+      console.log('✅ Shopping trip committed:', result.tripId, result.totalAmount);
 
-      // SECOND: Remove completed items from current list
-      // The Firestore listener will automatically update historyItems
-      setItems(prevItems => {
-        const remainingItems = prevItems.filter(item => !item.completed);
+      setItems((prevItems) => {
+        const remainingItems = prevItems.filter((item) => !item.completed);
         console.log('✅ Removed completed items. Remaining:', remainingItems.length);
         return remainingItems;
       });
-
     } catch (e) {
-      console.error('❌ Failed to process completed items:', e);
+      console.error('❌ Failed to commit shopping trip:', e);
     }
-  }, [listId, currency, setItems]);
+  }, [listId, currency, user?.uid, setItems]);
 
   const handleClearCompleted = useCallback(async () => {
     const completedItems = items.filter(item => item.completed);
@@ -2163,9 +2167,11 @@ function App() {
       return;
     }
 
-    console.log('⚠️ Price tracking disabled, clearing items without prices');
-    // Otherwise, add items without prices and remove them
-    await handleCompletedItemsWithPrices(completedItems.map(i => ({ name: i.name, category: i.category })));
+    console.log('⚠️ Price tracking disabled — committing with resolved prices');
+    await handleCompletedItemsWithPrices(
+      completedItems.map((i) => ({ name: i.name, category: i.category })),
+      'quick_checkout'
+    );
   }, [items, enablePriceTracking, handleCompletedItemsWithPrices]);
 
   const isAllCompleted = useMemo(() => items.length > 0 && items.every(item => item.completed), [items]);
@@ -2190,12 +2196,11 @@ function App() {
   }, [handleCompletedItemsWithPrices]);
 
   const handleInlinePriceCancel = useCallback(async () => {
-    console.log('❌ Inline price entry cancelled, saving without prices');
+    console.log('💡 Using last known / category prices for all items');
     setShowInlinePriceEntry(false);
-    const itemsToSave = pendingCompletedItems.map(i => ({ name: i.name, category: i.category }));
+    const itemsToSave = pendingCompletedItems.map((i) => ({ name: i.name, category: i.category }));
     setPendingCompletedItems([]);
-    // Save without prices
-    await handleCompletedItemsWithPrices(itemsToSave);
+    await handleCompletedItemsWithPrices(itemsToSave, 'manual');
   }, [handleCompletedItemsWithPrices, pendingCompletedItems]);
 
   const handleAddAllInCategory = useCallback((categoryName: string) => {

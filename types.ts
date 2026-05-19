@@ -35,7 +35,44 @@ export interface PurchaseHistoryItem {
   highestPrice?: number; // Most expensive
 }
 
-// Price history entry
+export type PriceSource = 'user' | 'last_known' | 'category' | 'receipt_ocr';
+
+export type ShoppingTripSource = 'manual' | 'receipt_ocr' | 'quick_checkout';
+
+/** One line on a shopping trip — source of truth for price + date. */
+export interface PurchaseEvent {
+  id?: string;
+  listId: string;
+  tripId: string;
+  canonicalName: string;
+  displayName: string;
+  purchasedAt: string;
+  price: number;
+  currency: string;
+  priceSource: PriceSource;
+  estimated: boolean;
+  store?: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  createdAt?: string;
+}
+
+/** Checkout batch (clear completed, receipt scan, etc.). */
+export interface ShoppingTrip {
+  id?: string;
+  listId: string;
+  purchasedAt: string;
+  store?: string;
+  source: ShoppingTripSource;
+  itemCount: number;
+  totalAmount: number;
+  receiptUrl?: string;
+  createdAt?: string;
+  createdBy?: string;
+}
+
+// Price history entry (aggregated cache on groceryLists.history)
 export interface PriceHistory {
   price: number; // Total price paid
   currency: string;
@@ -43,12 +80,12 @@ export interface PriceHistory {
   store?: string; // Optional: which store
   quantity?: number; // How many bought at this price (e.g., 2kg)
 
-  // NEW: Unit price tracking (for accurate store comparison)
   unitPrice?: number; // Price per unit (e.g., ₪6/kg)
   unit?: string; // Unit type: 'kg', 'lb', 'g', 'piece', 'liter', 'ml', etc.
-  
-  // IMPORTANT: Price estimation flag
-  estimatedPrice?: boolean; // True if price was auto-estimated (not user-entered)
+
+  priceSource?: PriceSource;
+  estimatedPrice?: boolean; // True if not user-entered or receipt OCR
+  tripId?: string; // Links to ShoppingTrip when committed via checkout
 }
 
 // User settings for price tracking

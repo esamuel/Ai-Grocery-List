@@ -52,6 +52,14 @@ service cloud.firestore {
       // This is safe because users can only access lists they have the ID for
       allow read, write: if isSignedIn();
       allow create: if isSignedIn();
+
+      // Shopping trips + purchase events (source of truth for checkout)
+      match /trips/{tripId} {
+        allow read, write: if canAccessGroceryList(listId);
+      }
+      match /purchases/{purchaseId} {
+        allow read, write: if canAccessGroceryList(listId);
+      }
     }
 
     // Family activity log (check-offs, adds) — used by UI and history recovery
