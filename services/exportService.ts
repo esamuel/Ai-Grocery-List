@@ -1,4 +1,5 @@
 import type { PurchaseHistoryItem } from '../types';
+import { parsePurchaseDate, toDateKey } from '../utils/parsePurchaseDate';
 
 export interface DailyPurchase {
   date: string; // YYYY-MM-DD format
@@ -43,15 +44,11 @@ export function getDailyPurchases(
         return;
       }
 
-      const purchaseDate = new Date(priceEntry.purchaseDate);
-
-      // Check if date is valid
-      if (isNaN(purchaseDate.getTime())) {
-        console.warn(`Invalid purchaseDate "${priceEntry.purchaseDate}" for item: ${item.name}`);
+      const date = toDateKey(priceEntry.purchaseDate);
+      if (!date) {
+        console.warn(`Invalid purchaseDate for item: ${item.name}`, priceEntry.purchaseDate);
         return;
       }
-
-      const date = purchaseDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
       if (!dailyMap.has(date)) {
         dailyMap.set(date, {

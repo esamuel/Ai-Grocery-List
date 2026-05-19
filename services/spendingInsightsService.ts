@@ -1,5 +1,11 @@
 import type { PurchaseHistoryItem } from '../types';
 import { normalizeCategory } from './categoryTranslations';
+import { parsePurchaseDate } from '../utils/parsePurchaseDate';
+
+function priceMatchesCurrency(priceCurrency: string | undefined, selectedCurrency: string): boolean {
+  if (!priceCurrency) return true;
+  return priceCurrency === selectedCurrency;
+}
 
 export interface SpendingInsight {
   totalSpent: number;
@@ -89,15 +95,13 @@ function calculateSpendingInRange(
       // Skip entries without purchaseDate
       if (!priceEntry.purchaseDate) return;
 
-      const purchaseDate = new Date(priceEntry.purchaseDate);
+      const purchaseDate = parsePurchaseDate(priceEntry.purchaseDate);
+      if (!purchaseDate) return;
 
-      // Skip entries with invalid dates
-      if (isNaN(purchaseDate.getTime())) return;
-
-      // Only count entries with price data and matching currency
+      // Only count entries with price data (missing currency = user's currency)
       if (purchaseDate >= start && purchaseDate <= end &&
           priceEntry.price !== undefined &&
-          priceEntry.currency === currency) {
+          priceMatchesCurrency(priceEntry.currency, currency)) {
         // price is already the TOTAL price paid, not unit price
         total += priceEntry.price;
       }
@@ -122,10 +126,8 @@ function countItemsInRange(
       // Skip entries without purchaseDate
       if (!priceEntry.purchaseDate) return;
 
-      const purchaseDate = new Date(priceEntry.purchaseDate);
-
-      // Skip entries with invalid dates
-      if (isNaN(purchaseDate.getTime())) return;
+      const purchaseDate = parsePurchaseDate(priceEntry.purchaseDate);
+      if (!purchaseDate) return;
 
       if (purchaseDate >= start && purchaseDate <= end) {
         // Count each purchase as 1 item (not by quantity)
@@ -191,15 +193,12 @@ export function getCategoryBreakdown(
       // Skip entries without purchaseDate
       if (!priceEntry.purchaseDate) return;
 
-      const purchaseDate = new Date(priceEntry.purchaseDate);
+      const purchaseDate = parsePurchaseDate(priceEntry.purchaseDate);
+      if (!purchaseDate) return;
 
-      // Skip entries with invalid dates
-      if (isNaN(purchaseDate.getTime())) return;
-
-      // Only count entries with price data
       if (purchaseDate >= start && purchaseDate <= end &&
           priceEntry.price !== undefined &&
-          priceEntry.currency === currency) {
+          priceMatchesCurrency(priceEntry.currency, currency)) {
         // price is already the TOTAL price paid, not unit price
         const amount = priceEntry.price;
         itemTotal += amount;

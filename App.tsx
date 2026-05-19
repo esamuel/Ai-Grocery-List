@@ -58,7 +58,7 @@ import { getCanonicalName, getDisplayNameForCanonical, isSemanticDuplicate, norm
 import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
-import { fixPurchaseDateYears } from './services/fixPurchaseDateYears';
+import { ensureAllMonthsVisible } from './services/ensureAllMonthsVisible';
 type Language = 'en' | 'he' | 'es' | 'ru';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
 
@@ -1644,25 +1644,32 @@ function App() {
         }
       });
 
-      // Fix incorrect purchase date years (2025 -> 2024)
-      console.log('🔍 Checking for incorrect purchase date years...');
-      fixPurchaseDateYears(listId)
-        .then(result => {
-          if (result.fixed > 0) {
-            console.log(`✅ Fixed ${result.fixed} items with incorrect year`);
-            showToast(`Fixed ${result.fixed} purchase dates - refresh to see Daily Purchases`, 'success');
-            // Refresh the page after a delay to show the corrected data
-            setTimeout(() => window.location.reload(), 2000);
-          } else {
-            console.log('✅ All purchase dates have correct years');
-          }
-          if (result.errors.length > 0) {
-            console.error('Date fix errors:', result.errors);
-          }
-        })
-        .catch(error => {
-          console.error('❌ Date year fix failed:', error);
-        });
+      // Repair purchase dates so all historical months appear in Monthly Purchases
+      const monthsFixKey = `monthsVisibleFix_v3:${listId}`;
+      const alreadyRanMonthsFix = localStorage.getItem(monthsFixKey) === 'done';
+      if (!alreadyRanMonthsFix) {
+        ensureAllMonthsVisible(listId)
+          .then(result => {
+            if (result.itemsFixed > 0 || result.pricesFixed > 0) {
+              localStorage.setItem(monthsFixKey, 'done');
+              showToast(
+                language === 'he'
+                  ? `שוחזרו ${result.monthsFound.length} חודשים בהיסטוריה`
+                  : `Restored ${result.monthsFound.length} months in purchase history`,
+                'success'
+              );
+              import('./services/purchaseHistoryService').then(({ getPurchaseHistory }) =>
+                getPurchaseHistory(listId).then(setHistoryItems)
+              );
+            } else if (result.monthsFound.length > 0) {
+              localStorage.setItem(monthsFixKey, 'done');
+            }
+            console.log('📅 Months in history:', result.monthsFound.join(', '));
+          })
+          .catch(error => {
+            console.error('❌ ensureAllMonthsVisible failed:', error);
+          });
+      }
     }
   }, [listId, user, historyItems]);
 

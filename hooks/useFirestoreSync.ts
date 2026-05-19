@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { subscribeToList, updateList, updateListItems } from '../services/firebaseService';
-import type { GroceryItem, PurchaseHistoryItem, GroceryListData } from '../types';
+import type { GroceryItem, PurchaseHistoryItem, GroceryListData, PriceHistory } from '../types';
+import { parsePurchaseDateISO } from '../utils/parsePurchaseDate';
 
 /**
  * Sanitizes raw data from Firestore or application state to ensure it is a
@@ -32,21 +33,27 @@ const sanitizeListData = (data: any): GroceryListData => {
             
             // Helper to convert various date formats to ISO string
             const parseDateField = (field: any): string => {
-                if (!field) return now;
-                if (typeof field === 'string') return field;
-                if (field instanceof Date) return field.toISOString();
-                if (typeof field === 'object' && field !== null && typeof field.toDate === 'function') {
-                    return field.toDate().toISOString();
-                }
-                if (typeof field === 'object' && field !== null && typeof field.seconds === 'number') {
-                    return new Date(field.seconds * 1000).toISOString();
-                }
-                return now;
+                return parsePurchaseDateISO(field) || now;
             };
 
             // Handle legacy data (lastAdded) and new data (lastPurchased/firstPurchased)
             const lastPurchased = parseDateField(historyItem?.lastPurchased || historyItem?.lastAdded);
             const firstPurchased = parseDateField(historyItem?.firstPurchased || historyItem?.lastAdded);
+
+            const sanitizePriceEntry = (price: any): PriceHistory => ({
+                price: price?.price != null ? Number(price.price) : undefined,
+                currency: price?.currency ? String(price.currency) : undefined,
+                purchaseDate: parsePurchaseDateISO(price?.purchaseDate),
+                store: price?.store ? String(price.store) : undefined,
+                quantity: price?.quantity != null ? Number(price.quantity) : undefined,
+                unit: price?.unit ? String(price.unit) : undefined,
+                unitPrice: price?.unitPrice != null ? Number(price.unitPrice) : undefined,
+                estimatedPrice: price?.estimatedPrice ? true : undefined,
+            });
+
+            const prices = historyItem && Array.isArray(historyItem.prices)
+                ? historyItem.prices.map(sanitizePriceEntry).filter((p: PriceHistory) => !!p.purchaseDate)
+                : undefined;
 
             return {
                 name: historyItem && historyItem.name ? String(historyItem.name) : '',
@@ -54,11 +61,11 @@ const sanitizeListData = (data: any): GroceryListData => {
                 frequency: historyItem && historyItem.frequency ? Number(historyItem.frequency) : 0,
                 lastPurchased,
                 firstPurchased,
+                canonicalName: historyItem?.canonicalName ? String(historyItem.canonicalName) : undefined,
                 avgDaysBetween: historyItem && historyItem.avgDaysBetween ? Number(historyItem.avgDaysBetween) : undefined,
                 starred: historyItem ? !!historyItem.starred : undefined,
                 tags: historyItem && Array.isArray(historyItem.tags) ? historyItem.tags : undefined,
-                // Price tracking fields
-                prices: historyItem && Array.isArray(historyItem.prices) ? historyItem.prices : undefined,
+                prices,
                 lastPrice: historyItem && historyItem.lastPrice ? Number(historyItem.lastPrice) : undefined,
                 avgPrice: historyItem && historyItem.avgPrice ? Number(historyItem.avgPrice) : undefined,
                 lowestPrice: historyItem && historyItem.lowestPrice ? Number(historyItem.lowestPrice) : undefined,

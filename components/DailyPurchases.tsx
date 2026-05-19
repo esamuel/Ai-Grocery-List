@@ -193,7 +193,7 @@ export const DailyPurchases: React.FC<DailyPurchasesProps> = ({
       {/* Day Cards Grid */}
       {dailyPurchases.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {dailyPurchases.slice(0, 30).map(daily => {
+          {dailyPurchases.map(daily => {
             const { weekday, day, month } = formatCardDate(daily.date);
             return (
               <button
