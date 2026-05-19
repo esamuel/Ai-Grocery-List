@@ -63,59 +63,6 @@ const schema = {
   }
 };
 
-const receiptSchema = {
-  type: Type.OBJECT,
-  properties: {
-    storeName: {
-      type: Type.STRING,
-      description: "The name of the store (e.g., 'Walmart', 'Rami Levy')"
-    },
-    purchaseDate: {
-      type: Type.STRING,
-      description: "The date of purchase in YYYY-MM-DD format if found, otherwise today's date"
-    },
-    currency: {
-      type: Type.STRING,
-      description: "The currency code (e.g., 'ILS', 'USD', 'EUR')"
-    },
-    items: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: {
-            type: Type.STRING,
-            description: "The name of the item"
-          },
-          category: {
-            type: Type.STRING,
-            description: "Grocery category for the item"
-          },
-          price: {
-            type: Type.NUMBER,
-            description: "The price of the item"
-          },
-          quantity: {
-            type: Type.NUMBER,
-            description: "The quantity or weight of the item (default to 1)"
-          },
-          unit: {
-            type: Type.STRING,
-            description: "The unit (e.g., 'kg', 'g', 'L', 'piece')"
-          }
-        },
-        required: ["name", "category", "price", "quantity"]
-      }
-    },
-    totalAmount: {
-      type: Type.NUMBER,
-      description: "The total amount paid on the receipt"
-    }
-  },
-  required: ["storeName", "purchaseDate", "currency", "items", "totalAmount"]
-};
-
-
 export interface ParsedGroceryItem {
   name: string;
   quantity: number;
@@ -377,21 +324,14 @@ export const categorizeAndTranslateImportedItems = async (
   }
 };
 
-export interface ReceiptItem {
-  name: string;
-  category: string;
-  price: number;
-  quantity: number;
-  unit?: string;
-}
-
-export interface ReceiptAnalysisResult {
-  storeName: string;
-  purchaseDate: string;
-  currency: string;
-  items: ReceiptItem[];
-  totalAmount: number;
-}
+export type { ReceiptItem, ReceiptAnalysisResult } from './receiptOcrShared';
+import type { ReceiptAnalysisResult } from './receiptOcrShared';
+import {
+  RECEIPT_OCR_MODELS,
+  buildReceiptOcrPrompt,
+  extractJsonFromModelText,
+  normalizeReceiptPayload,
+} from './receiptOcrShared';
 
 const callServerlessReceiptAnalysis = async (
   base64Image: string,
@@ -425,189 +365,80 @@ const callServerlessReceiptAnalysis = async (
     throw new Error(serverMessage || 'Receipt analysis failed on server');
   }
 
-  const parsed = JSON.parse(text) as ReceiptAnalysisResult;
-  parsed.items = parsed.items.map(item => ({
-    ...item,
-    category: normalizeCategory(item.category, uiLanguage)
-  }));
-  return parsed;
+  return JSON.parse(text) as ReceiptAnalysisResult;
 };
+
+async function runClientReceiptOcr(
+  base64Image: string,
+  uiLanguage: 'en' | 'he' | 'es'
+): Promise<ReceiptAnalysisResult> {
+  const geminiClient = getAiClient();
+  const categoryList = getCategoryPromptList(uiLanguage);
+  const today = new Date().toISOString().split('T')[0];
+  const prompt = buildReceiptOcrPrompt(uiLanguage, categoryList, today);
+
+  let mimeType = 'image/jpeg';
+  const mimeMatch = base64Image.match(/^data:([^;]+);base64,/);
+  const base64Data = base64Image.split(',')[1] || base64Image;
+  if (mimeMatch) mimeType = mimeMatch[1];
+
+  const errors: string[] = [];
+  for (const model of RECEIPT_OCR_MODELS) {
+    try {
+      console.log(`Client receipt OCR trying: ${model}`);
+      const result = await geminiClient.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inlineData: { data: base64Data, mimeType } },
+            ],
+          },
+        ],
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
+      const text = result.text?.trim();
+      if (!text) throw new Error('Empty response');
+      const parsed = extractJsonFromModelText(text);
+      const normalized = normalizeReceiptPayload(parsed, uiLanguage, today);
+      if (normalized.items.length === 0) throw new Error('No items');
+      return normalized;
+    } catch (err) {
+      errors.push(`${model}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  throw new Error(errors.join(' | ') || 'All models failed');
+}
 
 export const analyzeReceiptImage = async (
   base64Image: string,
   uiLanguage: 'en' | 'he' | 'es'
 ): Promise<ReceiptAnalysisResult> => {
-  const languageNames = { en: 'English', he: 'Hebrew', es: 'Spanish' };
-  const languageName = languageNames[uiLanguage];
-  const categoryList = getCategoryPromptList(uiLanguage);
-
-  // Extract MIME type from base64 if available, otherwise default to image/jpeg
-  let mimeType = "image/jpeg";
-  const mimeMatch = base64Image.match(/^data:([^;]+);base64,/);
-  if (mimeMatch) {
-    mimeType = mimeMatch[1];
+  try {
+    return await callServerlessReceiptAnalysis(base64Image, uiLanguage);
+  } catch (serverErr: unknown) {
+    const msg = serverErr instanceof Error ? serverErr.message : String(serverErr);
+    console.warn('Server receipt OCR failed, trying client:', msg);
+    if (msg.includes('API key') || msg.includes('not configured')) {
+      throw serverErr instanceof Error ? serverErr : new Error(msg);
+    }
   }
 
-  const prompt = `
-    You are an expert OCR and grocery receipt analysis engine specialized in Hebrew and multilingual receipts. 
-    Your task is to analyze this receipt image and extract structured data accurately.
-
-    INSTRUCTIONS:
-    1. **OCR Extraction**: Carefully read all text on the receipt. Handle potential low-quality, blurry, or rotated images.
-    2. **Language Awareness**: This receipt is likely from an Israeli supermarket (e.g., Rami Levy, Shufersal, Victory, Yohananof). It contains Hebrew text and currency (₪ / ILS). Preserve Hebrew characters exactly.
-    3. **Ambiguity**: If an item name is truncated or contains internal store codes, clean it up to a human-readable name in Hebrew.
-    4. **Layout**: Identify columns for item name, quantity, unit price, and total line price.
-    5. **Fields**:
-       - **storeName**: The supermarket name at the top (e.g., "רמי לוי", "שופרסל").
-       - **purchaseDate**: The date of shopping (Format: YYYY-MM-DD). If not clear, use today: ${new Date().toISOString().split('T')[0]}.
-       - **currency**: Default to "ILS" for Hebrew receipts unless stated otherwise.
-       - **items**: List each product:
-         - **name**: Product name in Hebrew (e.g., "חלב 3%", "עגבניות").
-         - **category**: Map to exactly ONE from: ${categoryList}.
-         - **price**: The final price for that item line.
-         - **quantity**: The quantity or weight.
-         - **unit**: e.g., "ק״ג", "יחידה", "L".
-       - **totalAmount**: The cumulative total at the bottom.
-
-    CRITICAL RULES:
-    - Use ONLY the categories provided: ${categoryList}.
-    - If you are unsure about an item's category, use the most logical one or 'Other' (translated to ${languageName}).
-    - Return ONLY valid JSON adhering to the schema. 
-    - No markdown formatting or extra text.
-  `;
-
   try {
-    // Prefer serverless function to avoid client-side CORS/quota hiccups
-    try {
-      return await callServerlessReceiptAnalysis(base64Image, uiLanguage);
-    } catch (serverErr: any) {
-      console.error('Server receipt analysis failed:', serverErr);
-      console.error('Server error message:', serverErr?.message);
-      console.error('Server error details:', JSON.stringify(serverErr, null, 2));
-      // If server has API key issues, throw immediately instead of falling back
-      if (serverErr?.message?.includes('API key')) {
-        throw serverErr;
-      }
-      console.warn('Falling back to client-side Gemini');
-    }
-
-    const geminiClient = getAiClient();
-
-    // Try Gemini 2.0 Flash first (faster, newer, better OCR)
-    const result = await geminiClient.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                data: base64Image.split(',')[1] || base64Image,
-                mimeType: mimeType
-              }
-            }
-          ]
-        }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: receiptSchema,
-      },
-    });
-
-    const jsonText = result.text.trim();
-    console.log('Gemini receipt analysis response (Pro):', jsonText);
-
-    const parsed = JSON.parse(jsonText) as ReceiptAnalysisResult;
-
-    // Normalize categories to ensure they match our internal list exactly
-    parsed.items = parsed.items.map(item => ({
-      ...item,
-      category: normalizeCategory(item.category, uiLanguage)
-    }));
-
-    return parsed;
-  } catch (error) {
-    console.error("Error analyzing receipt with Gemini Pro:", error);
-
-    // Fallback to 1.5 Pro if 2.0 Flash fails
-    try {
-      console.log("Attempting fallback to gemini-1.5-pro...");
-      const geminiClient = getAiClient();
-      const proResult = await geminiClient.models.generateContent({
-        model: "gemini-1.5-pro",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  data: base64Image.split(',')[1] || base64Image,
-                  mimeType: mimeType
-                }
-              }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: receiptSchema,
-        },
-      });
-      const proJson = proResult.text.trim();
-      const parsed = JSON.parse(proJson) as ReceiptAnalysisResult;
-      parsed.items = parsed.items.map(item => ({
-        ...item,
-        category: normalizeCategory(item.category, uiLanguage)
-      }));
-      return parsed;
-    } catch (fallbackError) {
-      // Last resort: try 1.5 Flash
-      try {
-        console.log("Final fallback to gemini-1.5-flash...");
-        const geminiClient = getAiClient();
-        const flashResult = await geminiClient.models.generateContent({
-          model: "gemini-1.5-flash",
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: prompt },
-                {
-                  inlineData: {
-                    data: base64Image.split(',')[1] || base64Image,
-                    mimeType: mimeType
-                  }
-                }
-              ]
-            }
-          ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: receiptSchema,
-          },
-        });
-        const flashJson = flashResult.text.trim();
-        const flashParsed = JSON.parse(flashJson) as ReceiptAnalysisResult;
-        flashParsed.items = flashParsed.items.map(item => ({
-          ...item,
-          category: normalizeCategory(item.category, uiLanguage)
-        }));
-        return flashParsed;
-      } catch (finalError) {
-        if (error instanceof Error && error.message.includes("SAFETY")) {
-          throw new Error("Receipt was flagged by safety filters. Please try a clearer image.");
-        }
-        const friendlyMessage =
-          uiLanguage === 'he'
-            ? "ניתוח הקבלה נכשל. ודא שהתמונה חדה, ללא השתקפויות והטקסט כולו נראה. נסה לצלם שוב מקרוב עם תאורה טובה."
-            : uiLanguage === 'es'
-              ? "El análisis del recibo falló. Asegúrate de que la foto sea nítida, sin reflejos y que todo el texto sea visible."
-              : "Receipt analysis failed. Make sure the photo is sharp, without glare, and all text is visible.";
-        throw new Error(friendlyMessage);
-      }
-    }
+    return await runClientReceiptOcr(base64Image, uiLanguage);
+  } catch (clientErr) {
+    console.error('Client receipt OCR failed:', clientErr);
+    const friendlyMessage =
+      uiLanguage === 'he'
+        ? 'ניתוח הקבלה נכשל. צלם מקרוב, תאורה טובה, הקבלה שטוחה וללא השתקפות — ונסה שוב.'
+        : uiLanguage === 'es'
+          ? 'No se pudo leer el ticket. Foto nítida, sin reflejos, todo el texto visible.'
+          : 'Receipt analysis failed. Use a sharp, close photo with good light and no glare.';
+    throw new Error(friendlyMessage);
   }
 };

@@ -50,25 +50,35 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-/** Shrink large photos so the API stays fast and under size limits. */
-async function compressImage(dataUrl: string, maxDim = 1600): Promise<string> {
+/** Keep text sharp for Hebrew receipts — only downscale very large images. */
+async function prepareReceiptImage(dataUrl: string, maxDim = 2560): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       let { width, height } = img;
-      if (width <= maxDim && height <= maxDim) {
-        resolve(dataUrl);
-        return;
+      const needsResize = width > maxDim || height > maxDim;
+      if (!needsResize) {
+        // Re-encode slightly only if huge data URL (>3MB est.)
+        if (dataUrl.length < 3_000_000) {
+          resolve(dataUrl);
+          return;
+        }
       }
-      const scale = maxDim / Math.max(width, height);
-      width = Math.round(width * scale);
-      height = Math.round(height * scale);
+      if (needsResize) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+      resolve(canvas.toDataURL('image/jpeg', 0.94));
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
@@ -119,8 +129,8 @@ export const ReceiptScanModal: React.FC<ReceiptScanModalProps> = ({
     setStep('analyzing');
     try {
       const dataUrl = await readFileAsDataUrl(file);
-      const compressed = await compressImage(dataUrl);
-      const result = await analyzeReceiptImage(compressed, language);
+      const prepared = await prepareReceiptImage(dataUrl);
+      const result = await analyzeReceiptImage(prepared, language);
       const enriched = enrichReceiptItems(result, historyItems);
       setReceipt(enriched);
       setStep('review');

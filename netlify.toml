@@ -66,3 +66,6 @@
 
 [build.environment]
   NODE_VERSION = "18"
+
+[functions."analyze-receipt"]
+  timeout = 60
