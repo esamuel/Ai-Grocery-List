@@ -1,66 +1,37 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { categorizeGroceriesLocally, getCachedCategorization, setCachedCategorization } from './localCategorizationService';
-import { normalizeCategory, getCategoryPromptList, type Language } from './categoryTranslations';
+import { normalizeCategory } from './categoryTranslations';
+import { detectInputLanguage } from './detectInputLanguage';
 
-let ai: GoogleGenAI | null = null;
+// All Gemini calls go through Netlify Functions so the API key never ships in the browser bundle.
 const receiptFunctionUrl = import.meta.env.VITE_RECEIPT_FUNCTION_URL || '/.netlify/functions/analyze-receipt';
-// Lazily initialize the AI client on first use to prevent app crash on load.
-const getAiClient = (): GoogleGenAI => {
-  if (ai) {
-    return ai;
+const aiFunctionUrl = import.meta.env.VITE_AI_FUNCTION_URL || '/.netlify/functions/gemini-categorize';
+
+const callGroceryAiFunction = async (payload: {
+  mode: 'categorize' | 'translate';
+  text: string;
+  existingItems: string[];
+  language?: 'en' | 'he' | 'es';
+}): Promise<string> => {
+  const response = await fetch(aiFunctionUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    let message = raw;
+    try {
+      message = JSON.parse(raw)?.message || raw;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(message || `AI function failed (${response.status})`);
   }
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn("Gemini API key not found. AI features will be disabled.");
-    throw new Error("Gemini API key not found. Please set VITE_GEMINI_API_KEY in your environment variables.");
-  }
-
-  ai = new GoogleGenAI({ apiKey });
-  return ai;
-};
-
-
-const model = "gemini-1.5-flash";
-
-const schema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      category: {
-        type: Type.STRING,
-        description: "A detailed category for grocery items, e.g., 'Fresh Produce', 'Dairy & Eggs', 'Pantry Staples'."
-      },
-      items: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            name: {
-              type: Type.STRING,
-              description: "The clean item name without quantity or unit (e.g., 'milk', 'tomatoes')"
-            },
-            quantity: {
-              type: Type.NUMBER,
-              description: "The numeric quantity if specified (e.g., 2 from '2× milk'). Use 1 if no quantity specified."
-            },
-            unit: {
-              type: Type.STRING,
-              description: "The unit if specified (e.g., 'L', 'kg', 'pieces', 'bottles'). Leave empty if no unit."
-            },
-            originalText: {
-              type: Type.STRING,
-              description: "The original text as provided by user (e.g., '2× milk 1L')"
-            }
-          },
-          required: ["name", "quantity", "originalText"]
-        },
-        description: "A list of parsed grocery items with quantity and unit information."
-      }
-    },
-    required: ["category", "items"]
-  }
+  const { text } = JSON.parse(raw) as { text?: string };
+  if (!text) throw new Error('AI function returned no text');
+  return text;
 };
 
 export interface ParsedGroceryItem {
@@ -75,16 +46,6 @@ export interface CategorizedResponse {
   items: ParsedGroceryItem[];
 }
 
-// Function to detect the language of input text
-const detectInputLanguage = (text: string): 'en' | 'he' | 'es' => {
-  // Hebrew Unicode range
-  if (/[\u0590-\u05FF]/.test(text)) return 'he';
-  // Spanish specific characters
-  if (/[ñáéíóúüÑÁÉÍÓÚÜ¿¡]/.test(text)) return 'es';
-  // Default to English
-  return 'en';
-};
-
 export const categorizeGroceries = async (newItemText: string, existingItems: string[], uiLanguage: 'en' | 'he' | 'es'): Promise<CategorizedResponse[]> => {
   // Check cache first
   const cachedResult = getCachedCategorization(newItemText, uiLanguage);
@@ -95,63 +56,15 @@ export const categorizeGroceries = async (newItemText: string, existingItems: st
   // Detect the actual language of the input text
   const inputLanguage = detectInputLanguage(newItemText);
 
-  const languageMap = {
-    en: 'English',
-    he: 'Hebrew',
-    es: 'Spanish'
-  };
-
-  // Use the detected input language for the response, not the UI language
+  // The function detects the language itself; we only need it here to normalize categories.
   const responseLanguage = inputLanguage;
-  const languageName = languageMap[responseLanguage];
-
-  const categoryList = getCategoryPromptList(responseLanguage);
-
-  const prompt = `
-      You are an expert grocery list assistant. Your task is to parse and categorize new grocery items with quantity and unit information.
-      
-      IMPORTANT: The user input is in ${languageName}. You MUST preserve the original language and script of the items exactly as provided. Do NOT translate the item names.
-      
-      Analyze the new item(s): "${newItemText}".
-      Here are the items already on the list: ${existingItems.length > 0 ? existingItems.join(', ') : 'The list is currently empty'}.
-
-      For each item, extract:
-      1. **name**: Clean item name without quantity/unit (e.g., "milk" from "2× milk 1L")
-      2. **quantity**: Numeric quantity (e.g., 2 from "2× milk", 1 if not specified)
-      3. **unit**: Unit if specified (e.g., "L", "kg", "pieces", "bottles") - leave empty if none
-      4. **originalText**: Exact original text as provided
-
-      Quantity parsing examples:
-      - "2× milk 1L" → name: "milk", quantity: 2, unit: "L", originalText: "2× milk 1L"
-      - "3 tomatoes" → name: "tomatoes", quantity: 3, unit: "pieces", originalText: "3 tomatoes"
-      - "bread" → name: "bread", quantity: 1, unit: "", originalText: "bread"
-      - "2 חלב 1 ליטר" → name: "חלב", quantity: 2, unit: "ליטר", originalText: "2 חלב 1 ליטר"
-
-      Please categorize ONLY the new item(s) into detailed and specific grocery categories:
-      - Keep the item names in their ORIGINAL language (${languageName})
-      - Use ONLY the ${languageName} category names provided below
-      - Do NOT translate or modify the actual grocery item names
-
-      Use ONLY these category names (in ${languageName}):
-      ${categoryList}
-
-      CRITICAL: You must use the EXACT category names listed above, in ${languageName}. Do not create new categories or use variations.
-
-      Return the result as a JSON object that adheres to the provided schema. Do not include existing items in your response.
-    `;
 
   try {
-    const geminiClient = getAiClient();
-    const response = await geminiClient.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
-    });
-
-    const jsonText = response.text.trim();
+    const jsonText = (await callGroceryAiFunction({
+      mode: 'categorize',
+      text: newItemText,
+      existingItems,
+    })).trim();
     console.log('Gemini categorization response:', jsonText);
 
     let parsedResponse: CategorizedResponse[];
@@ -219,50 +132,13 @@ export const categorizeAndTranslateImportedItems = async (
   existingItems: string[],
   targetLanguage: 'en' | 'he' | 'es'
 ): Promise<CategorizedResponse[]> => {
-  const languageNames = { en: 'English', he: 'Hebrew', es: 'Spanish' };
-  const languageName = languageNames[targetLanguage];
-  const categoryList = getCategoryPromptList(targetLanguage);
-
-  const prompt = `
-      You are an expert grocery list assistant. Your task is to parse, categorize, and translate imported grocery items.
-      
-      IMPORTANT: The user wants their grocery list in ${languageName}. You MUST translate all item names to ${languageName}.
-      
-      Analyze and translate these imported items: "${newItemText}".
-      Here are the items already on the list: ${existingItems.length > 0 ? existingItems.join(', ') : 'The list is currently empty'}.
-
-      For each item:
-      1. **Translate the item name to ${languageName}**
-      2. **name**: Translated item name (e.g., "milk" → "חלב" for Hebrew, "leche" for Spanish)
-      3. **quantity**: Numeric quantity (default 1 if not specified)
-      4. **unit**: Unit if specified, translated to ${languageName}
-      5. **originalText**: Keep the original imported text
-
-      Translation examples:
-      - English "milk" → Hebrew "חלב", Spanish "leche"
-      - English "bread" → Hebrew "לחם", Spanish "pan"
-      - English "apples" → Hebrew "תפוחים", Spanish "manzanas"
-
-      Use ONLY these category names (in ${languageName}):
-      ${categoryList}
-
-      CRITICAL: You must use the EXACT category names listed above, in ${languageName}. Do not create new categories or use variations.
-
-      Return the result as a JSON object that adheres to the provided schema.
-    `;
-
   try {
-    const geminiClient = getAiClient();
-    const response = await geminiClient.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-      },
+    const result = await callGroceryAiFunction({
+      mode: 'translate',
+      text: newItemText,
+      existingItems,
+      language: targetLanguage,
     });
-
-    const result = response.text;
     console.log('Gemini translation response:', result);
 
     let parsedResponse: CategorizedResponse[];
@@ -326,12 +202,6 @@ export const categorizeAndTranslateImportedItems = async (
 
 export type { ReceiptItem, ReceiptAnalysisResult } from './receiptOcrShared';
 import type { ReceiptAnalysisResult } from './receiptOcrShared';
-import {
-  RECEIPT_OCR_MODELS,
-  buildReceiptOcrPrompt,
-  extractJsonFromModelText,
-  normalizeReceiptPayload,
-} from './receiptOcrShared';
 
 const callServerlessReceiptAnalysis = async (
   base64Image: string,
@@ -368,53 +238,6 @@ const callServerlessReceiptAnalysis = async (
   return JSON.parse(text) as ReceiptAnalysisResult;
 };
 
-async function runClientReceiptOcr(
-  base64Image: string,
-  uiLanguage: 'en' | 'he' | 'es'
-): Promise<ReceiptAnalysisResult> {
-  const geminiClient = getAiClient();
-  const categoryList = getCategoryPromptList(uiLanguage);
-  const today = new Date().toISOString().split('T')[0];
-  const prompt = buildReceiptOcrPrompt(uiLanguage, categoryList, today);
-
-  let mimeType = 'image/jpeg';
-  const mimeMatch = base64Image.match(/^data:([^;]+);base64,/);
-  const base64Data = base64Image.split(',')[1] || base64Image;
-  if (mimeMatch) mimeType = mimeMatch[1];
-
-  const errors: string[] = [];
-  for (const model of RECEIPT_OCR_MODELS) {
-    try {
-      console.log(`Client receipt OCR trying: ${model}`);
-      const result = await geminiClient.models.generateContent({
-        model,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: prompt },
-              { inlineData: { data: base64Data, mimeType } },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
-      const text = result.text?.trim();
-      if (!text) throw new Error('Empty response');
-      const parsed = extractJsonFromModelText(text);
-      const normalized = normalizeReceiptPayload(parsed, uiLanguage, today);
-      if (normalized.items.length === 0) throw new Error('No items');
-      return normalized;
-    } catch (err) {
-      errors.push(`${model}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  throw new Error(errors.join(' | ') || 'All models failed');
-}
-
 export const analyzeReceiptImage = async (
   base64Image: string,
   uiLanguage: 'en' | 'he' | 'es'
@@ -423,16 +246,10 @@ export const analyzeReceiptImage = async (
     return await callServerlessReceiptAnalysis(base64Image, uiLanguage);
   } catch (serverErr: unknown) {
     const msg = serverErr instanceof Error ? serverErr.message : String(serverErr);
-    console.warn('Server receipt OCR failed, trying client:', msg);
+    console.error('Receipt OCR failed:', msg);
     if (msg.includes('API key') || msg.includes('not configured')) {
       throw serverErr instanceof Error ? serverErr : new Error(msg);
     }
-  }
-
-  try {
-    return await runClientReceiptOcr(base64Image, uiLanguage);
-  } catch (clientErr) {
-    console.error('Client receipt OCR failed:', clientErr);
     const friendlyMessage =
       uiLanguage === 'he'
         ? 'ניתוח הקבלה נכשל. צלם מקרוב, תאורה טובה, הקבלה שטוחה וללא השתקפות — ונסה שוב.'

@@ -25,7 +25,6 @@ export const handler: Handler = async (event) => {
 
   const apiKey =
     process.env.GEMINI_API_KEY ||
-    process.env.VITE_GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY;
 
   if (!apiKey) {

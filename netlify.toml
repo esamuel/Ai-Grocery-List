@@ -69,3 +69,6 @@
 
 [functions."analyze-receipt"]
   timeout = 60
+
+[functions."gemini-categorize"]
+  timeout = 30
