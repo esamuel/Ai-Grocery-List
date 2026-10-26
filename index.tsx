@@ -7,7 +7,6 @@ import './services/diagnosticTools';
 import './services/mergeHistoricalLists';
 import './services/purchaseHistoryMigration';
 import './services/fixPurchaseDateYears';
-import './services/checkAllDataSources';
 import './services/fixMissingPurchaseDates';
 
 const rootElement = document.getElementById('root');

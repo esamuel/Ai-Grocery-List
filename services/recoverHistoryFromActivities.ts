@@ -4,8 +4,7 @@
  * a price entry in groceryLists/{listId}.history[].prices[].
  */
 
-import { initializeApp, getApp } from 'firebase/app';
-import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { getSupabase } from './supabaseClient';
 import type { FamilyActivity } from './familyActivityService';
 import { getPurchaseHistory, setPurchaseHistory } from './purchaseHistoryService';
 import { backfillPricesFromAnchors } from './backfillPricesFromAnchors';
@@ -51,31 +50,14 @@ function recalcItemStats(item: PurchaseHistoryItem): PurchaseHistoryItem {
   };
 }
 
-function getDb() {
-  try {
-    return getFirestore(getApp());
-  } catch {
-    const firebaseConfig = {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
-    };
-    return getFirestore(initializeApp(firebaseConfig));
-  }
-}
-
 async function fetchAllCheckedActivities(listId: string): Promise<FamilyActivity[]> {
-  const db = getDb();
-  const q = query(
-    collection(db, 'familyActivities'),
-    where('listId', '==', listId),
-    where('type', '==', 'checked')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as FamilyActivity));
+  const { data, error } = await getSupabase()
+    .from('gl_family_activities')
+    .select('id,user_id,data')
+    .eq('list_id', listId)
+    .eq('data->>type', 'checked');
+  if (error) throw error;
+  return (data || []).map((r: any) => ({ id: r.id, listId, userId: r.user_id, ...r.data } as FamilyActivity));
 }
 
 export async function recoverHistoryFromActivities(

@@ -1,39 +1,9 @@
-import { initializeApp, getApp } from 'firebase/app';
-// Use Full Firestore for reads (queries, getDoc)
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  addDoc,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-} from 'firebase/firestore';
-
-// Get Firebase Firestore instance (assumes Firebase is already initialized by firebaseService)
-const getFirebaseDb = () => {
-  try {
-    const app = getApp();
-    return getFirestore(app);
-  } catch (error) {
-    // If app doesn't exist, initialize it
-    const firebaseConfig = {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
-    };
-    const app = initializeApp(firebaseConfig);
-    return getFirestore(app);
-  }
-};
+/**
+ * Family members + activity feed on Supabase.
+ * Tables: gl_family_activities(list_id, user_id, data jsonb{userName,type,itemName,timestamp})
+ * RPC:    gl_list_members(list_id) → id, email, display_name, last_active, is_owner
+ */
+import { getSupabase, nowIso } from './supabaseClient';
 
 export interface FamilyMember {
   id: string;
@@ -53,164 +23,76 @@ export interface FamilyActivity {
   timestamp: string;
 }
 
-const activitiesCollection = 'familyActivities';
-const usersCollection = 'users';
-const listsCollection = 'groceryLists';
+/** "samuel.eskenasy@gmail.com" => "Samuel Eskenasy" */
+const getFriendlyNameFromEmail = (email: string): string =>
+  email.split('@')[0].split(/[._-]/).map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
 
-/**
- * Extract a friendly name from email address
- * e.g., "samuel.eskenasy@gmail.com" => "Samuel Eskenasy"
- */
-const getFriendlyNameFromEmail = (email: string): string => {
-  const localPart = email.split('@')[0];
+type MemberRow = { id: string; email: string; display_name: string; last_active: string; is_owner: boolean };
 
-  // Split by dots, underscores, or hyphens
-  const parts = localPart.split(/[._-]/);
+async function fetchMemberRows(listId: string): Promise<MemberRow[]> {
+  const { data, error } = await getSupabase().rpc('gl_list_members', { p_list_id: listId });
+  if (error) throw error;
+  return (data as MemberRow[]) || [];
+}
 
-  // Capitalize each part
-  const capitalized = parts.map(part =>
-    part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-  );
-
-  return capitalized.join(' ');
-};
-
-/**
- * Get all family members for a list
- */
 export const getFamilyMembers = async (listId: string): Promise<FamilyMember[]> => {
   try {
-    const db = getFirebaseDb();
-
-    // Get the list document to find member IDs
-    const listDocRef = doc(db, listsCollection, listId);
-    const listDoc = await getDoc(listDocRef);
-
-    if (!listDoc.exists()) {
-      console.error('List not found');
-      return [];
-    }
-
-    const listData = listDoc.data();
-    const memberIds = listData.members || [];
-    const ownerId = listData.ownerId || memberIds[0];
-
-    // Get user details for each member
-    const memberPromises = memberIds.map(async (memberId: string) => {
-      const userDocRef = doc(db, usersCollection, memberId);
-      const userDoc = await getDoc(userDocRef);
-
-      if (!userDoc.exists()) {
-        return null;
-      }
-
-      const userData = userDoc.data();
-      const userEmail = userData.email || '';
-      const displayName = userData.displayName ||
-                          (userEmail ? getFriendlyNameFromEmail(userEmail) : 'User');
-
-      console.log(`Family member ${memberId}:`, {
-        email: userEmail,
-        displayName: userData.displayName,
-        finalName: displayName,
-        isOwner: memberId === ownerId
-      });
-
-      return {
-        id: memberId,
-        name: displayName,
-        email: userEmail,
-        isOwner: memberId === ownerId,
-        lastActive: userData.lastActive || new Date().toISOString(),
-      };
-    });
-
-    const members = await Promise.all(memberPromises);
-    return members.filter((m): m is FamilyMember => m !== null);
+    const rows = await fetchMemberRows(listId);
+    return rows.map(r => ({
+      id: r.id,
+      name: r.display_name || (r.email ? getFriendlyNameFromEmail(r.email) : 'User'),
+      email: r.email || '',
+      isOwner: r.is_owner,
+      lastActive: r.last_active || nowIso(),
+    }));
   } catch (error) {
     console.error('Error fetching family members:', error);
     return [];
   }
 };
 
-/**
- * Get recent family activities for a list (max 3 per member)
- */
-export const getFamilyActivities = async (
-  listId: string,
-  maxActivities: number = 50 // Fetch more to filter later
-): Promise<FamilyActivity[]> => {
+/** Recent activities for a list (max 3 per member), newest first. */
+export const getFamilyActivities = async (listId: string, maxActivities: number = 50): Promise<FamilyActivity[]> => {
   try {
-    const db = getFirebaseDb();
+    const sb = getSupabase();
+    const [{ data, error }, members] = await Promise.all([
+      sb.from('gl_family_activities')
+        .select('id,user_id,data')
+        .eq('list_id', listId)
+        .order('created_at', { ascending: false })
+        .limit(maxActivities),
+      fetchMemberRows(listId).catch(() => [] as MemberRow[]),
+    ]);
+    if (error) throw error;
 
-    const activitiesQuery = query(
-      collection(db, activitiesCollection),
-      where('listId', '==', listId),
-      orderBy('timestamp', 'desc'),
-      limit(maxActivities)
-    );
+    const names = new Map<string, string>();
+    members.forEach(m => names.set(m.id, m.display_name || (m.email ? getFriendlyNameFromEmail(m.email) : 'User')));
 
-    const snapshot = await getDocs(activitiesQuery);
-    
-    const allActivities = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    } as FamilyActivity));
-
-    // Get current display names for all users in activities
-    const userIds = [...new Set(allActivities.map(a => a.userId))];
-    const displayNamesMap = new Map<string, string>();
-
-    // Fetch display names from users collection
-    for (const userId of userIds) {
-      try {
-        const userDocRef = doc(db, usersCollection, userId);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const userEmail = userData.email || '';
-          const displayName = userData.displayName || 
-                              (userEmail ? getFriendlyNameFromEmail(userEmail) : 'User');
-          displayNamesMap.set(userId, displayName);
-        }
-      } catch (err) {
-        console.error(`Error fetching display name for ${userId}:`, err);
-      }
-    }
-
-    // Update activity userNames with current display names
-    const activitiesWithCurrentNames = allActivities.map(activity => ({
-      ...activity,
-      userName: displayNamesMap.get(activity.userId) || activity.userName
+    const all: FamilyActivity[] = (data || []).map((row: any) => ({
+      id: row.id,
+      listId,
+      userId: row.user_id,
+      ...(row.data as Omit<FamilyActivity, 'id' | 'listId' | 'userId'>),
+      userName: names.get(row.user_id) || row.data?.userName || 'User',
     }));
 
-    // Limit to 3 activities per user
-    const activitiesByUser = new Map<string, FamilyActivity[]>();
-    
-    for (const activity of activitiesWithCurrentNames) {
-      const userActivities = activitiesByUser.get(activity.userId) || [];
-      if (userActivities.length < 3) {
-        userActivities.push(activity);
-        activitiesByUser.set(activity.userId, userActivities);
+    const byUser = new Map<string, FamilyActivity[]>();
+    for (const a of all) {
+      const list = byUser.get(a.userId) || [];
+      if (list.length < 3) {
+        list.push(a);
+        byUser.set(a.userId, list);
       }
     }
-
-    // Flatten and sort by timestamp
-    const limitedActivities = Array.from(activitiesByUser.values())
-      .flat()
+    return Array.from(byUser.values()).flat()
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    return limitedActivities;
   } catch (error) {
     console.error('Error fetching family activities:', error);
     return [];
   }
 };
 
-/**
- * Log a family activity
- */
+/** Non-blocking activity log. */
 export const logFamilyActivity = async (
   listId: string,
   userId: string,
@@ -219,75 +101,36 @@ export const logFamilyActivity = async (
   itemName: string
 ): Promise<void> => {
   try {
-    console.log('logFamilyActivity: Logging activity', { listId, userId, userName, type, itemName });
-    const db = getFirebaseDb();
+    const sb = getSupabase();
+    const { error } = await sb.from('gl_family_activities').insert({
+      list_id: listId,
+      user_id: userId,
+      data: { userName, type, itemName, timestamp: nowIso() },
+    });
+    if (error) throw error;
 
-    const activity: Omit<FamilyActivity, 'id'> = {
-      listId,
-      userId,
-      userName,
-      type,
-      itemName,
-      timestamp: new Date().toISOString(),
-    };
-
-    await addDoc(collection(db, activitiesCollection), activity);
-    console.log('logFamilyActivity: Activity logged successfully');
-
-    // Update user's last active timestamp
-    const userDocRef = doc(db, usersCollection, userId);
-    const userDoc = await getDoc(userDocRef);
-
-    if (userDoc.exists()) {
-      await setDoc(
-        userDocRef,
-        {
-          ...userDoc.data(),
-          lastActive: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+    // Touch lastActive on the user's own row
+    const { data: me } = await sb.from('gl_users').select('data').eq('id', userId).maybeSingle();
+    if (me) {
+      await sb.from('gl_users').update({ data: { ...(me.data as object), lastActive: nowIso() } }).eq('id', userId);
     }
   } catch (error) {
     console.error('Error logging family activity:', error);
-    // Don't throw - activity logging should be non-blocking
   }
 };
 
-/**
- * Clean up old activities (keep last 100 per list)
- * This should be run periodically or via a cloud function
- */
+/** Keep the last 100 activities per list. */
 export const cleanupOldActivities = async (listId: string): Promise<void> => {
   try {
-    const db = getFirebaseDb();
-
-    const activitiesQuery = query(
-      collection(db, activitiesCollection),
-      where('listId', '==', listId),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-
-    const snapshot = await getDocs(activitiesQuery);
-
-    // Get IDs of activities to keep
-    const keepIds = new Set(snapshot.docs.map((doc) => doc.id));
-
-    // Query all activities for this list
-    const allActivitiesQuery = query(
-      collection(db, activitiesCollection),
-      where('listId', '==', listId)
-    );
-
-    const allSnapshot = await getDocs(allActivitiesQuery);
-
-    // Delete activities not in keep list
-    const deletePromises = allSnapshot.docs
-      .filter((doc) => !keepIds.has(doc.id))
-      .map((doc) => deleteDoc(doc.ref));
-
-    await Promise.all(deletePromises);
+    const sb = getSupabase();
+    const { data, error } = await sb.from('gl_family_activities')
+      .select('id')
+      .eq('list_id', listId)
+      .order('created_at', { ascending: false })
+      .range(100, 10000);
+    if (error) throw error;
+    const ids = (data || []).map((r: any) => r.id);
+    if (ids.length) await sb.from('gl_family_activities').delete().in('id', ids);
   } catch (error) {
     console.error('Error cleaning up old activities:', error);
   }

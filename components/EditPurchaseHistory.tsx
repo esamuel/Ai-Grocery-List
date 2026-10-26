@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { getFirebaseServices } from '../services/firebaseService';
+import { getListDoc, patchListDoc } from '../services/supabaseService';
 
 interface PriceHistory {
   price: number;
@@ -76,15 +75,10 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
       setError(null);
       addLog('📊 Loading purchase history...');
 
-      const { db } = getFirebaseServices();
-      const listRef = doc(db, 'groceryLists', listId);
-      const listSnap = await getDoc(listRef);
-
-      if (!listSnap.exists()) {
+      const data = await getListDoc(listId);
+      if (!data) {
         throw new Error(`List ${listId} not found`);
       }
-
-      const data = listSnap.data();
       const loadedHistory: PurchaseHistoryItem[] = data.history || [];
 
       setHistory(loadedHistory);
@@ -196,17 +190,12 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
       setPhase('saving');
       addLog('');
       addLog('💾 Saving changes...');
-      addLog('📥 Loading fresh data from Firestore...');
+      addLog('📥 Loading fresh data...');
 
-      const { db } = getFirebaseServices();
-      const listRef = doc(db, 'groceryLists', listId);
-      const listSnap = await getDoc(listRef);
-
-      if (!listSnap.exists()) {
+      const data = await getListDoc(listId);
+      if (!data) {
         throw new Error(`List ${listId} not found`);
       }
-
-      const data = listSnap.data();
       const freshHistory: PurchaseHistoryItem[] = JSON.parse(JSON.stringify(data.history || []));
 
       addLog(`✅ Loaded ${freshHistory.length} items`);
@@ -301,8 +290,8 @@ export const EditPurchaseHistory: React.FC<Props> = ({ listId, onClose }) => {
       const cleanedHistory = freshHistory.filter(item => item.frequency > 0);
 
       addLog('');
-      addLog('📤 Updating Firestore...');
-      await updateDoc(listRef, { history: cleanedHistory });
+      addLog('📤 Saving...');
+      await patchListDoc(listId, { history: cleanedHistory });
 
       addLog('');
       addLog('✅ CHANGES SAVED!');

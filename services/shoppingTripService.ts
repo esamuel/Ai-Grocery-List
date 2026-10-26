@@ -2,12 +2,7 @@
  * Single checkout pipeline: resolve prices → persist trip + purchase events → update history cache.
  */
 
-import {
-  collection,
-  doc,
-  writeBatch,
-} from 'firebase/firestore';
-import { getFirebaseServices } from './firebaseService';
+import { getSupabase } from './supabaseClient';
 import { getPurchaseHistory, addOrIncrementPurchase } from './purchaseHistoryService';
 import { getCanonicalName } from './semanticDupService';
 import { resolvePurchasePrice } from '../utils/priceResolution';
@@ -100,45 +95,53 @@ export async function commitShoppingTrip(
     };
   });
 
-  const { db } = getFirebaseServices();
-  const tripRef = doc(collection(db, 'groceryLists', listId, 'trips'));
-  const tripId = tripRef.id;
+  const sb = getSupabase();
   const totalAmount = resolved.reduce((s, l) => s + l.price, 0);
 
-  const batch = writeBatch(db);
-  batch.set(tripRef, {
-    listId,
-    purchasedAt,
-    store: tripStore || null,
-    source: options.source,
-    itemCount: resolved.length,
-    totalAmount,
-    receiptUrl: options.receiptUrl || null,
-    createdAt: new Date().toISOString(),
-    createdBy: options.userId || null,
-  });
+  const { data: tripRow, error: tripErr } = await sb
+    .from('gl_trips')
+    .insert({
+      list_id: listId,
+      data: {
+        listId,
+        purchasedAt,
+        store: tripStore || null,
+        source: options.source,
+        itemCount: resolved.length,
+        totalAmount,
+        receiptUrl: options.receiptUrl || null,
+        createdAt: new Date().toISOString(),
+        createdBy: options.userId || null,
+      },
+    })
+    .select('id')
+    .single();
+  if (tripErr) throw tripErr;
+  const tripId: string = tripRow.id;
 
-  for (const line of resolved) {
-    const purchaseRef = doc(collection(db, 'groceryLists', listId, 'purchases'));
-    batch.set(purchaseRef, {
-      listId,
-      tripId,
-      canonicalName: line.canonicalName,
-      displayName: line.name,
-      purchasedAt: line.purchaseDate,
-      price: line.price,
-      currency: line.currency,
-      priceSource: line.priceSource,
-      estimated: line.estimated,
-      store: line.store || null,
-      quantity: line.quantity ?? 1,
-      unit: line.unit || null,
-      unitPrice: line.unitPrice ?? null,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
-  await batch.commit();
+  const { error: purchErr } = await sb.from('gl_purchases').insert(
+    resolved.map((line) => ({
+      list_id: listId,
+      trip_id: tripId,
+      data: {
+        listId,
+        tripId,
+        canonicalName: line.canonicalName,
+        displayName: line.name,
+        purchasedAt: line.purchaseDate,
+        price: line.price,
+        currency: line.currency,
+        priceSource: line.priceSource,
+        estimated: line.estimated,
+        store: line.store || null,
+        quantity: line.quantity ?? 1,
+        unit: line.unit || null,
+        unitPrice: line.unitPrice ?? null,
+        createdAt: new Date().toISOString(),
+      },
+    }))
+  );
+  if (purchErr) throw purchErr;
 
   await addOrIncrementPurchase(
     listId,

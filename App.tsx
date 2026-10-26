@@ -30,7 +30,6 @@ import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
 import { BasketComparisonPage } from './components/BasketComparisonPage';
 import { PurchaseHistory } from './components/PurchaseHistory';
-import { PromoCodeAdmin } from './components/PromoCodeAdmin';
 import { EditPurchaseHistory } from './components/EditPurchaseHistory';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { usePWAInstall } from './hooks/usePWAInstall';
@@ -39,12 +38,11 @@ import { logFamilyActivity } from './services/familyActivityService';
 import { commitShoppingTrip } from './services/shoppingTripService';
 import { ReceiptScanModal } from './components/ReceiptScanModal';
 import { migrateListOwnershipFields, checkListNeedsMigration } from './services/listMigration';
-import type { User } from 'firebase/auth';
+import type { User } from './services/supabaseService';
 
 // Helper to get friendly name from user (fallback only)
 const getFriendlyUserNameFallback = (user: User | null): string => {
   if (!user) return 'User';
-  if (user.displayName) return user.displayName;
   if (user.email) {
     const localPart = user.email.split('@')[0];
     const parts = localPart.split(/[._-]/);
@@ -61,7 +59,6 @@ import { getUserSubscription } from './services/subscriptionService';
 import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/categoryMigration';
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { ensureAllMonthsVisible } from './services/ensureAllMonthsVisible';
-import './services/auditFirebaseHistory';
 type Language = 'en' | 'he' | 'es' | 'ru';
 type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
 
@@ -1645,7 +1642,6 @@ function App() {
   const [addMemberStatus, setAddMemberStatus] = useState<string | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showPromoAdmin, setShowPromoAdmin] = useState(false);
   const [showEditHistory, setShowEditHistory] = useState(false);
 
   // Display name state
@@ -3239,14 +3235,6 @@ function App() {
                   )}
                   {isOwner && (
                     <button
-                      onClick={() => { setShowSettings(false); setShowPromoAdmin(true); }}
-                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-semibold"
-                    >
-                      🎁 Add Promo Codes
-                    </button>
-                  )}
-                  {isOwner && (
-                    <button
                       onClick={() => { setShowSettings(false); setShowEditHistory(true); }}
                       className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-semibold"
                     >
@@ -3523,10 +3511,6 @@ function App() {
             },
           }}
         />
-      )}
-
-      {showPromoAdmin && (
-        <PromoCodeAdmin onClose={() => setShowPromoAdmin(false)} />
       )}
 
       {showEditHistory && listId && (

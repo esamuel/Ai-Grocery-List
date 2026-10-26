@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PayPalSubscribeButton } from './PayPalSubscribeButton';
-import { validatePromoCode, type PromoCode } from '../services/promoCodeService';
+// Payments are disabled (Supabase migration, Oct 2026) — promo codes always report invalid.
+type PromoCode = { code: string; type: 'percentage' | 'fixed'; value: number };
 
 interface PricingTier {
   id: 'free' | 'pro' | 'family';
@@ -70,8 +71,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
     try {
       // Get base price based on current selection
-      const basePrice = billingPeriod === 'monthly' ? 4.99 : 39.99;
-      const validation = await validatePromoCode(promoCodeInput, basePrice);
+      const validation: { valid: boolean; promoCode?: PromoCode; error?: string } = { valid: false };
 
       if (validation.valid && validation.promoCode) {
         setAppliedPromoCode(validation.promoCode);

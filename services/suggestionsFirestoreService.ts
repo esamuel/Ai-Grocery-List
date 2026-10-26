@@ -1,8 +1,6 @@
-import { doc as docLite, getDoc as getDocLite, setDoc as setDocLite } from 'firebase/firestore/lite';
-import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
+import { getSupabase } from './supabaseClient';
 
-// Reuse firebase initialization from firebaseService via lazy getter
-import { } from './firebaseService';
+// Table: gl_suggestions(list_id, language, items jsonb)
 
 export type Language = 'en' | 'he' | 'es';
 
@@ -13,39 +11,6 @@ export interface SuggestedItem {
   lastAdded?: string;
 }
 
-// Minimal accessor to Firestore Lite already initialized in firebaseService
-function getDb() {
-  // firebaseService already initializes and caches; import side-effects ensure app is initialized
-  // We re-create the db instance using the same app (safe), or rely on firebaseService exported getter pattern if available in future.
-  // This keeps us consistent with Firestore Lite usage elsewhere in the app.
-  // @ts-ignore - globalThis.firebaseApp may be set by firebaseService; if not, firebaseService exports manage a singleton internally.
-  // As we cannot import internals, we'll reinitialize via firebase config already present there; Firestore Lite handles singletons per app.
-  // But to avoid duplication, we piggyback on existing instances by calling an exported function if present in future.
-  // For now, Firebase SDK will return existing app when initializeApp is called with same config; however, here we avoid calling it again.
-  // So we simply access the default app through getFirestoreLite with no args is not possible; use window._firebaseApp pattern is not reliable.
-  // Instead, we access the Firestore instance indirectly via firebaseService docLite usage patterns by requiring caller to pass listId.
-  // However, we still need a db reference; we can obtain it from any doc path using docLite requires db. We'll rely on getFirestoreLite from the default app.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyFirebase: any = (globalThis as any);
-  if (!anyFirebase.__firebase_db_lite) {
-    // Try to read from firebaseService by requiring it to initialize first via getAccessibleListId call before suggestions use.
-    // The app already calls getAccessibleListId on auth ready, so db should be initialized.
-    try {
-      // Attempt to use the default app via getFirestoreLite(defaultApp)
-      // @ts-ignore
-      const db = getFirestoreLite();
-      anyFirebase.__firebase_db_lite = db;
-    } catch (e) {
-      throw new Error('Firestore not initialized yet. Ensure firebaseService initialized before using suggestionsFirestoreService.');
-    }
-  }
-  return anyFirebase.__firebase_db_lite;
-}
-
-function suggestionsDocPath(listId: string, language: Language) {
-  // Path: groceryLists/{listId}/suggestions/{language}
-  return docLite(getDb(), 'groceryLists', listId, 'suggestions', language);
-}
 
 // Quota backoff keys
 function disableKey(listId: string, language: Language) {
@@ -83,11 +48,10 @@ export async function getSuggestionsFromFirestore(listId: string, language: Lang
   }
 
   try {
-    const docRef = suggestionsDocPath(listId, language);
-    const snap = await getDocLite(docRef);
-    if (!snap.exists()) return [];
-    const data = snap.data();
-    return (data.items || []) as SuggestedItem[];
+    const { data, error } = await getSupabase()
+      .from('gl_suggestions').select('items').eq('list_id', listId).eq('language', language).maybeSingle();
+    if (error) throw error;
+    return ((data?.items as SuggestedItem[]) || []);
   } catch (e) {
     // On quota errors, disable further fetches for a cooldown window
     if (isQuotaError(e)) {
@@ -110,8 +74,10 @@ export async function setSuggestionsToFirestore(listId: string, language: Langua
     localStorage.setItem(key, JSON.stringify(items));
     return;
   }
-  const docRef = suggestionsDocPath(listId, language);
-  await setDocLite(docRef, { items, updatedAt: new Date().toISOString() });
+  const { error } = await getSupabase()
+    .from('gl_suggestions')
+    .upsert({ list_id: listId, language, items }, { onConflict: 'list_id,language' });
+  if (error) throw error;
 }
 
 export async function upsertSuggestionsToFirestore(listId: string, language: Language, items: SuggestedItem[]): Promise<void> {

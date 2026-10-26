@@ -45,33 +45,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoMode, trans
       console.error('Authentication error:', err);
       let errorMessage = 'Authentication failed';
       
-      if (err.code) {
-        switch (err.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = 'This email is already registered. Try signing in instead.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'Password should be at least 6 characters long.';
-            break;
-          case 'auth/invalid-email':
-            errorMessage = 'Please enter a valid email address.';
-            break;
-          case 'auth/user-not-found':
-            errorMessage = 'No account found with this email. Try creating an account.';
-            break;
-          case 'auth/wrong-password':
-            errorMessage = 'Incorrect password. Please try again.';
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = 'Too many failed attempts. Please try again later.';
-            break;
-          default:
-            errorMessage = err.message || 'Authentication failed';
-        }
+      // Supabase auth error messages / codes
+      const code: string = err.code || '';
+      const msg: string = err.message || '';
+      if (code === 'user_already_exists' || /already registered/i.test(msg)) {
+        errorMessage = 'This email is already registered. Try signing in instead.';
+      } else if (code === 'weak_password' || /password should be/i.test(msg)) {
+        errorMessage = 'Password should be at least 6 characters long.';
+      } else if (code === 'validation_failed' || /invalid email|unable to validate email/i.test(msg)) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (code === 'invalid_credentials' || /invalid login credentials/i.test(msg)) {
+        errorMessage = 'Wrong email or password. Please try again.';
+      } else if (code === 'email_not_confirmed' || /email not confirmed/i.test(msg)) {
+        errorMessage = 'Please confirm your email first — check your inbox.';
+      } else if (code === 'over_request_rate_limit' || /rate limit|too many/i.test(msg)) {
+        errorMessage = 'Too many attempts. Please try again later.';
       } else {
-        errorMessage = err.message || 'Authentication failed';
+        errorMessage = msg || 'Authentication failed';
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -125,12 +117,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoMode, trans
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">{translations.title}</h1>
           <p className="text-gray-600">{translations.subtitle}</p>
-          {error && error.includes('400') && (
-            <div className="mt-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded text-sm">
-              <strong>Setup Required:</strong> Email/Password authentication may not be enabled in Firebase Console. 
-              Please enable it in Authentication → Sign-in method → Email/Password.
-            </div>
-          )}
         </div>
 
         {resetEmailSent && (
@@ -223,7 +209,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onDemoMode, trans
                 🚀 Try Demo Mode (Skip Authentication)
               </button>
               <p className="text-xs text-gray-500 mt-1">
-                Test the app while Firebase setup is being configured
+                Test the app without an account
               </p>
             </div>
           )}

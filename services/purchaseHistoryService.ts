@@ -1,5 +1,4 @@
-import { doc as docLite, getDoc as getDocLite, updateDoc as updateDocLite } from 'firebase/firestore/lite';
-import { getFirestore as getFirestoreLite } from 'firebase/firestore/lite';
+import { getListDoc, patchListDoc } from './supabaseService';
 import type { PurchaseHistoryItem, GroceryHistoryItem, PriceSource } from '../types';
 import { getCanonicalName } from './semanticDupService';
 import { resolvePurchasePrice } from '../utils/priceResolution';
@@ -8,25 +7,6 @@ import type { SuggestedItem } from './suggestionsFirestoreService';
 
 type Language = 'en' | 'he' | 'es';
 
-// Access Firestore instance
-function getDb() {
-  const anyFirebase: any = (globalThis as any);
-  if (!anyFirebase.__firebase_db_lite) {
-    try {
-      // @ts-ignore
-      const db = getFirestoreLite();
-      anyFirebase.__firebase_db_lite = db;
-    } catch (e) {
-      throw new Error('Firestore not initialized yet. Ensure firebaseService initialized before using purchaseHistoryService.');
-    }
-  }
-  return anyFirebase.__firebase_db_lite;
-}
-
-function groceryListDocPath(listId: string) {
-  // Path: groceryLists/{listId} (main document)
-  return docLite(getDb(), 'groceryLists', listId);
-}
 
 // Calculate average days between purchases
 function calculateAvgDaysBetween(frequency: number, firstPurchased: string, lastPurchased: string): number {
@@ -56,10 +36,8 @@ export async function getPurchaseHistory(listId: string): Promise<PurchaseHistor
   }
 
   try {
-    const docRef = groceryListDocPath(listId);
-    const snap = await getDocLite(docRef);
-    if (!snap.exists()) return [];
-    const data = snap.data();
+    const data = await getListDoc(listId);
+    if (!data) return [];
     return (data.history || []) as PurchaseHistoryItem[];
   } catch (e) {
     console.warn('getPurchaseHistory failed', e);
@@ -101,15 +79,9 @@ export async function setPurchaseHistory(listId: string, items: PurchaseHistoryI
   }
 
   try {
-    const docRef = groceryListDocPath(listId);
-    // Clean undefined values before sending to Firestore
     const cleanedItems = removeUndefined(items);
-    console.log(`🔄 Writing ${cleanedItems.length} items to Firestore...`);
-    await updateDocLite(docRef, { 
-      history: cleanedItems,
-      updatedAt: new Date().toISOString()
-    });
-    console.log(`✅ Purchase history updated in Firestore (${cleanedItems.length} items) - UI will update in ~3s`);
+    await patchListDoc(listId, { history: cleanedItems });
+    console.log(`✅ Purchase history updated (${cleanedItems.length} items)`);
   } catch (e) {
     console.error('❌ Failed to update purchase history:', e);
     throw e;
