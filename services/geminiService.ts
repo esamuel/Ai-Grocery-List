@@ -228,6 +228,9 @@ const callServerlessReceiptAnalysis = async (
     try {
       const parsed = JSON.parse(text);
       serverMessage = parsed?.message || text;
+      if (Array.isArray(parsed?.details) && parsed.details.length) {
+        serverMessage += ` [${parsed.details.join(' | ')}]`;
+      }
       console.error('Server error parsed:', parsed);
     } catch {
       console.error('Could not parse server error, raw text:', text);
@@ -256,6 +259,7 @@ export const analyzeReceiptImage = async (
         : uiLanguage === 'es'
           ? 'No se pudo leer el ticket. Foto nítida, sin reflejos, todo el texto visible.'
           : 'Receipt analysis failed. Use a sharp, close photo with good light and no glare.';
-    throw new Error(friendlyMessage);
+    // Keep the technical reason visible (small) so failures can actually be diagnosed.
+    throw new Error(`${friendlyMessage}\n\n(${msg.slice(0, 300)})`);
   }
 };
