@@ -16,13 +16,15 @@ export interface ReceiptAnalysisResult {
   totalAmount: number;
 }
 
-/** Best vision models first (Israeli Hebrew receipts). */
+/**
+ * Vision models, fastest-good first (Israeli Hebrew receipts).
+ * Netlify functions time out at ~10s, so only fast models with a strict per-call budget.
+ * Updated Oct 2026 — 1.5/2.0 models are shut down.
+ */
 export const RECEIPT_OCR_MODELS = [
-  'gemini-2.5-pro',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
   'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
-  'gemini-1.5-flash',
 ] as const;
 
 export function buildReceiptOcrPrompt(

@@ -1,5 +1,5 @@
 import type { Handler } from '@netlify/functions';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, MediaResolution } from '@google/genai';
 import { getCategoryPromptList } from '../../services/categoryTranslations';
 import {
   RECEIPT_OCR_MODELS,
@@ -64,9 +64,21 @@ export const handler: Handler = async (event) => {
     let normalized: ReturnType<typeof normalizeReceiptPayload> | null = null;
     const errors: string[] = [];
 
+    // Netlify synchronous functions are killed at ~10s (26s if raised by support).
+    // Keep a hard budget so a slow model never eats the whole request.
+    const TOTAL_BUDGET_MS = Number(process.env.RECEIPT_OCR_BUDGET_MS || 9000);
+    const startedAt = Date.now();
+    console.log(`Receipt OCR start: ${Math.round(base64Data.length * 0.75 / 1024)} KB image, lang=${language}`);
+
     for (const model of RECEIPT_OCR_MODELS) {
+      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+      if (remaining < 2500) {
+        errors.push(`${model}: skipped (out of time)`);
+        break;
+      }
+      const t0 = Date.now();
       try {
-        console.log(`Receipt OCR trying model: ${model}`);
+        console.log(`Receipt OCR trying model: ${model} (budget ${remaining}ms)`);
         const result = await ai.models.generateContent({
           model,
           contents: [
@@ -81,6 +93,8 @@ export const handler: Handler = async (event) => {
           config: {
             responseMimeType: 'application/json',
             temperature: 0.1,
+            mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
+            httpOptions: { timeout: remaining },
           },
         });
 
@@ -92,12 +106,12 @@ export const handler: Handler = async (event) => {
           throw new Error('No line items parsed');
         }
         normalized = candidate;
-        console.log(`Receipt OCR success with ${model}: ${candidate.items.length} items`);
+        console.log(`Receipt OCR success with ${model}: ${candidate.items.length} items in ${Date.now() - t0}ms`);
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`${model}: ${msg}`);
-        console.warn(`Receipt OCR ${model} failed:`, msg);
+        errors.push(`${model}: ${msg.slice(0, 160)}`);
+        console.warn(`Receipt OCR ${model} failed after ${Date.now() - t0}ms:`, msg);
       }
     }
 
