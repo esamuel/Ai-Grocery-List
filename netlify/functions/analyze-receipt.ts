@@ -33,6 +33,21 @@ const buildCorsHeaders = (origin: string | undefined): Record<string, string> =>
   return headers;
 };
 
+// Provider error texts can contain the API key itself (Google: "Consumer 'api_key:AIza...' has been suspended").
+// Never send them to the browser: the client gets only the model, HTTP code and status word; logs get a redacted text.
+const redactSecrets = (s: string): string =>
+  s.replace(/AIza[0-9A-Za-z_-]{20,}/g, 'AIza…[redacted]')
+    .replace(/((?:api[_-]?key|key|token|secret)["'=: ]+)[^\s"',}]{8,}/gi, '$1[redacted]');
+
+const summarizeProviderError = (msg: string): { short: string; config: boolean } => {
+  const code = msg.match(/"code"\s*:\s*(\d{3})/)?.[1] ?? msg.match(/\b(4\d\d|5\d\d)\b/)?.[1];
+  const status = msg.match(/"status"\s*:\s*"([A-Z_]+)"/)?.[1];
+  // 401/403 or a key/permission problem is OUR configuration, not the user's photo.
+  const config = code === '401' || code === '403' || /PERMISSION_DENIED|UNAUTHENTICATED|API_KEY_INVALID|suspended/i.test(msg);
+  const short = code || status ? [code, status].filter(Boolean).join(' ') : redactSecrets(msg).slice(0, 80);
+  return { short, config };
+};
+
 export const handler: Handler = async (event) => {
   const corsHeaders = buildCorsHeaders(event.headers?.origin || event.headers?.Origin);
 
@@ -84,6 +99,7 @@ export const handler: Handler = async (event) => {
     const ai = new GoogleGenAI({ apiKey });
     let normalized: ReturnType<typeof normalizeReceiptPayload> | null = null;
     const errors: string[] = [];
+    let configProblem = false;
 
     // Netlify synchronous functions are killed at ~10s (26s if raised by support).
     // Keep a hard budget so a slow model never eats the whole request.
@@ -131,8 +147,10 @@ export const handler: Handler = async (event) => {
         break;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`${model}: ${msg.slice(0, 160)}`);
-        console.warn(`Receipt OCR ${model} failed after ${Date.now() - t0}ms:`, msg);
+        const { short, config } = summarizeProviderError(msg);
+        if (config) configProblem = true;
+        errors.push(`${model}: ${short}`);
+        console.warn(`Receipt OCR ${model} failed after ${Date.now() - t0}ms:`, redactSecrets(msg).slice(0, 500));
       }
     }
 
@@ -141,8 +159,11 @@ export const handler: Handler = async (event) => {
         statusCode: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message:
-            language === 'he'
+          message: configProblem
+            ? language === 'he'
+              ? 'שירות קריאת הקבלות לא זמין כרגע. זו תקלה אצלנו, לא בתמונה שלך. נסה שוב מאוחר יותר.'
+              : 'Receipt reading is unavailable right now. This is a problem on our side, not your photo. Please try again later.'
+            : language === 'he'
               ? 'לא הצלחנו לקרוא את הקבלה. נסה תמונה חדה יותר או צילום מקרוב.'
               : 'Could not read receipt. Try a sharper, closer photo.',
           details: errors.slice(0, 3),
@@ -156,8 +177,9 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify(normalized),
     };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Receipt analysis failed';
-    console.error('analyze-receipt error:', error);
+    const raw = error instanceof Error ? error.message : 'Receipt analysis failed';
+    const message = redactSecrets(raw).slice(0, 200);
+    console.error('analyze-receipt error:', message);
     return {
       statusCode: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
