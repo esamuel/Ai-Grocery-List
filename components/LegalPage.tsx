@@ -2,6 +2,58 @@ import React, { useEffect, useState } from 'react';
 
 type LegalTab = 'privacy' | 'terms';
 
+// Allowlist-based conversion of fetched HTML into React elements (no raw HTML injection).
+const ALLOWED_TAGS = new Set([
+  'main', 'section', 'article', 'header', 'footer', 'div', 'span', 'p', 'br', 'hr',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'strong', 'b', 'em', 'i', 'u',
+  'small', 'a', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+]);
+const VOID_TAGS = new Set(['br', 'hr']);
+
+const isSafeHref = (href: string): boolean => {
+  const trimmed = href.trim();
+  if (trimmed.startsWith('#') || trimmed.startsWith('/')) return !trimmed.startsWith('//');
+  try {
+    const url = new URL(trimmed, window.location.origin);
+    return ['http:', 'https:', 'mailto:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+};
+
+const toReact = (node: Node, key: number): React.ReactNode => {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+  const el = node as Element;
+  const tag = el.tagName.toLowerCase();
+  const children = Array.from(el.childNodes).map((c, i) => toReact(c, i));
+  if (!ALLOWED_TAGS.has(tag)) {
+    // Drop dangerous containers entirely; unwrap other unknown tags.
+    if (['script', 'style', 'iframe', 'object', 'embed', 'template', 'noscript'].includes(tag)) return null;
+    return <React.Fragment key={key}>{children}</React.Fragment>;
+  }
+  const props: Record<string, unknown> = { key };
+  const cls = el.getAttribute('class');
+  if (cls) props.className = cls;
+  const id = el.getAttribute('id');
+  if (id) props.id = id;
+  if (tag === 'a') {
+    const href = el.getAttribute('href');
+    if (href && isSafeHref(href)) props.href = href;
+    if (el.getAttribute('target') === '_blank') {
+      props.target = '_blank';
+      props.rel = 'noopener noreferrer';
+    }
+  }
+  if (VOID_TAGS.has(tag)) return React.createElement(tag, props);
+  return React.createElement(tag, props, ...children);
+};
+
+const htmlToReact = (html: string): React.ReactNode => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return Array.from(doc.body.childNodes).map((c, i) => toReact(c, i));
+};
+
 interface LegalPageProps {
   initialTab?: LegalTab;
   translations: {
@@ -70,10 +122,9 @@ export const LegalPage: React.FC<LegalPageProps> = ({ initialTab = 'privacy', tr
         {loading ? (
           <div className="text-center text-gray-500">Loading…</div>
         ) : (
-          <div
-            className="prose prose-sm md:prose lg:prose-lg dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          <div className="prose prose-sm md:prose lg:prose-lg dark:prose-invert max-w-none">
+            {htmlToReact(content)}
+          </div>
         )}
       </div>
     </div>
