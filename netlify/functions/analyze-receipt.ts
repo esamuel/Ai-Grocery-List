@@ -8,13 +8,34 @@ import {
   normalizeReceiptPayload,
 } from '../../services/receiptOcrShared';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// Only allow the site's own origins (Netlify-provided URLs) plus any
+// explicitly configured via ALLOWED_ORIGINS (comma-separated).
+const allowedOrigins = new Set(
+  [
+    process.env.URL,
+    process.env.DEPLOY_PRIME_URL,
+    process.env.DEPLOY_URL,
+    ...(process.env.ALLOWED_ORIGINS || '').split(','),
+  ]
+    .map((o) => (o || '').trim().replace(/\/+$/, ''))
+    .filter(Boolean),
+);
+
+const buildCorsHeaders = (origin: string | undefined): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+  if (origin && allowedOrigins.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  return headers;
 };
 
 export const handler: Handler = async (event) => {
+  const corsHeaders = buildCorsHeaders(event.headers?.origin || event.headers?.Origin);
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: corsHeaders, body: '' };
   }
