@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 
 serviceAccountKey.json
+
+# price collector
+collector/.env
+collector/dumps/
+collector/.venv/
+collector/__pycache__/

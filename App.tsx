@@ -29,6 +29,7 @@ import { FamilyActivities } from './components/FamilyActivities';
 import { DashboardPage } from './components/DashboardPage';
 import { PriceComparePage } from './components/PriceComparePage';
 import { BasketComparisonPage } from './components/BasketComparisonPage';
+import { MarketComparePage } from './components/MarketComparePage';
 import { PurchaseHistory } from './components/PurchaseHistory';
 import { EditPurchaseHistory } from './components/EditPurchaseHistory';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
@@ -60,7 +61,7 @@ import { migrateOtherCategoryToPantry, checkMigrationNeeded } from './services/c
 import { migrateMissingPriceEntries, checkPurchaseHistoryNeedsMigration } from './services/purchaseHistoryMigration';
 import { ensureAllMonthsVisible } from './services/ensureAllMonthsVisible';
 type Language = 'en' | 'he' | 'es' | 'ru';
-type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison';
+type View = 'dashboard' | 'list' | 'favorites' | 'insights' | 'daily' | 'legal' | 'family' | 'priceCompare' | 'suggestions' | 'history' | 'basketComparison' | 'marketCompare';
 
 const translations = {
   en: {
@@ -409,6 +410,8 @@ const translations = {
     priceCompareDesc: "Track & compare prices",
     basketComparison: "Basket Comparison",
     basketComparisonDesc: "Compare shopping baskets",
+    marketCompare: "Supermarket Prices",
+    marketCompareDesc: "Official chain prices near you — find the cheapest store for your basket",
     insightsDesc: "View spending insights",
     dailyDesc: "Daily purchase history",
     voiceDesc: "Voice input shopping",
@@ -792,6 +795,8 @@ const translations = {
     priceCompareDesc: "עקוב והשווה מחירים",
     basketComparison: "השוואת סלים",
     basketComparisonDesc: "השווה סלי קניות בין חנויות",
+    marketCompare: "מחירים בסופרים",
+    marketCompareDesc: "מחירים רשמיים של הרשתות באזורך — מצא את הסניף הזול ביותר לסל שלך",
     insightsDesc: "צפה בתובנות הוצאות",
     dailyDesc: "היסטוריית קניות יומית",
     voiceDesc: "קניות בקלט קולי",
@@ -1174,6 +1179,8 @@ const translations = {
     priceCompareDesc: "Rastrear y comparar precios",
     basketComparison: "Comparación de Cestas",
     basketComparisonDesc: "Comparar cestas entre tiendas",
+    marketCompare: "Precios de supermercados",
+    marketCompareDesc: "Precios oficiales de las cadenas cerca de ti",
     insightsDesc: "Ver información de gastos",
     dailyDesc: "Historial de compras diario",
     voiceDesc: "Compras por voz",
@@ -1348,6 +1355,8 @@ const translations = {
     priceCompareDesc: "Отслеживание и сравнение цен",
     basketComparison: "Сравнение корзин",
     basketComparisonDesc: "Сравнение корзин между магазинами",
+    marketCompare: "Цены в супермаркетах",
+    marketCompareDesc: "Официальные цены сетей рядом с вами",
     insightsDesc: "Просмотр анализа расходов",
     dailyDesc: "История ежедневных покупок",
     voiceDesc: "Добавление товаров голосом",
@@ -2612,6 +2621,8 @@ function App() {
               priceCompareDesc: currentText.priceCompareDesc,
               basketComparison: currentText.basketComparison,
               basketComparisonDesc: currentText.basketComparisonDesc,
+              marketCompare: currentText.marketCompare,
+              marketCompareDesc: currentText.marketCompareDesc,
               insights: currentText.spendingInsights,
               insightsDesc: currentText.insightsDesc,
               daily: currentText.dailyPurchases,
@@ -2716,6 +2727,13 @@ function App() {
               localStorage.setItem('enablePriceTracking', String(enabled));
             }}
             historyItemsCount={historyItems.length}
+          />
+        ) : currentView === 'marketCompare' ? (
+          <MarketComparePage
+            onBack={() => setCurrentView('dashboard')}
+            currentItems={items.map(item => item.name)}
+            language={language}
+            rtl={language === 'he'}
           />
         ) : currentView === 'basketComparison' ? (
           <BasketComparisonPage

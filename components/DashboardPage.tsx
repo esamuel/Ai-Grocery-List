@@ -47,6 +47,8 @@ interface DashboardPageProps {
     scanReceiptDesc?: string;
     basketComparison?: string;
     basketComparisonDesc?: string;
+    marketCompare?: string;
+    marketCompareDesc?: string;
   };
   itemsCount?: number;
   historyCount?: number;
@@ -107,6 +109,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       color: 'from-teal-400 to-teal-600',
       iconBg: 'bg-gradient-to-br from-teal-400 to-teal-600',
       onClick: () => onNavigate('basketComparison')
+    },
+    {
+      id: 'marketCompare',
+      icon: '🏪',
+      title: translations.marketCompare || 'Supermarket Prices',
+      description: translations.marketCompareDesc || 'Official chain prices near you',
+      color: 'from-emerald-400 to-emerald-600',
+      iconBg: 'bg-gradient-to-br from-emerald-400 to-emerald-600',
+      onClick: () => onNavigate('marketCompare')
     },
     {
       id: 'insights',

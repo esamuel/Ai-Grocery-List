@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Runs the price collector every morning at 06:30 (chains publish full price files overnight).
+       Install:  cp collector/com.aigrocerylists.collector.plist ~/Library/LaunchAgents/
+                 launchctl load ~/Library/LaunchAgents/com.aigrocerylists.collector.plist
+       Edit the two paths below to match where the repo lives on your Mac. -->
+  <key>Label</key>
+  <string>com.aigrocerylists.collector</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/CHANGE_ME/Ai-Grocery-List/collector/collect.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/CHANGE_ME/Ai-Grocery-List/collector</string>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/tmp/aigrocerylists-collector.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/aigrocerylists-collector.log</string>
+</dict>
+</plist>
